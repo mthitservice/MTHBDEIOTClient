@@ -16,8 +16,8 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 
-const db = require('../../public/database/DBManager');
-
+const configDB = require('../../public/database/DBConfig');
+let globalConfig: any = 0;
 require('dotenv').config();
 
 console.log('APP Name:', process.env.APP_NAME);
@@ -134,6 +134,13 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    globalConfig = configDB?.readAllConfig();
+    console.log('Global Config:', globalConfig);
+    if (globalConfig?.DEBUG_MODE === 'true') {
+      console.log('Debug mode is enabled');
+    }
+
+
     createWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
@@ -162,9 +169,32 @@ ipcMain.handle('get-env', async () => {
   };
 });
 
-ipcMain.handle('db-query', (event, sqlQuery) => {
-  console.log(typeof db); // sollte 'object' sein
-  console.log(Object.keys(db));
+ipcMain.handle('restart-app', () => {
+  app.relaunch();
+  app.exit();
+});
 
-  return db.prepare(sqlQuery).all();
+ipcMain.handle('get-initial-config', () => {
+  return globalConfig;
+});
+
+ipcMain.handle('db-config-get-all', () => {
+  const result = configDB?.readAllConfig();
+  console.log('readAllConfig result:', result);
+  return result;
+});
+ipcMain.handle('db-config-get-by-key', (event, key) => {
+  const result = configDB?.getByKey(key);
+  console.log('getByKey result:', result);
+  return result;
+});
+ipcMain.handle('db-config-create-or-update', (event, key, value) => {
+  const result = configDB?.createOrUpdateConfig(key, value);
+  console.log('createOrUpdate result:', result);
+  return result;
+});
+ipcMain.handle('db-config-delete-by-key', (event, key) => {
+  const result = configDB?.deleteByKey(key);
+  console.log('deleteByKey result:', result);
+  return result;
 });

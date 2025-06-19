@@ -5,7 +5,20 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 export type Channels = 'ipc-example';
 
 const electronHandler = {
-  dbQuery: () => ipcRenderer.invoke('db-query', 'SELECT * FROM Users'),
+  app: {
+    restart: () => ipcRenderer.invoke('restart-app'),
+  },
+  dbConfig: {
+    getInitialConfig: () => ipcRenderer.invoke('get-initial-config'),
+
+    readAllConfig: () => ipcRenderer.invoke('db-config-get-all'),
+    getByKey: (key: string) => ipcRenderer.invoke('db-config-get-by-key', key),
+    createOrUpdate: (key: string, value: string) =>
+      ipcRenderer.invoke('db-config-create-or-update', key, value),
+    deleteByKey: (key: string) =>
+      ipcRenderer.invoke('db-config-delete-by-key', key),
+  },
+  dbQuery: (query: string) => ipcRenderer.invoke('db-query', query),
   getEnv: () => ipcRenderer.invoke('get-env'),
   ipcRenderer: {
     sendMessage(channel: Channels, ...args: unknown[]) {

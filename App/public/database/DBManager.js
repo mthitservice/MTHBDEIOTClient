@@ -25,10 +25,16 @@ try {
   throw new Error('Failed to open database: ');
 }
 const db = new Database(dbPath);
-console.log('Databasfunctions');
-console.log(typeof db); // sollte 'object' sein
-console.log(Object.keys(db));
+try {
+  db.prepare(
+    'CREATE TABLE IF NOT EXISTS config (key Text PRIMARY KEY , value TEXT NOT NULL )',
+  ).run();
+} catch (err) {
+  console.error('Failed to create Config Table:', err);
+  throw new Error('Failed to enable foreign keys: ' + err.message);
+}
+// Konfigurationstabelle
 
 db.pragma('journal_mode = WAL');
 
-module.exports = db;
+module.exports = { db };

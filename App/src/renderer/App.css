@@ -2,6 +2,7 @@
  * @NOTE: Prepend a `~` to css file paths that are in your node_modules
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
+
 body {
   position: relative;
   color: white;
@@ -13,6 +14,21 @@ body {
   justify-content: center;
   align-items: center;
   color: #555555;
+}
+
+.bg-orange {
+  background-color: #ff9800;
+  border: none;
+}
+.bg-orange-soft {
+  background-color: #ece6dd;
+  border: none;
+}
+.bde-header {
+  text-transform: uppercase;
+}
+.bde-header strong {
+  text-transform: lowercase;
 }
 
 button {
@@ -31,12 +47,14 @@ button {
 }
 
 h1 {
-  font-size: 2.4rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 2.2rem;
   font-weight: 200;
   margin: 0;
 }
 h2 {
-  font-size: 1.5rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.4rem;
   font-weight: 200;
   margin: 0;
 }
@@ -68,10 +86,14 @@ a:hover {
 }
 
 .MainApplicationHello {
-  display: flex;
+  display: block;
   justify-content: center;
   align-items: center;
-  margin: 20px 0;
+  margin: auto;
+  text-align: center;
+  padding: 20px;
+
+  width: 70%;
 }
 
 .MainFooter {

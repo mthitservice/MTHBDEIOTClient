@@ -1,0 +1,4 @@
+// custom.scss
+$primary: #fd7e14; // Orange statt Blau
+
+@import "~bootstrap/scss/bootstrap";
