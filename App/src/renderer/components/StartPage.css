@@ -1,12 +1,2 @@
-body {
-  position: relative;
-  color: white;
-  height: 100vh;
-  background: #cccccc;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  overflow-y: hidden;
-  display: block !important;
-  justify-content: center;
-  align-items: center;
-  color: #555555;
+.StartPage {
 }

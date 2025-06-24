@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
+
 import { StartPage } from './components/StartPage';
 import { ConfigPage } from './components/ConfigPage';
-import { MainPage } from './components/MainPage';
+import MainPageWithRouter from './components/MainPageWithRouter';
+import ScanPage from './components/ScanPage';
+import './App.css';
 
 export default function App() {
   useEffect(() => {
@@ -23,7 +26,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<StartPage />} />
         <Route path="/config" element={<ConfigPage />} />
-        <Route path="/main" element={<MainPage />} />
+        <Route path="/main" element={<MainPageWithRouter />} />
+        <Route path="/scan" element={<ScanPage />} />
       </Routes>
     </Router>
   );

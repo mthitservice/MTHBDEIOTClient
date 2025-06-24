@@ -5,23 +5,32 @@
 
 body {
   position: relative;
-  color: white;
+
+  position: relative;
+  font-size: 14px !important;
   height: 100vh;
   background: #cccccc;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow-y: hidden;
-  display: flex;
+  display: block !important;
   justify-content: center;
   align-items: center;
-  color: #555555;
+  color: #444444 !important;
 }
 
+header {
+  font-size: 0.9em;
+}
+
+footer {
+  font-size: 0.9em;
+}
 .bg-orange {
   background-color: #ff9800;
   border: none;
 }
 .bg-orange-soft {
-  background-color: #ece6dd;
+  background-color: #f7f7f7;
   border: none;
 }
 .bde-header {
@@ -49,14 +58,17 @@ button {
 h1 {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 2.2rem;
-  font-weight: 200;
+  font-weight: 100 !important;
   margin: 0;
+  color: #ff9800 !important;
 }
 h2 {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 1.4rem;
-  font-weight: 200;
+  font-weight: 100;
   margin: 0;
+  font-weight: 100 !important;
+  color: #ff9800 !important;
 }
 
 p {

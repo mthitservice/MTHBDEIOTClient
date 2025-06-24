@@ -1,0 +1,20 @@
+.ScanPage {
+  margin-top: 50px;
+  padding: 50px;
+  background: #eeeeee;
+}
+.ScanPage img {
+  width: 200px;
+}
+
+.ScanPage h2 {
+  margin: 20px;
+  font-size: 28px;
+  background: #eeeeee;
+}
+
+.ScanPage form {
+  width: 400px;
+
+  margin: auto;
+}

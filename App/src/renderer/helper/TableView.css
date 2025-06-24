@@ -1,0 +1,48 @@
+.TableViewArea {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  font-size: 12px;
+}
+.bg-orange {
+  background-color: #ff9800 !important;
+}
+
+@keyframes blinkBlue {
+  0% {
+    background-color: #eaeae0;
+  }
+  50% {
+    background-color: #bdddee;
+  }
+  100% {
+    background: #eaeae0;
+  }
+}
+.fc-white {
+  color: white !important;
+}
+tr.blink-blue td {
+  -webkit-animation: blinkBlue 1s infinite !important;
+  animation: blinkBlue 1s infinite !important;
+}
+
+tr.problem td {
+  color: red !important;
+}
+
+.selected-row td {
+  background-color: #ffcc80 !important; /* Orange */
+}
+
+.row-marker {
+  width: 10px;
+  background-color: transparent;
+}
+
+.selected-marker {
+  background-color: #ff9800 !important;
+}
+.tblfoot {
+  color: #ff9800 !important;
+}

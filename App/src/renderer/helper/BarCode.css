@@ -1,0 +1,13 @@
+.BdeBarCode {
+  margin: 5px;
+  padding: 1px;
+  width: 100%;
+  text-align: left;
+}
+.BdeBarCodeArea {
+  background: #ffffff;
+  margin: 1px;
+  min-width: 200px;
+  max-width: 250px;
+  text-align: left;
+}
