@@ -1,9 +1,9 @@
 import '@testing-library/jest-dom';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, screen } from '@testing-library/react';
+import MainPage from '../renderer/components/MainPage';
 
 import App from '../renderer/App';
 
-// Mock für window.electron.getEnv
 beforeAll(() => {
   // Falls `window.electron` noch nicht existiert
   if (!window.electron) {
@@ -14,6 +14,11 @@ beforeAll(() => {
     APP_NAME: 'TestApp',
     APP_VERSION: '1.0.0',
   });
+
+  // Mock für window.electron.dbConfig.getInitialConfig
+  window.electron.dbConfig = {
+    getInitialConfig: jest.fn().mockResolvedValue({}),
+  };
 });
 
 describe('App', () => {
@@ -22,5 +27,23 @@ describe('App', () => {
     await waitFor(() => {
       expect(container).toBeTruthy();
     });
+  });
+});
+describe('MainPage', () => {
+  it('rendert die Überschrift "Auftragsübersicht"', () => {
+    render(<MainPage />);
+    expect(screen.getByText(/Auftragsübersicht/i)).toBeInTheDocument();
+  });
+
+  it('zeigt die TableView-Komponente an, wenn kein Auftrag ausgewählt ist', () => {
+    render(<MainPage />);
+    // Suche nach einem typischen Tabellen-Header
+    const headers = screen.getAllByText(/AuftrNr|Auftragsnummer|Objekt/i);
+    expect(headers.length).toBeGreaterThan(0);
+  });
+
+  it('zeigt keine Auftragsdetails an, wenn kein Auftrag ausgewählt ist', () => {
+    render(<MainPage />);
+    expect(screen.queryByText(/Auftragsdetails/i)).not.toBeInTheDocument();
   });
 });

@@ -1,10 +1,13 @@
 import React from 'react';
 import moment from 'moment';
+import BarCode from '../helper/BarCode';
 import './TaskView.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-interface TaskViewProps {
-  Task: TaskDetails | null;
+interface TaskScanProps {
+  barcode: string | null;
+  onBack: () => void;
+  onBarcodeAction?: (code: string) => void; // <-- NEU
 }
 interface TaskDetails {
   AuftrNr: string;
@@ -29,7 +32,23 @@ interface TaskDetails {
   Ansprechpartner: string;
 }
 
-const TaskView: React.FC<TaskViewProps> = ({ Task }) => {
+const TaskScan: React.FC<TaskScanProps> = (props) => {
+  const Task = {
+    Terminstatus: 0,
+    LDatum: '2025-09-15',
+    AuftrNr: '1281985',
+    Anzahl: 522494,
+    Objekt: 'Einzelblätter - Satz STS                          ',
+    Auftraggeber: 'Rowe-Roth',
+    Prozessstatus: 'nicht begonnen',
+    Status: 'Problem',
+    PDatum: '2025-08-14',
+    Kundennummer: '12345',
+    Kundenbetreuer: 'Testbetreuer 1',
+    Maschine: '654321',
+    Beschreibung:
+      'Der Auftrag kann durchgeführt werden. Auch wenn es hier  Probleme gibt, ist der Auftrag nicht in Gefahr. Es muss aber ein neues Projekt angelegt werden welches dazu führt ....',
+  } as TaskDetails; // Beispiel-Task, hier sollte die Logik zum Abrufen des Tasks stehen
   if (!Task) {
     return (
       <div className="TaskViewArea container mt-4">
@@ -70,7 +89,14 @@ const TaskView: React.FC<TaskViewProps> = ({ Task }) => {
   for (let i = 0; i < details.length; i += 2) {
     rows.push(details.slice(i, i + 2));
   }
-
+  const handleBarcodeClick = (code: string) => {
+    if (props.onBarcodeAction) {
+      props.onBarcodeAction(code);
+    }
+    if (code === '000006' && props.onBack) {
+      props.onBack();
+    }
+  };
   return (
     <div className="TaskViewArea container mt-4">
       <h2 className="mb-4">Auftragsdetails</h2>
@@ -139,8 +165,54 @@ const TaskView: React.FC<TaskViewProps> = ({ Task }) => {
           </tr>
         </tbody>
       </table>
+      <div className="row MainPageBarcodeArea">
+        <div className="col-sm">
+          <BarCode
+            code="000001"
+            text={
+              <>
+                <i className="bi bi-border-style"></i> Auftrag starten
+              </>
+            }
+            onClick={() => handleBarcodeClick('000001')}
+          />
+        </div>
+        <div className="col-sm">
+          <BarCode
+            code="00002"
+            text={
+              <>
+                <i className="bi bi-border-style"></i> Auftrag beenden
+              </>
+            }
+            onClick={() => handleBarcodeClick('000002')}
+          />
+        </div>
+        <div className="col-sm">
+          <BarCode
+            code="000003"
+            text={
+              <>
+                <i className="bi bi-border-style"></i> Problem melden
+              </>
+            }
+            onClick={() => handleBarcodeClick('000003')}
+          />
+        </div>
+        <div className="col-sm">
+          <BarCode
+            code="000006"
+            text={
+              <>
+                <i className="bi bi-briefcase-fill"></i> Abbrechen
+              </>
+            }
+            onClick={() => handleBarcodeClick('000006')}
+          />
+        </div>
+      </div>
     </div>
   );
 };
 
-export default TaskView;
+export default TaskScan;

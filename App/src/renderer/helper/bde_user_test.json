@@ -1,0 +1,42 @@
+[
+  {
+    "MitarbeiterNr": "1001",
+    "Name": "Anna Müller"
+  },
+  {
+    "MitarbeiterNr": "1002",
+    "Name": "Max Mustermann"
+  },
+  {
+    "MitarbeiterNr": "1003",
+    "Name": "Julia Schmidt"
+  },
+  {
+    "MitarbeiterNr": "1004",
+    "Name": "Lukas Schneider"
+  },
+  {
+    "MitarbeiterNr": "1005",
+    "Name": "Sophie Fischer"
+  },
+  {
+    "MitarbeiterNr": "1006",
+    "Name": "Paul Weber"
+  },
+  {
+    "MitarbeiterNr": "1007",
+    "Name": "Laura Wagner"
+  },
+  {
+    "MitarbeiterNr": "1008",
+    "Name": "Tim Becker"
+  },
+  {
+    "MitarbeiterNr": "1009",
+    "Name": "Sarah Hoffmann"
+  },
+  {
+    "MitarbeiterNr": "1010",
+    "Name": "Jonas Schäfer"
+  }
+]

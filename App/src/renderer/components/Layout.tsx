@@ -33,13 +33,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({
               frei ab: <b>01.01.2026</b>
             </div>
             <div className="col-md-2 text-md-end">
-              <i
-                className="bi bi-person"
-                style={{ fontSize: '16px', color: 'black' }}
-              >
-                {' '}
-              </i>{' '}
-              <b>User01</b>
+              <i className="bi bi-clock"> </i>
+              <DateTime />
             </div>
           </div>
         </div>
@@ -57,10 +52,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({
               letzte Aktion: 01.01.2025 00:00:00
             </div>
             <div className="col-md-3 text-md-center">IOT-Gerät: BDE01</div>
-            <div className="col-md-2 text-end">
-              <i className="bi bi-clock"> </i>
-              <DateTime />
-            </div>
+            <div className="col-md-2 text-end">V 1.0.0</div>
           </div>
         </div>
       </footer>

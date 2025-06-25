@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import Toast from 'react-bootstrap/Toast';
 import ToastContainer from 'react-bootstrap/ToastContainer';
 import TableView from '../helper/TableView';
 import TaskView from '../helper/TaskView';
 import dataRaw from '../helper/bde_tasks_test.json';
-import Button from 'react-bootstrap/Button';
 import { Layout } from './Layout';
 import BarCode from '../helper/BarCode';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -232,7 +231,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                     <TableView
                       ref={this.tableViewRef}
                       Auftraege={data}
-                      itemsPerPage={6}
+                      itemsPerPage={13}
                       showPager={false}
                       onSelectTask={this.handleSelectTask}
                     />
@@ -307,7 +306,8 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000006"
                             text={
                               <>
-                                <i className="bi bi-briefcase-fill"></i> zurück
+                                <i className="bi bi-briefcase-fill"></i>{' '}
+                                Standard Funktionen
                               </>
                             }
                             onClick={this.handleGoFunction}

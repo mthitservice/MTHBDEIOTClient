@@ -4,7 +4,7 @@ import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import { StartPage } from './components/StartPage';
 import { ConfigPage } from './components/ConfigPage';
 import MainPageWithRouter from './components/MainPageWithRouter';
-import ScanPage from './components/ScanPage';
+import { ScanPage } from './components/ScanPage';
 import './App.css';
 
 export default function App() {
