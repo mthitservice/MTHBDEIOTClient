@@ -15,7 +15,7 @@ variable "github.token" {
 
 variable "github.repository" {
   description = "GitHub Repository (owner/name)"
-  default     = "mthitservice/MthBdeIotClient"
+  default     = "MthBdeIotClient"
 }
 
 # Code Signing (Optional für Windows)
