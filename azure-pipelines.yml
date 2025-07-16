@@ -55,8 +55,13 @@ stages:
 
           - script: |
               cd App
-              # Engine-Checks überspringen für Kompatibilität
-              npm ci --engine-strict=false
+              # Engine-Checks überspringen und postinstall skippen
+              npm ci --engine-strict=false --ignore-scripts
+              
+              # Manuell die notwendigen postinstall Schritte ausführen
+              npx ts-node .erb/scripts/check-native-dep.js || true
+              npx electron-builder install-app-deps
+              npm run build:dll
             displayName: "Install dependencies"
 
           - task: PowerShell@2
