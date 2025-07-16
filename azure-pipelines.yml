@@ -538,23 +538,23 @@ stages:
               echo "=== BUILDING ADDITIONAL PACKAGES ==="
               echo "Building Windows package..."
               npx electron-builder@25.1.8 --win --x64 --publish never || echo "❌ Windows build failed"
-              
+
               echo "Building Linux x64 package..."
               npx electron-builder@25.1.8 --linux --x64 --publish never || echo "❌ Linux x64 build failed"
 
               # Comprehensive package verification
               echo "=== PACKAGE VERIFICATION ==="
               echo "Searching for all created packages..."
-              
+
               echo "🔍 Looking for .deb files:"
               find . -name "*.deb" -exec ls -lh {} \; || echo "❌ No .deb files found"
-              
+
               echo "🔍 Looking for .tar.gz files:"
               find . -name "*.tar.gz" -exec ls -lh {} \; || echo "❌ No .tar.gz files found"
-              
+
               echo "🔍 Looking for .exe files:"
               find . -name "*.exe" -exec ls -lh {} \; || echo "❌ No .exe files found"
-              
+
               echo "🔍 Looking for other packages:"
               find . -name "*.dmg" -o -name "*.appx" -o -name "*.snap" -o -name "*.AppImage" -exec ls -lh {} \; || echo "❌ No other packages found"
 
@@ -685,23 +685,35 @@ stages:
                   displayName: "Check Build Information"
 
                 - script: |
-                    echo "=== GitHub Service Connection Validation ==="
-                    echo "Testing GitHub connection configuration..."
+                    echo "=== COMPREHENSIVE GITHUB SERVICE CONNECTION VALIDATION ==="
+                    echo "Performing detailed GitHub connection diagnostics..."
                     echo ""
-                    echo "Expected GitHub Repository: $(githubRepository)"
-                    echo "Expected format: owner/repository (e.g., mthitservice/MTHBDEIOTClient)"
+                    echo "📋 Build Information:"
+                    echo "  Repository: $(githubRepository)"
+                    echo "  Expected format: owner/repository (case-sensitive!)"
+                    echo "  Service Connection: $(githubConnection)"
+                    echo "  Release Version: $(releaseVersion)"
+                    echo "  Build Number: $(Build.BuildNumber)"
+                    echo "  Source Version: $(Build.SourceVersion)"
+                    echo "  Source Branch: $(Build.SourceBranch)"
                     echo ""
-                    echo "GitHub Service Connection Name: $(githubConnection)"
-                    echo "This should match a service connection configured in Azure DevOps"
+                    echo "🔍 Common 'Validation Failed' causes:"
+                    echo "  1. Repository name case mismatch (GitHub is case-sensitive)"
+                    echo "  2. Service connection doesn't exist or has wrong name"
+                    echo "  3. GitHub token lacks required permissions"
+                    echo "  4. Repository doesn't exist or is private without access"
+                    echo "  5. Tag already exists in GitHub"
+                    echo "  6. Branch/commit doesn't exist in repository"
                     echo ""
-                    echo "If GitHub Release fails with 'Validation Failed':"
-                    echo "1. Check if service connection 'github-connection' exists"
-                    echo "2. Verify the service connection has 'Repository' permissions"
-                    echo "3. Ensure the repository name matches exactly: mthitservice/MTHBDEIOTClient"
-                    echo "4. Check if tag v$(releaseVersion) already exists in GitHub"
+                    echo "🛠️ Troubleshooting steps:"
+                    echo "  1. Verify service connection 'github-connection' exists in Azure DevOps"
+                    echo "  2. Check GitHub token has 'repo' scope (full repository access)"
+                    echo "  3. Ensure repository name is exactly: mthitservice/MTHBDEIOTClient"
+                    echo "  4. Verify the commit $(Build.SourceVersion) exists on GitHub"
+                    echo "  5. Check if tag v$(releaseVersion)-$(Build.BuildNumber) already exists"
                     echo ""
-                    echo "=== Continue with Release Creation ==="
-                  displayName: "Validate GitHub Configuration"
+                    echo "📝 Next step: Attempting GitHub Release creation with verbose logging..."
+                  displayName: "🔍 Enhanced GitHub Validation"
 
                 - download: current
                   displayName: "Download Build Artifacts"
@@ -813,19 +825,101 @@ stages:
                   continueOnError: true
 
                 - script: |
-                    echo "=== GitHub Release Troubleshooting ==="
-                    echo "Repository: $(githubRepository)"
-                    echo "Tag: v$(releaseVersion)"
-                    echo "GitHub Connection: $(githubConnection)"
+                    echo "=== 🔍 PRE-RELEASE COMPREHENSIVE DIAGNOSTICS ==="
+                    echo "Performing extensive validation before GitHub Release creation..."
                     echo ""
-                    echo "Checking if tag already exists..."
-                    # Note: We can't directly check GitHub from here without auth
-                    echo "If the release creation fails, the tag v$(releaseVersion) likely already exists"
-                    echo "Manual action needed: Delete the existing tag/release in GitHub first"
-                  displayName: "Pre-Release Diagnostics"
+                    echo "📊 Repository Details:"
+                    echo "  Owner/Repo: $(githubRepository)"
+                    echo "  Target Tag: v$(releaseVersion)-$(Build.BuildNumber)"
+                    echo "  Fallback Tag: emergency-$(Build.BuildId)"
+                    echo "  Commit SHA: $(Build.SourceVersion)"
+                    echo "  Branch: $(Build.SourceBranch)"
+                    echo ""
+                    echo "🔐 Service Connection Details:"
+                    echo "  Connection Name: $(githubConnection)"
+                    echo "  Expected in Azure DevOps: Project Settings > Service Connections"
+                    echo ""
+                    echo "📁 Available Artifacts Check:"
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-Release"
+                    if [ -d "$workspace" ]; then
+                      echo "  ✅ Workspace found: $workspace"
+                      echo "  📂 Workspace structure:"
+                      find "$workspace" -type f | head -20 | sed 's/^/    /'
+                      echo "  📊 Total files: $(find "$workspace" -type f | wc -l)"
+                    else
+                      echo "  ❌ Workspace not found: $workspace"
+                    fi
+                    echo ""
+                    echo "🎯 GitHub Release Strategy:"
+                    echo "  1. Primary attempt: v$(releaseVersion)-$(Build.BuildNumber)"
+                    echo "  2. Fallback attempt: emergency-$(Build.BuildId)"
+                    echo "  3. Both as draft releases for manual review"
+                    echo ""
+                    echo "⚠️ Known 'Validation Failed' Solutions:"
+                    echo "  - Repository name must be exact: mthitservice/MTHBDEIOTClient"
+                    echo "  - Service connection must have 'Contents: Write' permission"
+                    echo "  - GitHub token needs 'repo' scope"
+                    echo "  - Target commit must exist in repository"
+                    echo ""
+                    echo "🚀 Proceeding with release creation..."
+                  displayName: "🔍 Pre-Release Comprehensive Diagnostics"
 
                 - task: GitHubRelease@1
-                  displayName: "Create GitHub Release (with unique timestamp)"
+                  displayName: "🗑️ Delete Existing GitHub Release (Cleanup)"
+                  condition: always()
+                  inputs:
+                    gitHubConnection: $(githubConnection)
+                    repositoryName: $(githubRepository)
+                    action: "delete"
+                    tag: "v$(releaseVersion)-$(Build.BuildNumber)"
+                  continueOnError: true
+
+                - script: |
+                    echo "=== 🎯 PRIMARY RELEASE ATTEMPT PREPARATION ==="
+                    echo "Preparing for primary GitHub Release creation..."
+                    echo ""
+                    echo "📋 Release Details:"
+                    echo "  Repository: $(githubRepository)"
+                    echo "  Tag: v$(releaseVersion)-$(Build.BuildNumber)"
+                    echo "  Title: MthBdeIotClient v$(releaseVersion) Build $(Build.BuildNumber)"
+                    echo "  Target Commit: $(Build.SourceVersion)"
+                    echo "  Release Type: Draft + PreRelease"
+                    echo ""
+                    echo "📁 Assets to Upload:"
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-Release"
+                    echo "  Installation files: $workspace/installation/*"
+                    echo "  Distribution files: $workspace/dist/**/*"
+                    echo ""
+                    echo "🔍 Asset Verification:"
+                    if [ -d "$workspace/installation" ]; then
+                      echo "  ✅ Installation directory exists"
+                      echo "  📄 Installation files:"
+                      find "$workspace/installation" -type f | head -10 | sed 's/^/    /'
+                    else
+                      echo "  ⚠️ Installation directory missing"
+                    fi
+                    
+                    if [ -d "$workspace/dist" ]; then
+                      echo "  ✅ Distribution directory exists"
+                      echo "  📄 Distribution files:"
+                      find "$workspace/dist" -type f | head -10 | sed 's/^/    /'
+                    else
+                      echo "  ⚠️ Distribution directory missing"
+                    fi
+                    
+                    if [ -d "$workspace/release" ]; then
+                      echo "  ✅ Release directory exists"
+                      echo "  📄 Release files (.deb, .tar.gz, etc.):"
+                      find "$workspace/release" -type f \( -name "*.deb" -o -name "*.tar.gz" -o -name "*.exe" \) | sed 's/^/    /'
+                    else
+                      echo "  ⚠️ Release directory missing"
+                    fi
+                    echo ""
+                    echo "🚀 Executing primary release creation..."
+                  displayName: "🎯 Primary Release Preparation"
+
+                - task: GitHubRelease@1
+                  displayName: "🚀 Create Primary GitHub Release (Enhanced Logging)"
                   condition: always()
                   inputs:
                     gitHubConnection: $(githubConnection)
@@ -839,14 +933,63 @@ stages:
                     assets: |
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/installation/*
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/dist/**/*
+                      $(Pipeline.Workspace)/MthBdeIotClient-Release/release/**/*
                     assetUploadMode: "replace"
                     isDraft: true
                     isPreRelease: true
                     addChangeLog: false
                   continueOnError: true
+                  env:
+                    SYSTEM_DEBUG: true
+
+                - script: |
+                    echo "=== 📊 PRIMARY RELEASE RESULT ANALYSIS ==="
+                    echo "Analyzing the result of primary release creation..."
+                    echo ""
+                    echo "🔍 Task Status Variables:"
+                    echo "  Agent.JobStatus: $AGENT_JOBSTATUS"
+                    echo "  Task Result: Check above task for detailed logs"
+                    echo ""
+                    echo "❌ If 'Validation Failed' error occurred, check:"
+                    echo "  1. Repository name case: 'mthitservice/MTHBDEIOTClient' (exact match)"
+                    echo "  2. Service connection 'github-connection' exists"
+                    echo "  3. GitHub token has 'Contents: Write' + 'Metadata: Read' permissions"
+                    echo "  4. Repository exists and is accessible"
+                    echo "  5. Commit $(Build.SourceVersion) exists in repository"
+                    echo ""
+                    echo "🔧 Troubleshooting URLs:"
+                    echo "  Repository: https://github.com/$(githubRepository)"
+                    echo "  Service Connections: $(System.CollectionUri)$(System.TeamProject)/_settings/adminservices"
+                    echo ""
+                    echo "⏭️ Proceeding to fallback strategy (if needed)..."
+                  displayName: "📊 Primary Release Analysis"
+                  condition: always()
+
+                - script: |
+                    echo "=== 🔄 FALLBACK RELEASE PREPARATION ==="
+                    echo "Preparing fallback release with emergency tag..."
+                    echo ""
+                    echo "📋 Fallback Release Details:"
+                    echo "  Repository: $(githubRepository)"
+                    echo "  Fallback Tag: emergency-$(Build.BuildId)"
+                    echo "  Title: Emergency Build $(Build.BuildId) - $(releaseVersion)"
+                    echo "  Purpose: Ensure artifacts are available even if primary fails"
+                    echo ""
+                    echo "📁 Simplified Assets Strategy:"
+                    echo "  Focus on essential files only for emergency release"
+                    echo "  Will attempt to upload any available artifacts"
+                    echo ""
+                    echo "🎯 Fallback Strategy:"
+                    echo "  - Use unique emergency tag to avoid conflicts"
+                    echo "  - Upload all available files"
+                    echo "  - Mark as draft for manual review"
+                    echo ""
+                    echo "🚀 Executing fallback release creation..."
+                  displayName: "🔄 Fallback Release Preparation"
+                  condition: failed()
 
                 - task: GitHubRelease@1
-                  displayName: "Fallback: Create Release with simple tag"
+                  displayName: "🆘 Create Fallback GitHub Release (Emergency)"
                   condition: failed()
                   inputs:
                     gitHubConnection: $(githubConnection)
@@ -855,15 +998,57 @@ stages:
                     target: "$(Build.SourceVersion)"
                     tagSource: "userSpecifiedTag"
                     tag: "emergency-$(Build.BuildId)"
-                    title: "Emergency Build $(Build.BuildId) - $(releaseVersion)"
+                    title: "🆘 Emergency Build $(Build.BuildId) - v$(releaseVersion)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
                     assets: |
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/installation/*
+                      $(Pipeline.Workspace)/MthBdeIotClient-Release/release/**/*
                     assetUploadMode: "replace"
                     isDraft: true
                     isPreRelease: true
                     addChangeLog: false
                   continueOnError: true
+                  env:
+                    SYSTEM_DEBUG: true
+
+                - script: |
+                    echo "=== 📋 FINAL GITHUB RELEASE SUMMARY ==="
+                    echo "Comprehensive summary of GitHub Release creation attempts..."
+                    echo ""
+                    echo "🎯 Primary Release Attempt:"
+                    echo "  Repository: $(githubRepository)"
+                    echo "  Tag: v$(releaseVersion)-$(Build.BuildNumber)"
+                    echo "  Status: Check GitHubRelease@1 task results above"
+                    echo "  Expected URL: https://github.com/$(githubRepository)/releases/tag/v$(releaseVersion)-$(Build.BuildNumber)"
+                    echo ""
+                    echo "🆘 Fallback Release Attempt:"
+                    echo "  Tag: emergency-$(Build.BuildId)"
+                    echo "  Status: Check GitHubRelease@1 task results above (if executed)"
+                    echo "  Expected URL: https://github.com/$(githubRepository)/releases/tag/emergency-$(Build.BuildId)"
+                    echo ""
+                    echo "🔍 If Both Failed - Manual Validation Checklist:"
+                    echo "  ✓ Service connection 'github-connection' exists in Azure DevOps"
+                    echo "  ✓ GitHub PAT has scopes: repo, workflow, write:packages"
+                    echo "  ✓ Repository name exactly: mthitservice/MTHBDEIOTClient (case-sensitive)"
+                    echo "  ✓ Repository exists and is accessible"
+                    echo "  ✓ Commit $(Build.SourceVersion) exists in target repository"
+                    echo "  ✓ No conflicting tags exist in GitHub"
+                    echo ""
+                    echo "🛠️ Manual Actions Required (if automated release failed):"
+                    echo "  1. Download build artifacts from Azure DevOps"
+                    echo "  2. Create GitHub release manually"
+                    echo "  3. Upload artifacts manually to GitHub release"
+                    echo ""
+                    echo "🔗 Useful Links:"
+                    echo "  GitHub Repository: https://github.com/$(githubRepository)"
+                    echo "  GitHub Releases: https://github.com/$(githubRepository)/releases"
+                    echo "  Azure DevOps Service Connections: $(System.CollectionUri)$(System.TeamProject)/_settings/adminservices"
+                    echo "  Build Artifacts: $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                    echo ""
+                    echo "✅ GitHub Release process completed"
+                    echo "📋 Review task results above for success/failure details"
+                  displayName: "📋 Final Release Summary & Troubleshooting"
+                  condition: always()
 
   - stage: UpdateLatest
     displayName: "Update Latest Release"
