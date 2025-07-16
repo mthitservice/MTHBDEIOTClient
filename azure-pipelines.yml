@@ -716,7 +716,7 @@ stages:
                     gitHubConnection: $(githubConnection)
                     repositoryName: $(githubRepository)
                     action: "delete"
-                    tag: "v$(releaseVersion)-beta"
+                    tag: "v$(releaseVersion)"
                   continueOnError: true
 
                 - task: GitHubRelease@1
@@ -728,8 +728,8 @@ stages:
                     action: "create"
                     target: "$(Build.SourceVersion)"
                     tagSource: "userSpecifiedTag"
-                    tag: "v$(releaseVersion)-beta"
-                    title: "MthBdeIotClient v$(releaseVersion)-beta (Emergency Build)"
+                    tag: "v$(releaseVersion)"
+                    title: "MthBdeIotClient v$(releaseVersion) (Emergency Build)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
                     assets: |
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/installation/*
@@ -752,15 +752,15 @@ stages:
         steps:
           - script: |
               echo "=== RELEASE COMPLETED SUCCESSFULLY ==="
-              echo "Version: $(releaseVersion)-beta"
+              echo "Version: $(releaseVersion)"
               echo "Build ID: $(Build.BuildId)"
-              echo "GitHub Release created: v$(releaseVersion)-beta"
+              echo "GitHub Release created: v$(releaseVersion)"
               echo ""
               echo "Note: Latest tag update skipped due to Git permissions in CI/CD."
               echo "To update the latest tag manually, run:"
               echo "  git tag -d latest"
               echo "  git push origin --delete latest"
-              echo "  git tag latest v$(releaseVersion)-beta"
+              echo "  git tag latest v$(releaseVersion)"
               echo "  git push origin latest"
               echo ""
               echo "=== PIPELINE COMPLETED ==="
@@ -778,19 +778,19 @@ stages:
         steps:
           - script: |
               echo "=== DOCUMENTATION UPDATE INSTRUCTIONS ==="
-              echo "Version: $(releaseVersion)-beta"
+              echo "Version: $(releaseVersion)"
               echo ""
               echo "Manual steps to update documentation:"
               echo ""
               echo "1. Update README.md download links:"
               echo "   - Replace: download/v[old-version]/"
-              echo "   - With: download/v$(releaseVersion)-beta/"
+              echo "   - With: download/v$(releaseVersion)/"
               echo ""
               echo "2. Update RASPBERRY_INSTALLATION.md:"
               echo "   - Replace: releases/download/v[old-version]/"
-              echo "   - With: releases/download/v$(releaseVersion)-beta/"
+              echo "   - With: releases/download/v$(releaseVersion)/"
               echo "   - Replace: mthbdeiotclient_[old-version]_armhf.deb"
-              echo "   - With: mthbdeiotclient_$(releaseVersion)-beta_armhf.deb"
+              echo "   - With: mthbdeiotclient_$(releaseVersion)_armhf.deb"
               echo ""
               echo "3. Update any installation scripts with new version numbers"
               echo ""
