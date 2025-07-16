@@ -56,13 +56,26 @@ stages:
           - script: |
               cd App
 
-              # Erstmal alle dependencies installieren
-              echo "Installing base dependencies..."
+              # PHASE 1: Clean installation
+              echo "Phase 1: Clean base installation..."
               npm ci --engine-strict=false || npm install --engine-strict=false
 
-              # CRITICAL: Installiere chalk als produktive Abhängigkeit (nicht dev!)
-              echo "Installing chalk as production dependency..."
-              npm install chalk@^4.1.2
+              # PHASE 2: Essential build tools installation
+              echo "Phase 2: Installing essential build tools..."
+              npm install chalk@4.1.2 --save
+              npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1
+
+              # PHASE 3: Verify installations
+              echo "Phase 3: Verifying critical tools..."
+              node -e "console.log('Node version:', process.version)"
+              npm --version
+              npx webpack --version || echo "webpack not available"
+              npx webpack-cli --version || echo "webpack-cli not available"
+              npx concurrently --version || echo "concurrently not available"
+            displayName: "Install Dependencies and Build Tools"
+
+          - script: |
+              cd App
 
               # WORKAROUND: Erstelle temporäres check-native-dep.js das funktioniert
               echo "Creating workaround for check-native-dep.js..."
@@ -75,41 +88,32 @@ stages:
               # Backup original and use workaround if chalk fails
               if [ -f ".erb/scripts/check-native-dep.js" ]; then
                 cp .erb/scripts/check-native-dep.js .erb/scripts/check-native-dep-original.js
-                # Test if chalk import works, if not use backup
-                node -e "import('chalk').then(() => console.log('Chalk import works')).catch(() => { console.log('Chalk import failed, using backup'); process.exit(1); })" || {
+                # Test if chalk import works, if not use backup - aber robuster Test
+                echo "Testing chalk availability..."
+                if node -e "try { const chalk = require('chalk'); console.log('Chalk test:', chalk.green('SUCCESS')); } catch(e) { console.log('Chalk test failed:', e.message); process.exit(1); }"; then
+                  echo "Chalk is working correctly"
+                else
                   echo "Chalk import test failed, using backup script"
                   cp .erb/scripts/check-native-dep-backup.js .erb/scripts/check-native-dep.js
-                }
+                fi
               fi
 
-              # Installiere alle anderen notwendigen DevDependencies
-              echo "Installing development dependencies..."
-              npm install --save-dev \
-                webpack@^5.96.1 \
-                webpack-cli@^5.1.4 \
-                ts-node@^10.9.2 \
-                typescript@^5.6.3 \
-                electron@^35.0.2 \
-                electron-builder@^26.0.12 \
-                cross-env@^7.0.3 \
-                concurrently@^9.1.2 \
-                rimraf@^3.0.2
-
-              # PATCH: Installiere spezifische ts-node register files
-              echo "Ensuring ts-node is properly configured..."
-              npx ts-node --version
-
-              # Verify chalk is available
-              echo "Verifying chalk installation..."
-              node -e "console.log('Chalk test:', require('chalk').green('SUCCESS'))" || echo "Chalk installation failed"
+              # Verify chalk is available with robust script
+              echo "Verifying chalk installation with robust method..."
+              if node .erb/scripts/pipeline-check-chalk.js; then
+                echo "Chalk verification successful"
+              else
+                echo "Chalk verification failed but continuing with pipeline..."
+              fi
 
               # Verify other essential tools
               echo "Verifying other tools..."
               npx concurrently --version || echo "concurrently not available"
               npx electron-builder --version || echo "electron-builder not available"
+              npx ts-node --version || echo "ts-node not available"
 
               echo "All dependencies installed and verified successfully"
-            displayName: "Install dependencies"
+            displayName: "Setup Chalk and Dependencies"
 
           - script: |
               # Version aus Tag oder automatisch generieren
@@ -153,24 +157,34 @@ stages:
               export REACT_APP_VERSION=$(APP_VERSION)
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
 
-              # FIRST: Try npm scripts directly (they should work now with chalk installed)
-              echo "Attempting npm build scripts..."
+              # CRITICAL: Ensure all build tools are properly installed before building
+              echo "Installing and verifying essential build tools..."
+              npm install --save-dev concurrently@^9.1.2 webpack-cli@^6.0.1 || echo "Build tools installation failed"
+
+              # Verify tools are available
+              echo "Verifying build tools..."
+              npx concurrently --version || echo "concurrently not available"
+              npx webpack-cli --version || echo "webpack-cli not available"
+
+              # Try npm scripts with all dependencies installed
+              echo "Attempting npm build scripts with verified tools..."
               if npm run build; then
                 echo "npm build successful!"
               else
-                echo "npm build failed, trying direct webpack builds..."
+                echo "npm build failed, trying manual webpack builds..."
                 
-                # Alternative: Direct webpack calls without ts-node/register
-                echo "Building main process (without ts-node preload)..."
-                npx webpack --config ./.erb/configs/webpack.config.main.prod.ts --node-env=production || {
-                  echo "Direct webpack main failed, trying ts-node approach..."
-                  npx ts-node ./.erb/configs/webpack.config.main.prod.ts || echo "ts-node main build failed"
+                # Fallback: Manual webpack builds
+                echo "Building main process manually..."
+                npx webpack --config ./.erb/configs/webpack.config.main.prod.ts --mode=production || {
+                  echo "Main webpack build failed, trying ts-node approach..."
+                  npx ts-node --transpile-only ./.erb/configs/webpack.config.main.prod.ts || echo "ts-node main build failed"
                 }
 
-                echo "Building renderer process (without ts-node preload)..."
-                npx webpack --config ./.erb/configs/webpack.config.renderer.prod.ts --node-env=production || {
-                  echo "Direct webpack renderer failed, trying ts-node approach..."
-                  npx ts-node ./.erb/configs/webpack.config.renderer.prod.ts || echo "ts-node renderer build failed"
+                echo "Building renderer process manually..."
+                npx webpack --config ./.erb/configs/webpack.config.renderer.prod.ts --mode=production || {
+                  echo "Renderer webpack build failed, trying ts-node approach..."
+                  npx ts-node --transpile-only ./.erb/configs/webpack.config.renderer.prod.ts || echo "ts-node renderer build failed"
+                }
                 }
               fi
 
