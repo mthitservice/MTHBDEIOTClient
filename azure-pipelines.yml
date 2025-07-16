@@ -114,27 +114,10 @@ stages:
               export REACT_APP_VERSION=$(APP_VERSION)
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
 
-              # Build Scripts mit npx ausführen (parallel mit &)
-              echo "Building main and renderer in parallel..."
+              # Build mit npm scripts (die bereits richtig konfiguriert sind)
+              echo "Building application using npm scripts..."
 
-              # Build main
-              npx cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" npx webpack --config ./.erb/configs/webpack.config.main.prod.ts &
-              MAIN_PID=$!
-
-              # Build renderer  
-              npx cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" npx webpack --config ./.erb/configs/webpack.config.renderer.prod.ts &
-              RENDERER_PID=$!
-
-              # Warten auf beide Builds
-              wait $MAIN_PID
-              MAIN_EXIT=$?
-              wait $RENDERER_PID  
-              RENDERER_EXIT=$?
-
-              if [ $MAIN_EXIT -ne 0 ] || [ $RENDERER_EXIT -ne 0 ]; then
-                echo "Build failed. Main exit: $MAIN_EXIT, Renderer exit: $RENDERER_EXIT"
-                exit 1
-              fi
+              npm run build
 
               echo "Build completed successfully"
             displayName: "Build Application"
@@ -146,19 +129,16 @@ stages:
 
           - script: |
               cd App
-              # Electron Builder mit npx
+              # Electron Builder mit npm scripts
               echo "Starting Electron packaging..."
 
-              # Clean dist folder first
-              npx ts-node ./.erb/scripts/clean.js dist || echo "Clean skipped"
+              # Standard package für alle Plattformen
+              npm run package:all
 
-              # Standard package (Windows, Linux x64, macOS)
-              npx electron-builder build --publish never --config.nodeGypRebuild=false
-
-              # Raspberry Pi Builds
+              # Zusätzlich Raspberry Pi Builds
               echo "Building for Raspberry Pi..."
-              npx electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false
-              npx electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false
+              npm run package:raspberry-deb
+              npm run package:raspberry
 
               echo "Packaging completed successfully"
             displayName: "Package Electron App"
