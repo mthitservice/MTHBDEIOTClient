@@ -129,18 +129,17 @@ stages:
 
           - script: |
               cd App
-              # Electron Builder mit npm scripts
+              # Electron Builder mit npm scripts - vereinfacht für Debugging
               echo "Starting Electron packaging..."
 
-              # Standard package für alle Plattformen
-              npm run package:all
+              # Erst versuchen nur einen einfachen Build
+              echo "Trying simple package command..."
+              npm run package || echo "Package command failed"
 
-              # Zusätzlich Raspberry Pi Builds
-              echo "Building for Raspberry Pi..."
-              npm run package:raspberry-deb
-              npm run package:raspberry
+              echo "Checking what was created..."
+              find release -type f 2>/dev/null | head -20 || echo "No release directory found"
 
-              echo "Packaging completed successfully"
+              echo "Packaging completed (with potential errors)"
             displayName: "Package Electron App"
             env:
               NODE_ENV: production
@@ -148,6 +147,7 @@ stages:
               REACT_APP_VERSION: $(APP_VERSION)
               GH_TOKEN: $(GITHUB_TOKEN)
               ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+            continueOnError: true
 
           - task: CopyFiles@2
             displayName: "Copy Build Artifacts"
@@ -160,10 +160,16 @@ stages:
 
           - script: |
               echo "=== Debugging Release Structure ==="
-              find App/release -type f -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" | head -20 || echo "No release files found"
-              ls -la App/release/ || echo "Release directory not found"
-              echo "=== Staging Directory ==="
-              ls -la $(Build.ArtifactStagingDirectory)/ || echo "Staging directory empty"
+              find App/release -type f 2>/dev/null | head -30 || echo "No release directory found"
+
+              echo "=== Specific release files ==="
+              find App/release -type f \( -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.AppImage" -o -name "*.dmg" \) 2>/dev/null || echo "No release files found"
+
+              echo "=== Staging Directory Contents ==="
+              ls -la $(Build.ArtifactStagingDirectory)/ 2>/dev/null || echo "Staging directory empty"
+
+              echo "=== Staging subdirectories ==="
+              find $(Build.ArtifactStagingDirectory) -type f 2>/dev/null | head -20 || echo "No files in staging"
             displayName: "Debug Release Files"
             condition: succeededOrFailed()
 
@@ -184,7 +190,19 @@ stages:
               pathToPublish: "$(Build.ArtifactStagingDirectory)"
               artifactName: $(artifactName)
               publishLocation: "Container"
+            condition: always()
 
+          - script: |
+              echo "=== Final check: What was actually published? ==="
+              ls -la $(Build.ArtifactStagingDirectory)/ 2>/dev/null || echo "Nothing in staging directory"
+              
+              echo "=== Size of staging directory ==="
+              du -sh $(Build.ArtifactStagingDirectory)/ 2>/dev/null || echo "Cannot measure size"
+              
+              echo "=== All files that would be published ==="
+              find $(Build.ArtifactStagingDirectory) -type f | wc -l 2>/dev/null || echo "Cannot count files"
+            displayName: "Final Artifact Check"
+            condition: always()
   - stage: Release
     displayName: "GitHub Release"
     condition: and(succeeded(), eq(variables.isRelease, true))
@@ -199,15 +217,27 @@ stages:
           runOnce:
             deploy:
               steps:
+                - script: |
+                    echo "=== Checking available artifacts ==="
+                    echo "Build ID: $(Build.BuildId)"
+                    echo "Build Number: $(Build.BuildNumber)"
+                    echo "Artifact Name: $(artifactName)"
+                  displayName: "Check Build Information"
+
                 - download: current
-                  artifact: $(artifactName)
-                  displayName: "Download Build Artifacts"
+                  displayName: "Try to download artifacts"
+                  continueOnError: true
 
                 - script: |
-                    echo "=== Debugging Artifact Structure ==="
-                    find $(Pipeline.Workspace) -type f -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" | head -20
-                    ls -la $(Pipeline.Workspace)/$(artifactName)/ || echo "Artifact directory not found"
-                  displayName: "Debug Artifact Structure"
+                    echo "=== Pipeline Workspace Structure ==="
+                    ls -la $(Pipeline.Workspace)/ || echo "Pipeline workspace not found"
+                    
+                    echo "=== Available artifacts ==="
+                    find $(Pipeline.Workspace) -name "*" -type d | head -10 || echo "No directories found"
+                    
+                    echo "=== All files ==="
+                    find $(Pipeline.Workspace) -type f | head -20 || echo "No files found"
+                  displayName: "Debug Available Files"
 
                 - task: PowerShell@2
                   displayName: "Prepare Release Notes"
@@ -265,6 +295,7 @@ stages:
 
                 - task: GitHubRelease@1
                   displayName: "Create GitHub Release"
+                  condition: always()
                   inputs:
                     gitHubConnection: $(githubConnection)
                     repositoryName: $(githubRepository)
@@ -274,20 +305,12 @@ stages:
                     tagPattern: "v*"
                     title: "MthBdeIotClient v$(releaseVersion)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
-                    assets: "$(Pipeline.Workspace)/$(artifactName)/**/*"
+                    assets: "$(Pipeline.Workspace)/**/*"
                     assetUploadMode: "replace"
-                    isDraft: false
+                    isDraft: true
                     isPreRelease: false
-                    addChangeLog: true
-                    changeLogCompareToRelease: "lastFullRelease"
-                    changeLogType: "commitBased"
-                    changeLogLabels: |
-                      [
-                        {"label":"enhancement","displayName":"🚀 Enhancements"},
-                        {"label":"bug","displayName":"🐛 Bug Fixes"},
-                        {"label":"documentation","displayName":"📖 Documentation"},
-                        {"label":"breaking","displayName":"⚠️ Breaking Changes"}
-                      ]
+                    addChangeLog: false
+                  continueOnError: true
 
   - stage: UpdateLatest
     displayName: "Update Latest Release"
