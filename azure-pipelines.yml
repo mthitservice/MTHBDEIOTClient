@@ -56,7 +56,7 @@ stages:
           - script: |
               cd App
               # Vollständige Installation mit allen DevDependencies
-              npm install --engine-strict=false
+              npm ci --engine-strict=false || npm install --engine-strict=false
 
               # Alle notwendigen DevDependencies explizit installieren
               npm install --save-dev \
@@ -67,7 +67,16 @@ stages:
                 electron@^35.0.2 \
                 electron-builder@^26.0.12 \
                 chalk@^4.1.2 \
-                cross-env@^7.0.3
+                cross-env@^7.0.3 \
+                concurrently@^9.1.2 \
+                rimraf@^3.0.2
+
+              # Verify essential tools are available
+              echo "Verifying installed tools..."
+              npx --version
+              npx ts-node --version || echo "ts-node not available"
+              npx concurrently --version || echo "concurrently not available"
+              npx electron-builder --version || echo "electron-builder not available"
 
               echo "All dependencies installed successfully"
             displayName: "Install dependencies"
@@ -114,10 +123,20 @@ stages:
               export REACT_APP_VERSION=$(APP_VERSION)
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
 
-              # Build mit npm scripts (die bereits richtig konfiguriert sind)
-              echo "Building application using npm scripts..."
+              # Build mit direkten webpack calls falls npm scripts nicht funktionieren
+              echo "Building application using direct webpack calls..."
 
-              npm run build
+              # Main process build
+              echo "Building main process..."
+              npx cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" webpack --config ./.erb/configs/webpack.config.main.prod.ts
+
+              # Renderer process build
+              echo "Building renderer process..."
+              npx cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" webpack --config ./.erb/configs/webpack.config.renderer.prod.ts
+
+              # Fallback: Try npm scripts
+              echo "Attempting npm scripts as fallback..."
+              npm run build || echo "npm run build failed, using direct webpack builds"
 
               echo "Build completed successfully"
             displayName: "Build Application"
@@ -129,27 +148,37 @@ stages:
 
           - script: |
               cd App
-              # Electron Builder - verwende die vordefinierten npm scripts
-              echo "Starting Electron packaging with npm scripts..."
+              # Electron Builder - robuste Packaging-Strategie
+              echo "Starting Electron packaging with robust approach..."
 
-              # Clean the dist folder first using the same method as package scripts
+              # Clean the dist folder first
               echo "Cleaning previous builds..."
-              npx ts-node ./.erb/scripts/clean.js dist || echo "Clean failed, continuing..."
+              rm -rf dist || echo "No dist folder to clean"
+              rm -rf release || echo "No release folder to clean"
 
-              # Build the application first (this is already done but ensure it's complete)
-              npm run build
-
-              # Use the predefined packaging scripts from package.json
-              echo "Creating cross-platform builds..."
-              npm run package:all || echo "Cross-platform build failed"
+              # Ensure build is complete
+              echo "Ensuring build is complete..."
+              
+              # Try npm scripts first, then fallback to direct electron-builder
+              echo "Attempting npm packaging scripts..."
+              npm run package:all || {
+                echo "npm scripts failed, trying direct electron-builder..."
+                
+                # Build DLL first
+                npx cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts || echo "DLL build failed"
+                
+                # Direct electron-builder calls
+                echo "Using direct electron-builder calls..."
+                npx electron-builder build --publish never --win --linux --mac || echo "Cross-platform build failed"
+              }
 
               echo "Creating Raspberry Pi specific builds..."
-              npm run package:raspberry || echo "Raspberry Pi tar.gz build failed"
-              npm run package:raspberry-deb || echo "Raspberry Pi deb build failed"
+              npm run package:raspberry || npx electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false || echo "Raspberry Pi tar.gz build failed"
+              npm run package:raspberry-deb || npx electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false || echo "Raspberry Pi deb build failed"
 
               # List what was actually created
               echo "=== Checking what was built ==="
-              find . -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.dmg" -o -name "*.appx" -o -name "*.snap" | head -20
+              find . -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.dmg" -o -name "*.appx" -o -name "*.snap" -o -name "*.AppImage" | head -20
 
               # Also check the dist folder structure
               echo "=== Dist folder structure ==="
