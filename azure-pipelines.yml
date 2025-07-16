@@ -140,9 +140,11 @@ stages:
                 
                 // Add essential dependencies for electron-builder
                 if (!originalPkg.dependencies) originalPkg.dependencies = {};
-                originalPkg.dependencies.electron = '32.2.6';
+                // Remove electron from dependencies - it should only be in devDependencies
+                delete originalPkg.dependencies.electron;
                 
                 if (!originalPkg.devDependencies) originalPkg.devDependencies = {};
+                originalPkg.devDependencies['electron'] = '32.2.6';
                 originalPkg.devDependencies['electron-builder'] = '25.1.8';
                 originalPkg.devDependencies['webpack-cli'] = '6.0.1';
                 
@@ -468,8 +470,16 @@ stages:
               echo "Verifying electron-builder configuration..."
               node -e "
                 const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
-                console.log('Build config:', JSON.stringify(pkg.build, null, 2));
-                console.log('Linux targets:', JSON.stringify(pkg.build.linux.target, null, 2));
+                console.log('Main package.json:');
+                console.log('  Electron in dependencies:', pkg.dependencies?.electron || 'NONE');
+                console.log('  Electron in devDependencies:', pkg.devDependencies?.electron || 'NONE');
+                console.log('  Has build config:', !!pkg.build);
+                console.log('Linux targets:', JSON.stringify(pkg.build?.linux?.target, null, 2));
+                
+                const appPkg = JSON.parse(require('fs').readFileSync('release/app/package.json', 'utf8'));
+                console.log('App package.json:');
+                console.log('  Has build config:', !!appPkg.build);
+                console.log('  Electron in dependencies:', appPkg.dependencies?.electron || 'NONE');
               "
 
               # Ensure the required release/app directory exists
@@ -479,7 +489,31 @@ stages:
               # Copy necessary files for electron-builder
               echo "Preparing release structure..."
               if [ -f "package.json" ]; then
-                cp package.json release/app/
+                # Create clean package.json for release/app WITHOUT build configuration
+                echo "Creating clean package.json for release/app (without build config)..."
+                node -e "
+                  const fs = require('fs');
+                  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                  
+                  // Create minimal package.json for app directory
+                  const appPkg = {
+                    name: pkg.name,
+                    version: pkg.version,
+                    description: pkg.description,
+                    main: pkg.main,
+                    homepage: pkg.homepage,
+                    author: pkg.author,
+                    license: pkg.license,
+                    // Only include essential dependencies, NO devDependencies
+                    dependencies: pkg.dependencies || {}
+                  };
+                  
+                  // Remove electron from dependencies if present
+                  delete appPkg.dependencies.electron;
+                  
+                  fs.writeFileSync('release/app/package.json', JSON.stringify(appPkg, null, 2));
+                  console.log('Clean app package.json created without build config');
+                "
               fi
 
               # Ensure dist folder exists with basic structure for electron
@@ -708,7 +742,7 @@ stages:
                     echo "🛠️ Troubleshooting steps:"
                     echo "  1. Verify service connection 'github-connection' exists in Azure DevOps"
                     echo "  2. Check GitHub token has 'repo' scope (full repository access)"
-                    echo "  3. Ensure repository name is exactly: mthitservice/MTHBDEIOTClient"
+                    echo "  3. Ensure repository name is exactly: MTHBDEIOTClient"
                     echo "  4. Verify the commit $(Build.SourceVersion) exists on GitHub"
                     echo "  5. Check if tag v$(releaseVersion)-$(Build.BuildNumber) already exists"
                     echo ""
@@ -856,7 +890,7 @@ stages:
                     echo "  3. Both as draft releases for manual review"
                     echo ""
                     echo "⚠️ Known 'Validation Failed' Solutions:"
-                    echo "  - Repository name must be exact: mthitservice/MTHBDEIOTClient"
+                    echo "  - Repository name must be exact:MTHBDEIOTClient"
                     echo "  - Service connection must have 'Contents: Write' permission"
                     echo "  - GitHub token needs 'repo' scope"
                     echo "  - Target commit must exist in repository"
@@ -1029,7 +1063,7 @@ stages:
                     echo "🔍 If Both Failed - Manual Validation Checklist:"
                     echo "  ✓ Service connection 'github-connection' exists in Azure DevOps"
                     echo "  ✓ GitHub PAT has scopes: repo, workflow, write:packages"
-                    echo "  ✓ Repository name exactly: mthitservice/MTHBDEIOTClient (case-sensitive)"
+                    echo "  ✓ Repository name exactly: MTHBDEIOTClient (case-sensitive)"
                     echo "  ✓ Repository exists and is accessible"
                     echo "  ✓ Commit $(Build.SourceVersion) exists in target repository"
                     echo "  ✓ No conflicting tags exist in GitHub"
