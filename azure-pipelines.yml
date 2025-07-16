@@ -55,7 +55,7 @@ stages:
 
           - script: |
               cd App
-              
+
               # Erstmal alle dependencies installieren
               echo "Installing base dependencies..."
               npm ci --engine-strict=false || npm install --engine-strict=false
@@ -98,7 +98,7 @@ stages:
               # PATCH: Installiere spezifische ts-node register files
               echo "Ensuring ts-node is properly configured..."
               npx ts-node --version
-              
+
               # Verify chalk is available
               echo "Verifying chalk installation..."
               node -e "console.log('Chalk test:', require('chalk').green('SUCCESS'))" || echo "Chalk installation failed"
@@ -197,7 +197,7 @@ stages:
               # Ensure the required release/app directory exists
               echo "Creating release/app directory structure..."
               mkdir -p release/app
-              
+
               # Copy necessary files for electron-builder
               echo "Preparing release structure..."
               if [ -f "package.json" ]; then
