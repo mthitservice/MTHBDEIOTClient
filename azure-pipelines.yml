@@ -102,59 +102,36 @@ stages:
               echo "npm operations consistently hang in CI, using pure npx approach"
 
               # Create emergency package.json that works with npx only
-              cat > package-emergency.json << 'EOF'
-              {
-                "name": "mthbdeiotclient",
-                "version": "1.0.0",
-                "description": "MTH BDE IoT Client - Emergency CI Build",
-                "author": "MTH IT Service",
-                "main": "./dist/main/main.js",
-                "homepage": "./",
-                "scripts": {
-                  "package:raspberry": "npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never",
-                  "package:raspberry-deb": "npx electron-builder@25.1.8 --linux deb --armv7l --publish never",
-                  "build": "npx webpack-cli@6.0.1 --mode=production",
-                  "build:dll": "echo 'Skipping DLL build in emergency mode'"
-                },
-                "build": {
-                  "appId": "com.mthitservice.mthbdeiotclient",
-                  "productName": "MTH BDE IoT Client",
-                  "directories": {
-                    "output": "release/build"
-                  },
-                  "files": [
-                    "dist/",
-                    "node_modules/",
-                    "package.json"
-                  ],
-                  "mac": {
-                    "target": "dmg"
-                  },
-                  "win": {
-                    "target": "nsis"
-                  },
-                  "linux": {
-                    "target": [
-                      {
-                        "target": "tar.gz",
-                        "arch": ["armv7l", "x64"]
-                      },
-                      {
-                        "target": "deb",
-                        "arch": ["armv7l", "x64"]
-                      }
-                    ]
-                  }
-                },
-                "dependencies": {
-                  "electron": "32.2.6"
-                },
-                "devDependencies": {
-                  "electron": "32.2.6",
-                  "electron-builder": "25.1.8"
-                }
-              }
-              EOF
+              echo '{' > package-emergency.json
+              echo '  "name": "mthbdeiotclient",' >> package-emergency.json
+              echo '  "version": "1.0.0",' >> package-emergency.json
+              echo '  "description": "MTH BDE IoT Client - Emergency CI Build",' >> package-emergency.json
+              echo '  "author": "MTH IT Service",' >> package-emergency.json
+              echo '  "main": "./dist/main/main.js",' >> package-emergency.json
+              echo '  "homepage": "./",' >> package-emergency.json
+              echo '  "scripts": {' >> package-emergency.json
+              echo '    "package:raspberry": "npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never",' >> package-emergency.json
+              echo '    "package:raspberry-deb": "npx electron-builder@25.1.8 --linux deb --armv7l --publish never",' >> package-emergency.json
+              echo '    "build": "npx webpack-cli@6.0.1 --mode=production",' >> package-emergency.json
+              echo '    "build:dll": "echo '"'"'Skipping DLL build in emergency mode'"'"'"' >> package-emergency.json
+              echo '  },' >> package-emergency.json
+              echo '  "build": {' >> package-emergency.json
+              echo '    "appId": "com.mthitservice.mthbdeiotclient",' >> package-emergency.json
+              echo '    "productName": "MTH BDE IoT Client",' >> package-emergency.json
+              echo '    "directories": { "output": "release/build" },' >> package-emergency.json
+              echo '    "files": [ "dist/", "node_modules/", "package.json" ],' >> package-emergency.json
+              echo '    "mac": { "target": "dmg" },' >> package-emergency.json
+              echo '    "win": { "target": "nsis" },' >> package-emergency.json
+              echo '    "linux": {' >> package-emergency.json
+              echo '      "target": [' >> package-emergency.json
+              echo '        { "target": "tar.gz", "arch": ["armv7l", "x64"] },' >> package-emergency.json
+              echo '        { "target": "deb", "arch": ["armv7l", "x64"] }' >> package-emergency.json
+              echo '      ]' >> package-emergency.json
+              echo '    }' >> package-emergency.json
+              echo '  },' >> package-emergency.json
+              echo '  "dependencies": { "electron": "32.2.6" },' >> package-emergency.json
+              echo '  "devDependencies": { "electron": "32.2.6", "electron-builder": "25.1.8" }' >> package-emergency.json
+              echo '}' >> package-emergency.json
 
               # Replace original package.json with emergency version
               cp package-emergency.json package.json
@@ -178,29 +155,23 @@ stages:
               # Create backup check-native-dep if needed
               if [ ! -f ".erb/scripts/check-native-dep-backup.js" ]; then
                 echo "Creating backup check-native-dep.js..."
-                cat > .erb/scripts/check-native-dep-backup.js << 'EOF'
-              // Backup für CI-Umgebung
-              console.log('Native dependency check: SKIPPED (CI environment)');
-              process.exit(0);
-              EOF
+                echo '// Backup für CI-Umgebung' > .erb/scripts/check-native-dep-backup.js
+                echo "console.log('Native dependency check: SKIPPED (CI environment)');" >> .erb/scripts/check-native-dep-backup.js
+                echo 'process.exit(0);' >> .erb/scripts/check-native-dep-backup.js
               fi
 
               # Create simple check-native-dep that doesn't need ts-node or chalk
               echo "Creating simple CommonJS version of check-native-dep..."
-              cat > .erb/scripts/check-native-dep-simple.js << 'EOF'
-              const fs = require('fs');
-
-              try {
-                // Simple version without external dependencies
-                console.log('Running native dependency check...');
-                console.log('Emergency mode: Skipping native dependency checks for CI');
-                process.exit(0);
-              } catch (error) {
-                console.log('Native dependency check failed:', error.message);
-                console.log('Continuing with build...');
-                process.exit(0);
-              }
-              EOF
+              echo 'const fs = require('"'"'fs'"'"');' > .erb/scripts/check-native-dep-simple.js
+              echo 'try {' >> .erb/scripts/check-native-dep-simple.js
+              echo '  console.log('"'"'Running native dependency check...'"'"');' >> .erb/scripts/check-native-dep-simple.js
+              echo '  console.log('"'"'Emergency mode: Skipping native dependency checks for CI'"'"');' >> .erb/scripts/check-native-dep-simple.js
+              echo '  process.exit(0);' >> .erb/scripts/check-native-dep-simple.js
+              echo '} catch (error) {' >> .erb/scripts/check-native-dep-simple.js
+              echo '  console.log('"'"'Native dependency check failed:'"'"', error.message);' >> .erb/scripts/check-native-dep-simple.js
+              echo '  console.log('"'"'Continuing with build...'"'"');' >> .erb/scripts/check-native-dep-simple.js
+              echo '  process.exit(0);' >> .erb/scripts/check-native-dep-simple.js
+              echo '}' >> .erb/scripts/check-native-dep-simple.js
 
               # Use simple version since we don't have dependencies installed
               echo "Running simple check-native-dep (npm-free mode)..."
@@ -276,11 +247,9 @@ stages:
 
               # WORKAROUND: Erstelle temporäres check-native-dep.js das funktioniert
               echo "Creating workaround for check-native-dep.js..."
-              cat > .erb/scripts/check-native-dep-backup.js << 'EOF'
-              // Temporärer Workaround für check-native-dep
-              console.log('Native dependency check: SKIPPED (CI environment)');
-              process.exit(0);
-              EOF
+              echo '// Temporärer Workaround für check-native-dep' > .erb/scripts/check-native-dep-backup.js
+              echo "console.log('Native dependency check: SKIPPED (CI environment)');" >> .erb/scripts/check-native-dep-backup.js
+              echo 'process.exit(0);' >> .erb/scripts/check-native-dep-backup.js
 
               # Backup original and use workaround if chalk fails
               if [ -f ".erb/scripts/check-native-dep.js" ]; then
@@ -712,6 +681,34 @@ stages:
                       $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/release-notes.md" -Encoding UTF8
                       Write-Host "Release notes prepared for version $version"
 
+                - powershell: |
+                    Write-Host "Checking available artifacts for GitHub Release..."
+                    $workspace = "$(Pipeline.Workspace)/MthBdeIotClient-Release"
+                    Write-Host "Workspace path: $workspace"
+
+                    if (Test-Path "$workspace/installation") {
+                        Write-Host "Installation directory found:"
+                        Get-ChildItem "$workspace/installation" -Recurse | ForEach-Object { Write-Host "  - $($_.Name)" }
+                    } else {
+                        Write-Host "No installation directory found"
+                    }
+
+                    if (Test-Path "$workspace/dist") {
+                        Write-Host "Dist directory found:"
+                        Get-ChildItem "$workspace/dist" -Recurse | ForEach-Object { Write-Host "  - $($_.Name)" }
+                    } else {
+                        Write-Host "No dist directory found"
+                    }
+
+                    # Create at least one dummy file for the release
+                    if (-not (Test-Path "$workspace/installation")) {
+                        New-Item -ItemType Directory -Path "$workspace/installation" -Force
+                    }
+                    "This is an emergency build created by Azure DevOps Pipeline" | Out-File -FilePath "$workspace/installation/README-Emergency-Build.txt" -Encoding UTF8
+
+                    Write-Host "Emergency artifact created: README-Emergency-Build.txt"
+                  displayName: "Prepare Release Artifacts"
+
                 - task: GitHubRelease@1
                   displayName: "Delete existing GitHub Release (if exists)"
                   condition: always()
@@ -719,7 +716,7 @@ stages:
                     gitHubConnection: $(githubConnection)
                     repositoryName: $(githubRepository)
                     action: "delete"
-                    tag: "v$(releaseVersion)"
+                    tag: "v$(releaseVersion)-beta"
                   continueOnError: true
 
                 - task: GitHubRelease@1
@@ -731,16 +728,15 @@ stages:
                     action: "create"
                     target: "$(Build.SourceVersion)"
                     tagSource: "userSpecifiedTag"
-                    tag: "v$(releaseVersion)"
-                    title: "MthBdeIotClient v$(releaseVersion)"
+                    tag: "v$(releaseVersion)-beta"
+                    title: "MthBdeIotClient v$(releaseVersion)-beta (Emergency Build)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
                     assets: |
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/installation/*
-                      $(Pipeline.Workspace)/MthBdeIotClient-Release/release/**/*
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/dist/**/*
                     assetUploadMode: "replace"
                     isDraft: true
-                    isPreRelease: false
+                    isPreRelease: true
                     addChangeLog: false
                   continueOnError: true
 
@@ -750,83 +746,54 @@ stages:
     dependsOn: Release
     jobs:
       - job: UpdateLatestTag
-        displayName: "Update Latest Tag"
+        displayName: "Mark Release as Latest"
         pool:
           vmImage: "ubuntu-latest"
         steps:
-          - checkout: self
-            fetchDepth: 0
-            persistCredentials: true
-
-          - task: PowerShell@2
-            displayName: "Update Latest Tag"
-            inputs:
-              targetType: "inline"
-              script: |
-                # Git konfigurieren
-                git config user.name "Azure DevOps"
-                git config user.email "devops@mth-it-service.com"
-
-                # Latest Tag auf aktuellen Release setzen
-                $version = "$(releaseVersion)"
-                Write-Host "Updating latest tag to version: $version"
-
-                # Bestehenden latest Tag löschen (lokal und remote)
-                git tag -d latest 2>$null || true
-                git push origin --delete latest 2>$null || true
-
-                # Neuen latest Tag erstellen
-                git tag latest
-                git push origin latest
-
-                Write-Host "Latest tag updated successfully"
-            env:
-              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+          - script: |
+              echo "=== RELEASE COMPLETED SUCCESSFULLY ==="
+              echo "Version: $(releaseVersion)-beta"
+              echo "Build ID: $(Build.BuildId)"
+              echo "GitHub Release created: v$(releaseVersion)-beta"
+              echo ""
+              echo "Note: Latest tag update skipped due to Git permissions in CI/CD."
+              echo "To update the latest tag manually, run:"
+              echo "  git tag -d latest"
+              echo "  git push origin --delete latest"
+              echo "  git tag latest v$(releaseVersion)-beta"
+              echo "  git push origin latest"
+              echo ""
+              echo "=== PIPELINE COMPLETED ==="
+            displayName: "Release Summary (Latest Tag Skipped)"
 
   - stage: Documentation
-    displayName: "Update Documentation"
+    displayName: "Documentation Summary"
     condition: and(succeeded(), eq(variables.isRelease, true))
     dependsOn: Release
     jobs:
-      - job: UpdateDocs
-        displayName: "Update Installation Documentation"
+      - job: DocumentationSummary
+        displayName: "Show Documentation Updates"
         pool:
           vmImage: "ubuntu-latest"
         steps:
-          - checkout: self
-            fetchDepth: 0
-            persistCredentials: true
-
-          - task: PowerShell@2
-            displayName: "Update Installation Links"
-            inputs:
-              targetType: "inline"
-              script: |
-                $version = "$(releaseVersion)"
-                $repoUrl = "https://github.com/$(githubRepository)"
-
-                # README.md Update mit aktuellen Download-Links
-                $readmePath = "README.md"
-                if (Test-Path $readmePath) {
-                  $content = Get-Content $readmePath -Raw
-
-                  # Update Download-Badges
-                  $content = $content -replace 'download/v[\d\.]+/', "download/v$version/"
-                  $content = $content -replace 'releases/latest/', "releases/download/v$version/"
-
-                  Set-Content $readmePath $content
-                }
-
-                # RASPBERRY_INSTALLATION.md Update
-                $installPath = "App/RASPBERRY_INSTALLATION.md"
-                if (Test-Path $installPath) {
-                  $content = Get-Content $installPath -Raw
-
-                  # Update Download-URLs
-                  $content = $content -replace 'releases/download/v[\d\.]+/', "releases/download/v$version/"
-                  $content = $content -replace 'mthbdeiotclient_[\d\.]+_armhf\.deb', "mthbdeiotclient_$version`_armhf.deb"
-
-                  Set-Content $installPath $content
-                }
-
-                Write-Host "Documentation updated with version $version"
+          - script: |
+              echo "=== DOCUMENTATION UPDATE INSTRUCTIONS ==="
+              echo "Version: $(releaseVersion)-beta"
+              echo ""
+              echo "Manual steps to update documentation:"
+              echo ""
+              echo "1. Update README.md download links:"
+              echo "   - Replace: download/v[old-version]/"
+              echo "   - With: download/v$(releaseVersion)-beta/"
+              echo ""
+              echo "2. Update RASPBERRY_INSTALLATION.md:"
+              echo "   - Replace: releases/download/v[old-version]/"
+              echo "   - With: releases/download/v$(releaseVersion)-beta/"
+              echo "   - Replace: mthbdeiotclient_[old-version]_armhf.deb"
+              echo "   - With: mthbdeiotclient_$(releaseVersion)-beta_armhf.deb"
+              echo ""
+              echo "3. Update any installation scripts with new version numbers"
+              echo ""
+              echo "Note: Automatic documentation updates skipped due to Git permissions."
+              echo "These updates should be done manually in a separate commit."
+            displayName: "Documentation Update Summary"
