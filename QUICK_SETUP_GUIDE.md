@@ -71,22 +71,22 @@ Gehen Sie zu: **Pipelines → Ihre Pipeline → Edit → Variables**
 
 #### Erforderliche Variables:
 
-| Variable Name | Beispiel Wert | Secret |
-|---------------|---------------|--------|
-| `GITHUB_TOKEN` | `ghp_xxxxxxxxxxxx` | ✅ |
-| `GITHUB_REPOSITORY` | `mthitservice/MthBdeIotClient` | ❌ |
-| `API_ENDPOINT_URL` | `https://api.mth-it-service.com` | ❌ |
-| `API_KEY_PRODUCTION` | `prod_api_key_123` | ✅ |
+| Variable Name        | Beispiel Wert                    | Secret |
+| -------------------- | -------------------------------- | ------ |
+| `GITHUB_TOKEN`       | `ghp_xxxxxxxxxxxx`               | ✅      |
+| `GITHUB_REPOSITORY`  | `mthitservice/MthBdeIotClient`   | ❌      |
+| `API_ENDPOINT_URL`   | `https://api.mth-it-service.com` | ❌      |
+| `API_KEY_PRODUCTION` | `prod_api_key_123`               | ✅      |
 
 #### Optionale Variables:
 
-| Variable Name | Beschreibung | Secret |
-|---------------|--------------|--------|
-| `SIGNING_CERT_THUMBPRINT` | Windows Code Signing | ✅ |
-| `SIGNING_CERT_PASSWORD` | Zertifikat Passwort | ✅ |
-| `SENTRY_DSN` | Error Tracking URL | ✅ |
-| `ANALYTICS_KEY` | Analytics API Key | ✅ |
-| `LICENSE_KEY` | Software Lizenz | ✅ |
+| Variable Name             | Beschreibung         | Secret |
+| ------------------------- | -------------------- | ------ |
+| `SIGNING_CERT_THUMBPRINT` | Windows Code Signing | ✅      |
+| `SIGNING_CERT_PASSWORD`   | Zertifikat Passwort  | ✅      |
+| `SENTRY_DSN`              | Error Tracking URL   | ✅      |
+| `ANALYTICS_KEY`           | Analytics API Key    | ✅      |
+| `LICENSE_KEY`             | Software Lizenz      | ✅      |
 
 ### 3. GitHub Service Connection erstellen
 
