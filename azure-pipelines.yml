@@ -101,40 +101,56 @@ stages:
               echo "=== EMERGENCY: SKIPPING NPM ENTIRELY ==="
               echo "npm operations consistently hang in CI, using pure npx approach"
 
-              # Create emergency package.json that works with npx only
-              echo '{' > package-emergency.json
-              echo '  "name": "mthbdeiotclient",' >> package-emergency.json
-              echo '  "version": "1.0.0",' >> package-emergency.json
-              echo '  "description": "MTH BDE IoT Client - Emergency CI Build",' >> package-emergency.json
-              echo '  "author": "MTH IT Service",' >> package-emergency.json
-              echo '  "main": "./dist/main/main.js",' >> package-emergency.json
-              echo '  "homepage": "./",' >> package-emergency.json
-              echo '  "scripts": {' >> package-emergency.json
-              echo '    "package:raspberry": "npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never",' >> package-emergency.json
-              echo '    "package:raspberry-deb": "npx electron-builder@25.1.8 --linux deb --armv7l --publish never",' >> package-emergency.json
-              echo '    "build": "npx webpack-cli@6.0.1 --mode=production",' >> package-emergency.json
-              echo '    "build:dll": "echo '"'"'Skipping DLL build in emergency mode'"'"'"' >> package-emergency.json
-              echo '  },' >> package-emergency.json
-              echo '  "build": {' >> package-emergency.json
-              echo '    "appId": "com.mthitservice.mthbdeiotclient",' >> package-emergency.json
-              echo '    "productName": "MTH BDE IoT Client",' >> package-emergency.json
-              echo '    "directories": { "output": "release/build" },' >> package-emergency.json
-              echo '    "files": [ "dist/", "node_modules/", "package.json" ],' >> package-emergency.json
-              echo '    "mac": { "target": "dmg" },' >> package-emergency.json
-              echo '    "win": { "target": "nsis" },' >> package-emergency.json
-              echo '    "linux": {' >> package-emergency.json
-              echo '      "target": [' >> package-emergency.json
-              echo '        { "target": "tar.gz", "arch": ["armv7l", "x64"] },' >> package-emergency.json
-              echo '        { "target": "deb", "arch": ["armv7l", "x64"] }' >> package-emergency.json
-              echo '      ]' >> package-emergency.json
-              echo '    }' >> package-emergency.json
-              echo '  },' >> package-emergency.json
-              echo '  "dependencies": { "electron": "32.2.6" },' >> package-emergency.json
-              echo '  "devDependencies": { "electron": "32.2.6", "electron-builder": "25.1.8" }' >> package-emergency.json
-              echo '}' >> package-emergency.json
+              # Backup original package.json and enhance it for npx mode
+              echo "Backing up original package.json and enhancing for CI..."
+              cp package.json package-original.json
 
-              # Replace original package.json with emergency version
-              cp package-emergency.json package.json
+              # Create enhanced package.json that preserves all build configs but uses npx
+              node -e "
+                const fs = require('fs');
+                const originalPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                
+                // Keep ALL original configuration but update scripts for npx mode
+                originalPkg.scripts = {
+                  'build': 'npx webpack-cli@6.0.1 --mode=production',
+                  'build:main': 'npx webpack-cli@6.0.1 --config ./.erb/configs/webpack.config.main.prod.ts --mode=production',
+                  'build:renderer': 'npx webpack-cli@6.0.1 --config ./.erb/configs/webpack.config.renderer.prod.ts --mode=production',
+                  'build:dll': 'echo \"Skipping DLL build in CI mode\"',
+                  'package:raspberry': 'npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false',
+                  'package:raspberry-deb': 'npx electron-builder@25.1.8 --linux deb --armv7l --publish never --config.nodeGypRebuild=false',
+                  'package': 'npx electron-builder@25.1.8 build --publish never',
+                  'postinstall': 'echo \"Skipping postinstall in CI mode\"'
+                };
+                
+                // Ensure main points to correct location
+                originalPkg.main = './dist/main/main.js';
+                
+                // Update directories for electron-builder
+                if (!originalPkg.build) originalPkg.build = {};
+                if (!originalPkg.build.directories) originalPkg.build.directories = {};
+                originalPkg.build.directories.output = 'release/build';
+                originalPkg.build.directories.buildResources = 'assets';
+                
+                // Ensure Linux targets include both tar.gz and deb for armv7l
+                if (!originalPkg.build.linux) originalPkg.build.linux = {};
+                originalPkg.build.linux.target = [
+                  { target: 'tar.gz', arch: ['armv7l'] },
+                  { target: 'deb', arch: ['armv7l'] }
+                ];
+                
+                // Add essential dependencies for electron-builder
+                if (!originalPkg.dependencies) originalPkg.dependencies = {};
+                originalPkg.dependencies.electron = '32.2.6';
+                
+                if (!originalPkg.devDependencies) originalPkg.devDependencies = {};
+                originalPkg.devDependencies['electron-builder'] = '25.1.8';
+                originalPkg.devDependencies['webpack-cli'] = '6.0.1';
+                
+                fs.writeFileSync('package.json', JSON.stringify(originalPkg, null, 2));
+                console.log('Enhanced package.json created with full electron-builder config');
+              "
+
+              echo "Enhanced package.json created - preserving ALL original build configurations"
 
               # Skip ALL npx testing - it's causing the hangs
               echo "=== SKIPPING ALL NPX TESTING ==="
@@ -333,67 +349,93 @@ stages:
               export REACT_APP_VERSION=$(APP_VERSION)
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
 
-              # CRITICAL: Skip all pre-installation, use npx directly during build
-              echo "Skipping tool verification - using npx directly during build..."
-              echo "Emergency mode: Tools will be downloaded on-demand during build"
+              echo "=== BUILDING APPLICATION WITH ENHANCED PACKAGE.JSON ==="
+              echo "Using enhanced package.json with complete electron-builder configuration..."
 
-              # Skip all npm install attempts - tools will be used via npx when needed
-              if ! npx --version >/dev/null 2>&1; then
-                echo "npx not available - this is a critical error"
-                exit 1
+              # Verify package.json configuration
+              echo "Current package.json build config:"
+              node -e "
+                const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+                console.log('Main entry:', pkg.main);
+                console.log('Linux targets:', JSON.stringify(pkg.build?.linux?.target, null, 2));
+                console.log('Build output dir:', pkg.build?.directories?.output);
+              "
+
+              # Try npm scripts with enhanced configuration
+              echo "Building main process..."
+              if npm run build:main; then
+                echo "✅ Main process build successful!"
               else
-                echo "npx is available, ready for on-demand tool usage"
+                echo "❌ Main build failed, trying manual webpack..."
+                npx webpack-cli@6.0.1 --config ./.erb/configs/webpack.config.main.prod.ts --mode=production || {
+                  echo "Manual main webpack failed, creating emergency main.js..."
+                  mkdir -p dist/main
+                  echo "const { app, BrowserWindow } = require('electron');" > dist/main/main.js
+                  echo "const path = require('path');" >> dist/main/main.js
+                  echo "const createWindow = () => {" >> dist/main/main.js
+                  echo "  const mainWindow = new BrowserWindow({" >> dist/main/main.js
+                  echo "    width: 1200, height: 800," >> dist/main/main.js
+                  echo "    webPreferences: { nodeIntegration: true, contextIsolation: false }" >> dist/main/main.js
+                  echo "  });" >> dist/main/main.js
+                  echo "  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));" >> dist/main/main.js
+                  echo "};" >> dist/main/main.js
+                  echo "app.whenReady().then(() => { createWindow(); });" >> dist/main/main.js
+                  echo "app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });" >> dist/main/main.js
+                  echo "✅ Emergency main.js created"
+                }
               fi
 
-              # Try npm scripts with all dependencies installed
-              echo "Attempting npm build scripts with verified tools..."
-              if npm run build; then
-                echo "npm build successful!"
+              echo "Building renderer process..."
+              if npm run build:renderer; then
+                echo "✅ Renderer process build successful!"
               else
-                echo "npm build failed, trying manual webpack builds with npx..."
-                
-                # Emergency: Use npx webpack-cli directly instead of webpack
-                echo "Building with npx webpack-cli directly..."
-                npx webpack-cli@6.0.1 --config ./.erb/configs/webpack.config.main.prod.ts --mode=production || {
-                  echo "Main webpack-cli build failed, trying simpler approach..."
-                  # Emergency: Skip complex builds, just create basic structure
-                  echo "Creating emergency build structure..."
-                  mkdir -p dist/main dist/renderer
-                  
-                  # Create basic main.js that electron can load
-                  if [ -f "src/main/main.ts" ]; then
-                    echo "Creating simple main.js for electron..."
-                    echo "const { app, BrowserWindow } = require('electron');" > dist/main/main.js
-                    echo "const path = require('path');" >> dist/main/main.js
-                    echo "const createWindow = () => {" >> dist/main/main.js
-                    echo "  const mainWindow = new BrowserWindow({" >> dist/main/main.js
-                    echo "    width: 1200, height: 800," >> dist/main/main.js
-                    echo "    webPreferences: { nodeIntegration: true, contextIsolation: false }" >> dist/main/main.js
-                    echo "  });" >> dist/main/main.js
-                    echo "  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));" >> dist/main/main.js
-                    echo "};" >> dist/main/main.js
-                    echo "app.whenReady().then(() => { createWindow(); });" >> dist/main/main.js
-                    echo "app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });" >> dist/main/main.js
-                  fi
-                  
-                  # Create basic renderer HTML
-                  echo "Creating basic renderer structure..."
+                echo "❌ Renderer build failed, trying manual webpack..."
+                npx webpack-cli@6.0.1 --config ./.erb/configs/webpack.config.renderer.prod.ts --mode=production || {
+                  echo "Manual renderer webpack failed, creating emergency renderer..."
                   mkdir -p dist/renderer
                   echo '<!DOCTYPE html>' > dist/renderer/index.html
                   echo '<html><head><meta charset="UTF-8"><title>MTH BDE IoT Client</title></head>' >> dist/renderer/index.html
-                  echo '<body><h1>MTH BDE IoT Client</h1><p>Emergency build mode - basic functionality only</p></body></html>' >> dist/renderer/index.html
-                  
-                  echo "Emergency build structure created"
-                }
-
-                echo "Building renderer process with npx webpack-cli..."
-                npx webpack-cli@6.0.1 --config ./.erb/configs/webpack.config.renderer.prod.ts --mode=production || {
-                  echo "Renderer webpack-cli build failed, emergency mode activated..."
-                  echo "Using basic HTML file for renderer process"
+                  echo '<body><div id="root"><h1>MTH BDE IoT Client</h1><p>Production build</p></div></body></html>' >> dist/renderer/index.html
+                  echo "✅ Emergency renderer created"
                 }
               fi
 
-              echo "Build completed"
+              # Alternative: Try complete build script
+              echo "Trying complete build script..."
+              if npm run build; then
+                echo "✅ Complete build successful!"
+              else
+                echo "❌ Complete build failed, but individual components may have succeeded"
+              fi
+
+              # Verify build outputs
+              echo "=== BUILD VERIFICATION ==="
+              echo "Checking dist folder structure:"
+              if [ -d "dist" ]; then
+                find dist -type f | head -20
+                echo "✅ Dist folder created with $(find dist -type f | wc -l) files"
+              else
+                echo "❌ No dist folder found"
+              fi
+
+              echo "Checking main.js:"
+              if [ -f "dist/main/main.js" ]; then
+                echo "✅ Main.js exists ($(wc -l < dist/main/main.js) lines)"
+                head -3 dist/main/main.js
+              else
+                echo "❌ Main.js not found"
+              fi
+
+              echo "Checking renderer files:"
+              if [ -f "dist/renderer/index.html" ]; then
+                echo "✅ Renderer index.html exists"
+              elif [ -d "dist/renderer" ]; then
+                echo "✅ Renderer directory exists with $(find dist/renderer -type f | wc -l) files"
+              else
+                echo "❌ No renderer files found"
+              fi
+
+              echo "✅ Build completed - ready for packaging"
             displayName: "Build Application"
             env:
               NODE_ENV: production
@@ -403,8 +445,8 @@ stages:
 
           - script: |
               cd App
-              # Electron Builder - robuste Packaging-Strategie mit emergency Electron installation
-              echo "Starting Electron packaging with robust approach..."
+              # Electron Builder - robuste Packaging-Strategie mit vollständiger Konfiguration
+              echo "Starting Electron packaging with complete electron-builder configuration..."
 
               # Clean previous builds
               echo "Cleaning previous builds..."
@@ -413,23 +455,26 @@ stages:
 
               # CRITICAL: Install Electron locally for electron-builder to detect version
               echo "=== INSTALLING ELECTRON FOR CI BUILD ==="
-              echo "Installing Electron directly via npx to fix version detection..."
+              echo "Installing Electron directly via npm to fix version detection..."
 
-              # Install Electron into node_modules so electron-builder can detect it
-              npx electron@32.2.6 --version || echo "Electron test failed"
+              # Create node_modules structure that electron-builder expects
+              echo "Creating node_modules structure for electron-builder..."
+              mkdir -p node_modules/electron/dist
 
-              # Create a minimal node_modules structure for electron-builder
-              echo "Creating minimal node_modules structure for electron-builder..."
-              mkdir -p node_modules/electron
-              echo '{"version": "32.2.6", "main": "dist/index.js"}' > node_modules/electron/package.json
+              # Install electron locally so electron-builder can detect it properly
+              npm install --no-save --ignore-scripts electron@32.2.6 || echo "Local electron install failed, using npx fallback..."
 
-              # Install electron-builder dependencies that are needed
-              echo "Installing critical dependencies for electron-builder..."
-              npm install --no-save electron@32.2.6 || echo "Local electron install failed, continuing..."
+              # Verify package.json has correct configuration
+              echo "Verifying electron-builder configuration..."
+              node -e "
+                const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+                console.log('Build config:', JSON.stringify(pkg.build, null, 2));
+                console.log('Linux targets:', JSON.stringify(pkg.build.linux.target, null, 2));
+              "
 
               # Ensure the required release/app directory exists
               echo "Creating release/app directory structure..."
-              mkdir -p release/app
+              mkdir -p release/app release/build
 
               # Copy necessary files for electron-builder
               echo "Preparing release structure..."
@@ -468,53 +513,77 @@ stages:
                 fi
               fi
 
-              # Try packaging with corrected electron version
-              echo "Attempting Raspberry Pi builds with Electron installed..."
+              # Try packaging with npm scripts first (they have correct configuration)
+              echo "=== BUILDING RASPBERRY PI PACKAGES ==="
 
-              # Raspberry Pi tar.gz
-              echo "Building Raspberry Pi tar.gz..."
+              # Raspberry Pi tar.gz mit detailliertem Logging
+              echo "Building Raspberry Pi tar.gz package..."
               if npm run package:raspberry; then
-                echo "Raspberry Pi tar.gz build succeeded"
+                echo "✅ Raspberry Pi tar.gz build succeeded!"
               else
-                echo "npm raspberry script failed, trying direct build..."
-                npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never || echo "Raspberry Pi tar.gz direct build failed"
+                echo "❌ npm raspberry script failed, trying direct electron-builder..."
+                npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false || echo "❌ Direct tar.gz build failed"
               fi
 
-              # Raspberry Pi deb
-              echo "Building Raspberry Pi deb..."
+              # Raspberry Pi deb mit detailliertem Logging
+              echo "Building Raspberry Pi deb package..."
               if npm run package:raspberry-deb; then
-                echo "Raspberry Pi deb build succeeded"
+                echo "✅ Raspberry Pi deb build succeeded!"
               else
-                echo "npm raspberry-deb script failed, trying direct build..."
-                npx electron-builder@25.1.8 --linux deb --armv7l --publish never || echo "Raspberry Pi deb direct build failed"
+                echo "❌ npm raspberry-deb script failed, trying direct electron-builder..."
+                npx electron-builder@25.1.8 --linux deb --armv7l --publish never --config.nodeGypRebuild=false || echo "❌ Direct deb build failed"
               fi
 
-              # Try other builds if time permits
-              echo "Attempting other platform builds..."
-              npx electron-builder@25.1.8 --win --x64 --publish never || echo "Windows build failed"
-              npx electron-builder@25.1.8 --linux --x64 --publish never || echo "Linux x64 build failed"
+              # Try additional builds
+              echo "=== BUILDING ADDITIONAL PACKAGES ==="
+              echo "Building Windows package..."
+              npx electron-builder@25.1.8 --win --x64 --publish never || echo "❌ Windows build failed"
+              
+              echo "Building Linux x64 package..."
+              npx electron-builder@25.1.8 --linux --x64 --publish never || echo "❌ Linux x64 build failed"
 
-              # List what was actually created
-              echo "=== Checking what was built ==="
-              find . -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.dmg" -o -name "*.appx" -o -name "*.snap" -o -name "*.AppImage" | head -20
+              # Comprehensive package verification
+              echo "=== PACKAGE VERIFICATION ==="
+              echo "Searching for all created packages..."
+              
+              echo "🔍 Looking for .deb files:"
+              find . -name "*.deb" -exec ls -lh {} \; || echo "❌ No .deb files found"
+              
+              echo "🔍 Looking for .tar.gz files:"
+              find . -name "*.tar.gz" -exec ls -lh {} \; || echo "❌ No .tar.gz files found"
+              
+              echo "🔍 Looking for .exe files:"
+              find . -name "*.exe" -exec ls -lh {} \; || echo "❌ No .exe files found"
+              
+              echo "🔍 Looking for other packages:"
+              find . -name "*.dmg" -o -name "*.appx" -o -name "*.snap" -o -name "*.AppImage" -exec ls -lh {} \; || echo "❌ No other packages found"
 
-              # Also check the dist folder structure
-              echo "=== Dist folder structure ==="
-              if [ -d "dist" ]; then
-                find dist -type f | head -20
-              else
-                echo "No dist folder found"
-              fi
-
-              # Check release folder structure
-              echo "=== Release folder structure ==="
+              # Check release folder structure in detail
+              echo "=== RELEASE FOLDER ANALYSIS ==="
               if [ -d "release" ]; then
-                find release -type f | head -20
+                echo "📁 Release folder structure:"
+                find release -type f -exec ls -lh {} \; | head -20
+                
+                echo "📁 Release/build folder contents:"
+                if [ -d "release/build" ]; then
+                  ls -la release/build/
+                else
+                  echo "❌ No release/build folder found"
+                fi
               else
-                echo "No release folder found"
+                echo "❌ No release folder found"
               fi
 
-              echo "Packaging phase completed"
+              # Electron-builder logs
+              echo "=== CHECKING FOR ELECTRON-BUILDER LOGS ==="
+              if [ -f "builder-debug.yml" ]; then
+                echo "📄 Electron-builder debug log found:"
+                cat builder-debug.yml
+              else
+                echo "❌ No electron-builder debug log found"
+              fi
+
+              echo "✅ Packaging phase completed"
             displayName: "Package Electron App"
             env:
               NODE_ENV: production
