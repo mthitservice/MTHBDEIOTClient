@@ -89,56 +89,93 @@ stages:
               npm config set audit false
               npm config set progress false
 
-              # Try npm ci first (faster), fallback to npm install
-              echo "Attempting npm ci..."
-              timeout 300 npm ci --ignore-scripts --engine-strict=false --no-audit --no-fund --silent || {
-                echo "npm ci failed or timed out, trying npm install..."
-                timeout 300 npm install --ignore-scripts --engine-strict=false --no-audit --no-fund --silent || {
-                  echo "Both npm ci and npm install failed, trying minimal install..."
-                  # Last resort: Install only production dependencies first
-                  npm install --production --ignore-scripts --no-audit --no-fund --silent || {
-                    echo "Even minimal install failed"
-                    exit 1
+              # FORCE KILL any hanging npm processes
+              echo "Killing any existing npm processes..."
+              pkill -f npm || echo "No npm processes to kill"
+
+              # Clear npm cache aggressively
+              echo "Clearing npm cache..."
+              npm cache clean --force 2>/dev/null || echo "Cache clean failed"
+
+              # Aggressive timeout strategy with multiple fallbacks
+              echo "Attempting npm ci with aggressive timeout..."
+              timeout 120 npm ci --ignore-scripts --engine-strict=false --no-audit --no-fund --silent || {
+                echo "npm ci failed/timed out after 120s, trying npm install with timeout..."
+                timeout 120 npm install --ignore-scripts --engine-strict=false --no-audit --no-fund --silent || {
+                  echo "Both npm ci and npm install failed, trying without package-lock..."
+                  rm -f package-lock.json
+                  timeout 90 npm install --ignore-scripts --no-audit --no-fund --silent || {
+                    echo "Regular install failed, trying production-only..."
+                    timeout 60 npm install --production --ignore-scripts --no-audit --no-fund --silent || {
+                      echo "All base installation attempts failed"
+                      exit 1
+                    }
                   }
                 }
               }
 
               echo "Base installation completed at $(date)"
 
-              # ALTERNATIVE: Try installing all at once to avoid timeouts
-              echo "Phase 2-3: Installing all dependencies at once..."
-              timeout 300 npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 electron@^35.0.2 --no-audit --no-fund --silent && \
-              timeout 60 npm install chalk@4.1.2 --save --no-audit --no-fund --silent || {
-                echo "Batch installation failed, falling back to individual installation..."
-                
-                # PHASE 2: Install critical dependencies first
-                echo "Phase 2: Installing critical dependencies..."
-                echo "Installing electron-builder and ts-node..."
-                timeout 120 npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 --no-audit --no-fund --silent || {
-                  echo "Critical dependencies installation failed or timed out"
-                  exit 1
-                }
+              # CRITICAL TIMEOUT CHECK: If we're still here after expected time, skip to emergency mode
+              CURRENT_TIME=$(date +%s)
+              START_TIME=$(date -d "$(date)" +%s)
+              if [ $((CURRENT_TIME - START_TIME)) -gt 300 ]; then
+                echo "WARNING: Installation taking too long, switching to emergency npx-only mode"
+                EMERGENCY_MODE=true
+              else
+                EMERGENCY_MODE=false
+              fi
 
-                echo "Installing chalk..."
+              if [ "$EMERGENCY_MODE" = "true" ]; then
+                echo "=== EMERGENCY MODE: Skipping local installation, using pure npx ==="
+                # Create minimal package.json fallback
+                echo '{"name":"mthbdeiotclient","version":"1.0.0","scripts":{"package:raspberry":"npx electron-builder@25.1.8 --linux tar.gz --armv7l --publish never"}}' > package-emergency.json
+                cp package-emergency.json package.json
+                
+                # Test npx tools directly
+                echo "Testing emergency npx tools..."
+                npx electron-builder@25.1.8 --version || echo "electron-builder npx test failed"
+                npx webpack@5.100.0 --version || echo "webpack npx test failed"
+                
+                echo "Emergency mode setup complete, skipping to build phase"
+              else
+                echo "Normal installation mode, proceeding with dependency installation..."
+
+                # ALTERNATIVE: Try installing all at once to avoid timeouts
+                echo "Phase 2-3: Installing all dependencies at once..."
+                timeout 300 npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 electron@^35.0.2 --no-audit --no-fund --silent && \
                 timeout 60 npm install chalk@4.1.2 --save --no-audit --no-fund --silent || {
-                  echo "Chalk installation failed or timed out, trying alternative approach..."
-                  # Try without version constraint
-                  timeout 30 npm install chalk --save --no-audit --no-fund --silent || {
-                    echo "Chalk installation completely failed, creating simple fallback..."
-                    mkdir -p node_modules/chalk
-                    echo "module.exports = { red: (t) => t, green: (t) => t, yellow: (t) => t, blue: (t) => t };" > node_modules/chalk/index.js
-                    echo '{"name": "chalk", "version": "4.1.2", "main": "index.js"}' > node_modules/chalk/package.json
-                    echo "Fallback chalk module created"
+                  echo "Batch installation failed, falling back to individual installation..."
+                  
+                  # PHASE 2: Install critical dependencies first
+                  echo "Phase 2: Installing critical dependencies..."
+                  echo "Installing electron-builder and ts-node..."
+                  timeout 120 npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 --no-audit --no-fund --silent || {
+                    echo "Critical dependencies installation failed or timed out"
+                    exit 1
+                  }
+
+                  echo "Installing chalk..."
+                  timeout 60 npm install chalk@4.1.2 --save --no-audit --no-fund --silent || {
+                    echo "Chalk installation failed or timed out, trying alternative approach..."
+                    # Try without version constraint
+                    timeout 30 npm install chalk --save --no-audit --no-fund --silent || {
+                      echo "Chalk installation completely failed, creating simple fallback..."
+                      mkdir -p node_modules/chalk
+                      echo "module.exports = { red: (t) => t, green: (t) => t, yellow: (t) => t, blue: (t) => t };" > node_modules/chalk/index.js
+                      echo '{"name": "chalk", "version": "4.1.2", "main": "index.js"}' > node_modules/chalk/package.json
+                      echo "Fallback chalk module created"
+                    }
+                  }
+
+                  # PHASE 3: Install remaining build tools
+                  echo "Phase 3: Installing build tools..."
+                  timeout 120 npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 electron@^35.0.2 --no-audit --no-fund --silent || {
+                    echo "Build tools installation failed or timed out"
+                    exit 1
                   }
                 }
-
-                # PHASE 3: Install remaining build tools
-                echo "Phase 3: Installing build tools..."
-                timeout 120 npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 electron@^35.0.2 --no-audit --no-fund --silent || {
-                  echo "Build tools installation failed or timed out"
-                  exit 1
-                }
-              }
+              fi
 
               # PHASE 4: Now run postinstall manually (when all tools are available)
               echo "Phase 4: Running postinstall tasks manually..."
