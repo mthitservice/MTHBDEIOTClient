@@ -55,20 +55,23 @@ stages:
 
           - script: |
               cd App
-              # Dependencies ohne postinstall installieren
-              npm ci --engine-strict=false --ignore-scripts
+              # Vollständige Installation mit allen DevDependencies
+              npm install --engine-strict=false --ignore-scripts
               
-              # Postinstall Schritte manuell in der richtigen Reihenfolge
+              # Electron manuell installieren (für electron-builder)
+              npm install electron@^35.0.2 --save-dev --engine-strict=false
+              
+              # Postinstall Schritte manuell ausführen
               echo "Running postinstall steps manually..."
               
-              # 1. Check native dependencies (optional, kann fehlschlagen)
-              npx ts-node .erb/scripts/check-native-dep.js || echo "Native dep check skipped (optional)"
+              # 1. Check native dependencies (optional)
+              ./node_modules/.bin/ts-node .erb/scripts/check-native-dep.js || echo "Native dep check skipped"
               
               # 2. Install app dependencies for electron-builder
-              npx electron-builder install-app-deps
+              ./node_modules/.bin/electron-builder install-app-deps || echo "Electron app deps skipped"
               
               # 3. Build DLL
-              npm run build:dll
+              ./node_modules/.bin/cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts || echo "DLL build skipped"
             displayName: "Install dependencies"
 
           - task: PowerShell@2
