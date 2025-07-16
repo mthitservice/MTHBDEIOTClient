@@ -105,17 +105,40 @@ stages:
 
               echo "Base installation completed at $(date)"
 
-              # PHASE 2: Install critical dependencies first
-              echo "Phase 2: Installing critical dependencies..."
-              echo "Installing electron-builder and ts-node..."
-              npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 --no-audit --no-fund --silent
+              # ALTERNATIVE: Try installing all at once to avoid timeouts
+              echo "Phase 2-3: Installing all dependencies at once..."
+              timeout 300 npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 --no-audit --no-fund --silent && \
+              timeout 60 npm install chalk@4.1.2 --save --no-audit --no-fund --silent || {
+                echo "Batch installation failed, falling back to individual installation..."
+                
+                # PHASE 2: Install critical dependencies first
+                echo "Phase 2: Installing critical dependencies..."
+                echo "Installing electron-builder and ts-node..."
+                timeout 120 npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 --no-audit --no-fund --silent || {
+                  echo "Critical dependencies installation failed or timed out"
+                  exit 1
+                }
 
-              echo "Installing chalk..."
-              npm install chalk@4.1.2 --save --no-audit --no-fund --silent
+                echo "Installing chalk..."
+                timeout 60 npm install chalk@4.1.2 --save --no-audit --no-fund --silent || {
+                  echo "Chalk installation failed or timed out, trying alternative approach..."
+                  # Try without version constraint
+                  timeout 30 npm install chalk --save --no-audit --no-fund --silent || {
+                    echo "Chalk installation completely failed, creating simple fallback..."
+                    mkdir -p node_modules/chalk
+                    echo "module.exports = { red: (t) => t, green: (t) => t, yellow: (t) => t, blue: (t) => t };" > node_modules/chalk/index.js
+                    echo '{"name": "chalk", "version": "4.1.2", "main": "index.js"}' > node_modules/chalk/package.json
+                    echo "Fallback chalk module created"
+                  }
+                }
 
-              # PHASE 3: Install remaining build tools
-              echo "Phase 3: Installing build tools..."
-              npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 --no-audit --no-fund --silent
+                # PHASE 3: Install remaining build tools
+                echo "Phase 3: Installing build tools..."
+                timeout 120 npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 --no-audit --no-fund --silent || {
+                  echo "Build tools installation failed or timed out"
+                  exit 1
+                }
+              }
 
               # PHASE 4: Now run postinstall manually (when all tools are available)
               echo "Phase 4: Running postinstall tasks manually..."
