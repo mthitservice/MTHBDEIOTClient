@@ -74,35 +74,39 @@ stages:
               ./node_modules/.bin/cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts || echo "DLL build skipped"
             displayName: "Install dependencies"
 
-          - task: PowerShell@2
-            displayName: "Set Version and Environment Variables"
-            inputs:
-              targetType: "inline"
-              script: |
-                # Version aus Tag oder automatisch generieren
-                if ($env:ISRELEASE -eq "True") {
-                  $version = $env:RELEASEVERSION
-                  Write-Host "Release Version: $version"
-                } else {
-                  $buildNumber = $env:BUILD_BUILDNUMBER
-                  $shortCommit = $env:BUILD_SOURCEVERSION.Substring(0,7)
-                  $version = "1.0.0-dev.$buildNumber+$shortCommit"
-                  Write-Host "Development Version: $version"
+          - script: |
+              # Version aus Tag oder automatisch generieren
+              if [ "$ISRELEASE" = "True" ]; then
+                VERSION="$RELEASEVERSION"
+                echo "Release Version: $VERSION"
+              else
+                BUILD_NUMBER="$BUILD_BUILDNUMBER"
+                SHORT_COMMIT=$(echo "$BUILD_SOURCEVERSION" | cut -c1-7)
+                VERSION="1.0.0-dev.$BUILD_NUMBER+$SHORT_COMMIT"
+                echo "Development Version: $VERSION"
+              fi
+
+              # Environment Variables setzen
+              echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=NODE_ENV]production"
+              echo "##vso[task.setvariable variable=REACT_APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+              # Package.json Version aktualisieren mit Node.js
+              cd App
+              node -e "
+                const fs = require('fs');
+                const path = 'package.json';
+                try {
+                  const packageJson = JSON.parse(fs.readFileSync(path, 'utf8'));
+                  packageJson.version = '$VERSION';
+                  fs.writeFileSync(path, JSON.stringify(packageJson, null, 2));
+                  console.log('Updated package.json version to: $VERSION');
+                } catch (error) {
+                  console.log('Warning: Could not update package.json version:', error.message);
                 }
-
-                # Environment Variables setzen
-                Write-Host "##vso[task.setvariable variable=APP_VERSION]$version"
-                Write-Host "##vso[task.setvariable variable=NODE_ENV]production"
-                Write-Host "##vso[task.setvariable variable=REACT_APP_VERSION]$version"
-                Write-Host "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
-
-                # Package.json Version aktualisieren
-                $packagePath = "App/package.json"
-                $packageJson = Get-Content $packagePath | ConvertFrom-Json
-                $packageJson.version = $version
-                $packageJson | ConvertTo-Json -Depth 10 | Set-Content $packagePath
-
-                Write-Host "Updated package.json version to: $version"
+              "
+            displayName: "Set Version and Environment Variables (Bash)"
 
           - script: |
               cd App
