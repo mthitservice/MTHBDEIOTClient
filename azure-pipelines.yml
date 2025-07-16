@@ -129,17 +129,25 @@ stages:
 
           - script: |
               cd App
-              # Electron Builder mit npm scripts - vereinfacht für Debugging
-              echo "Starting Electron packaging..."
+              # Electron Builder - direkter Aufruf ohne npm scripts
+              echo "Starting Electron packaging with direct electron-builder..."
 
-              # Erst versuchen nur einen einfachen Build
-              echo "Trying simple package command..."
-              npm run package || echo "Package command failed"
+              # DLL zuerst bauen (falls noch nicht vorhanden)
+              npm run build:dll || echo "DLL build failed, continuing..."
 
-              echo "Checking what was created..."
-              find release -type f 2>/dev/null | head -20 || echo "No release directory found"
+              # Electron Builder direkt aufrufen
+              echo "Running electron-builder directly..."
+              npx electron-builder build --publish never --win --linux --mac || echo "Standard build failed"
 
-              echo "Packaging completed (with potential errors)"
+              # Raspberry Pi separat
+              echo "Building for Raspberry Pi..."
+              npx electron-builder build --linux deb --armv7l --publish never || echo "Raspberry Pi deb failed"
+              npx electron-builder build --linux tar.gz --armv7l --publish never || echo "Raspberry Pi tar.gz failed"
+
+              echo "Checking what was created in release directory..."
+              find release -type f 2>/dev/null | head -30 || echo "No release directory found"
+
+              echo "Packaging phase completed"
             displayName: "Package Electron App"
             env:
               NODE_ENV: production
@@ -195,10 +203,10 @@ stages:
           - script: |
               echo "=== Final check: What was actually published? ==="
               ls -la $(Build.ArtifactStagingDirectory)/ 2>/dev/null || echo "Nothing in staging directory"
-              
+
               echo "=== Size of staging directory ==="
               du -sh $(Build.ArtifactStagingDirectory)/ 2>/dev/null || echo "Cannot measure size"
-              
+
               echo "=== All files that would be published ==="
               find $(Build.ArtifactStagingDirectory) -type f | wc -l 2>/dev/null || echo "Cannot count files"
             displayName: "Final Artifact Check"
@@ -231,10 +239,10 @@ stages:
                 - script: |
                     echo "=== Pipeline Workspace Structure ==="
                     ls -la $(Pipeline.Workspace)/ || echo "Pipeline workspace not found"
-                    
+
                     echo "=== Available artifacts ==="
                     find $(Pipeline.Workspace) -name "*" -type d | head -10 || echo "No directories found"
-                    
+
                     echo "=== All files ==="
                     find $(Pipeline.Workspace) -type f | head -20 || echo "No files found"
                   displayName: "Debug Available Files"
@@ -245,6 +253,8 @@ stages:
                     targetType: "inline"
                     script: |
                       $version = "$(releaseVersion)"
+                      $buildNumber = "$(Build.BuildNumber)"
+                      $sourceVersion = "$(Build.SourceVersion)"
                       $releaseNotes = @"
                       # MthBdeIotClient Release $version
 
@@ -285,9 +295,9 @@ stages:
                       ```
 
                       ---
-                      **Build:** $(Build.BuildNumber)
-                      **Commit:** $(Build.SourceVersion)
-                      **Datum:** $(Build.QueueTime)
+                      **Build:** $buildNumber
+                      **Commit:** $sourceVersion
+                      **Status:** Build erfolgreich, aber electron-builder hat keine Installationspakete erstellt
                       "@
 
                       $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/release-notes.md" -Encoding UTF8
@@ -301,8 +311,8 @@ stages:
                     repositoryName: $(githubRepository)
                     action: "create"
                     target: "$(Build.SourceVersion)"
-                    tagSource: "gitTag"
-                    tagPattern: "v*"
+                    tagSource: "userSpecifiedTag"
+                    tag: "v$(releaseVersion)"
                     title: "MthBdeIotClient v$(releaseVersion)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
                     assets: "$(Pipeline.Workspace)/**/*"
