@@ -13,7 +13,7 @@ trigger:
 variables:
   # Build-Konfiguration
   buildConfiguration: "Release"
-  nodeVersion: "20.x"
+  nodeVersion: "22.x"
 
   # Versioning
   isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
@@ -55,12 +55,19 @@ stages:
 
           - script: |
               cd App
-              # Engine-Checks überspringen und postinstall skippen
+              # Dependencies ohne postinstall installieren
               npm ci --engine-strict=false --ignore-scripts
               
-              # Manuell die notwendigen postinstall Schritte ausführen
-              npx ts-node .erb/scripts/check-native-dep.js || true
+              # Postinstall Schritte manuell in der richtigen Reihenfolge
+              echo "Running postinstall steps manually..."
+              
+              # 1. Check native dependencies (optional, kann fehlschlagen)
+              npx ts-node .erb/scripts/check-native-dep.js || echo "Native dep check skipped (optional)"
+              
+              # 2. Install app dependencies for electron-builder
               npx electron-builder install-app-deps
+              
+              # 3. Build DLL
               npm run build:dll
             displayName: "Install dependencies"
 
@@ -215,8 +222,8 @@ stages:
                       ```
 
                       ---
-                      **Build:** $(Build.BuildNumber)  
-                      **Commit:** $(Build.SourceVersion)  
+                      **Build:** $(Build.BuildNumber)
+                      **Commit:** $(Build.SourceVersion)
                       **Datum:** $(Build.QueueTime)
                       "@
 
@@ -316,11 +323,11 @@ stages:
                 $readmePath = "README.md"
                 if (Test-Path $readmePath) {
                   $content = Get-Content $readmePath -Raw
-                  
+
                   # Update Download-Badges
                   $content = $content -replace 'download/v[\d\.]+/', "download/v$version/"
                   $content = $content -replace 'releases/latest/', "releases/download/v$version/"
-                  
+
                   Set-Content $readmePath $content
                 }
 
@@ -328,11 +335,11 @@ stages:
                 $installPath = "App/RASPBERRY_INSTALLATION.md"
                 if (Test-Path $installPath) {
                   $content = Get-Content $installPath -Raw
-                  
+
                   # Update Download-URLs
                   $content = $content -replace 'releases/download/v[\d\.]+/', "releases/download/v$version/"
                   $content = $content -replace 'mthbdeiotclient_[\d\.]+_armhf\.deb', "mthbdeiotclient_$version`_armhf.deb"
-                  
+
                   Set-Content $installPath $content
                 }
 

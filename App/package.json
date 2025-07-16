@@ -289,13 +289,13 @@
     "url": "https://opencollective.com/electron-react-boilerplate-594"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=9.0.0"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=20.x",
+      "version": ">=22.x",
       "onFail": "warn"
     },
     "packageManager": {
