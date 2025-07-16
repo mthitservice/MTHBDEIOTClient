@@ -53,21 +53,69 @@ stages:
                 npm | "$(Agent.OS)"
               path: App/node_modules
 
+          # Pre-installation diagnostics
+          - script: |
+              echo "=== PRE-INSTALLATION DIAGNOSTICS ==="
+              echo "Node version: $(node --version)"
+              echo "NPM version: $(npm --version)"
+              echo "Working directory: $(pwd)"
+              echo "Disk space:"
+              df -h /tmp || echo "Cannot check disk space"
+              echo "Memory info:"
+              free -h || echo "Cannot check memory"
+              echo "Network connectivity:"
+              ping -c 1 registry.npmjs.org || echo "NPM registry not reachable"
+
+              cd App
+              echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+              echo "Package-lock.json exists: $(test -f package-lock.json && echo 'YES' || echo 'NO')"
+              echo "Node_modules exists: $(test -d node_modules && echo 'YES' || echo 'NO')"
+
+              # Check npm cache
+              echo "NPM cache info:"
+              npm cache verify || echo "Cache verification failed"
+
+            displayName: "Pre-Installation Diagnostics"
+
           - script: |
               cd App
 
               # PHASE 1: Clean installation WITHOUT postinstall scripts
               echo "Phase 1: Clean base installation (skipping postinstall)..."
-              npm ci --ignore-scripts --engine-strict=false || npm install --ignore-scripts --engine-strict=false
+              echo "Starting npm install at $(date)"
+
+              # Set npm configuration for CI environment
+              npm config set fund false
+              npm config set audit false
+              npm config set progress false
+
+              # Try npm ci first (faster), fallback to npm install
+              echo "Attempting npm ci..."
+              timeout 300 npm ci --ignore-scripts --engine-strict=false --no-audit --no-fund --silent || {
+                echo "npm ci failed or timed out, trying npm install..."
+                timeout 300 npm install --ignore-scripts --engine-strict=false --no-audit --no-fund --silent || {
+                  echo "Both npm ci and npm install failed, trying minimal install..."
+                  # Last resort: Install only production dependencies first
+                  npm install --production --ignore-scripts --no-audit --no-fund --silent || {
+                    echo "Even minimal install failed"
+                    exit 1
+                  }
+                }
+              }
+
+              echo "Base installation completed at $(date)"
 
               # PHASE 2: Install critical dependencies first
               echo "Phase 2: Installing critical dependencies..."
-              npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2
-              npm install chalk@4.1.2 --save
+              echo "Installing electron-builder and ts-node..."
+              npm install --save-dev electron-builder@^25.1.8 ts-node@^10.9.2 --no-audit --no-fund --silent
+
+              echo "Installing chalk..."
+              npm install chalk@4.1.2 --save --no-audit --no-fund --silent
 
               # PHASE 3: Install remaining build tools
               echo "Phase 3: Installing build tools..."
-              npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1
+              npm install --save-dev concurrently@^9.1.2 webpack@^5.100.0 webpack-cli@^6.0.1 --no-audit --no-fund --silent
 
               # PHASE 4: Now run postinstall manually (when all tools are available)
               echo "Phase 4: Running postinstall tasks manually..."
@@ -102,6 +150,59 @@ stages:
               npx concurrently --version || echo "concurrently not available"
               npx electron-builder --version || echo "electron-builder not available"
             displayName: "Install Dependencies and Build Tools"
+            timeoutInMinutes: 15
+
+          # Alternative: Fallback installation strategy if main installation fails
+          - script: |
+              cd App
+
+              echo "=== FALLBACK INSTALLATION STRATEGY ==="
+              echo "This runs only if the main installation step fails"
+
+              # Clean start
+              rm -rf node_modules package-lock.json || echo "No cleanup needed"
+
+              # Install only the absolutely necessary packages globally via npx
+              echo "Installing critical tools globally..."
+              npm install -g electron-builder@25.1.8 concurrently@9.1.2 webpack@5.100.0 webpack-cli@6.0.1 ts-node@10.9.2
+
+              # Install only production dependencies locally
+              echo "Installing production dependencies only..."
+              npm install --production --ignore-scripts --no-audit --no-fund
+
+              # Verify tools
+              echo "Verifying global tools..."
+              electron-builder --version || echo "electron-builder not available"
+              concurrently --version || echo "concurrently not available"
+              webpack --version || echo "webpack not available"
+              ts-node --version || echo "ts-node not available"
+
+            displayName: "Fallback Installation Strategy"
+            condition: failed()
+            timeoutInMinutes: 10
+
+          # Ultimate fallback: No local installation, pure npx approach
+          - script: |
+              cd App
+
+              echo "=== ULTIMATE FALLBACK: PURE NPX STRATEGY ==="
+              echo "Using npx for all tools without local installation"
+
+              # Test npx availability
+              echo "Testing npx functionality..."
+              npx --version || echo "npx not available"
+
+              # Test if we can run tools via npx directly
+              echo "Testing direct npx tool access..."
+              npx concurrently@9.1.2 --version || echo "concurrently via npx failed"
+              npx webpack@5.100.0 --version || echo "webpack via npx failed"
+              npx electron-builder@25.1.8 --version || echo "electron-builder via npx failed"
+
+              echo "Pure npx strategy ready"
+
+            displayName: "Ultimate Fallback: Pure NPX Strategy"
+            condition: and(failed(), eq(variables['Agent.JobStatus'], 'Failed'))
+            timeoutInMinutes: 5
 
           - script: |
               cd App
@@ -198,7 +299,17 @@ stages:
 
               # CRITICAL: Ensure all build tools are properly installed before building
               echo "Installing and verifying essential build tools..."
-              npm install --save-dev concurrently@^9.1.2 webpack-cli@^6.0.1 || echo "Build tools installation failed"
+
+              # Check if we need to install tools (depending on which installation strategy worked)
+              if ! npx concurrently --version >/dev/null 2>&1; then
+                echo "concurrently not available, installing..."
+                npm install --save-dev concurrently@^9.1.2 --no-audit --no-fund || echo "concurrently installation failed"
+              fi
+
+              if ! npx webpack-cli --version >/dev/null 2>&1; then
+                echo "webpack-cli not available, installing..."
+                npm install --save-dev webpack-cli@^6.0.1 --no-audit --no-fund || echo "webpack-cli installation failed"
+              fi
 
               # Verify tools are available
               echo "Verifying build tools..."
