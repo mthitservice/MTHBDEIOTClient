@@ -123,9 +123,14 @@ stages:
 
               # Skip npm entirely - test npx tools directly
               echo "Testing emergency npx tools without local installation..."
-              npx electron-builder@25.1.8 --version || echo "electron-builder npx failed"
-              npx webpack@5.100.0 --version || echo "webpack npx failed"
-              npx concurrently@9.1.2 --version || echo "concurrently npx failed"
+              echo "=== TESTING ELECTRON-BUILDER ==="
+              timeout 60 npx --verbose electron-builder@25.1.8 --version 2>&1 || echo "electron-builder npx failed or timed out"
+
+              echo "=== TESTING WEBPACK ==="
+              timeout 60 npx --verbose webpack@5.100.0 --version 2>&1 || echo "webpack npx failed or timed out"
+
+              echo "=== TESTING CONCURRENTLY ==="
+              timeout 60 npx --verbose concurrently@9.1.2 --version 2>&1 || echo "concurrently npx failed or timed out"
 
               echo "Emergency mode: npm operations skipped, using pure npx strategy"
 
@@ -176,11 +181,16 @@ stages:
               echo "Phase 5: Verifying critical tools..."
               node -e "console.log('Node version:', process.version)"
               npm --version
-              npx webpack --version || echo "webpack not available"
-              npx webpack-cli --version || echo "webpack-cli not available"
-              npx concurrently --version || echo "concurrently not available"
-              npx electron-builder --version || echo "electron-builder not available"
-              npx electron --version || echo "electron not available"
+              echo "=== TESTING WEBPACK WITH VERBOSE ==="
+              timeout 60 npx --verbose webpack --version 2>&1 || echo "webpack not available or timed out"
+              echo "=== TESTING WEBPACK-CLI WITH VERBOSE ==="
+              timeout 60 npx --verbose webpack-cli --version 2>&1 || echo "webpack-cli not available or timed out"
+              echo "=== TESTING CONCURRENTLY WITH VERBOSE ==="
+              timeout 60 npx --verbose concurrently --version 2>&1 || echo "concurrently not available or timed out"
+              echo "=== TESTING ELECTRON-BUILDER WITH VERBOSE ==="
+              timeout 60 npx --verbose electron-builder --version 2>&1 || echo "electron-builder not available or timed out"
+              echo "=== TESTING ELECTRON WITH VERBOSE ==="
+              timeout 60 npx --verbose electron --version 2>&1 || echo "electron not available or timed out"
             displayName: "Install Dependencies and Build Tools"
             timeoutInMinutes: 15
 
