@@ -43,6 +43,13 @@
     "lint": "cross-env NODE_ENV=development eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "cross-env NODE_ENV=development eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "package": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --publish never && npm run build:dll",
+    "package:all": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --win --linux --mac --publish never",
+    "package:github": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --win --linux --mac --publish always",
+    "package:raspberry": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false",
+    "package:raspberry-deb": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false",
+    "install:raspberry": "npm install --target_arch=armv7l --target_platform=linux --cache=/tmp/.npm",
+    "version:set": "node scripts/set-version.js",
+    "release:prepare": "npm run version:set && npm run build && npm run package:all",
     "rebuild": "electron-rebuild --parallel --types prod,dev,optional --module-dir release/app -f -w better-sqlite3",
     "prestart": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS=\"-r ts-node/register --no-warnings\" webpack --config ./.erb/configs/webpack.config.main.dev.ts",
     "start": "ts-node ./.erb/scripts/check-port-in-use.js && npm run prestart && npm run start:renderer",
@@ -242,9 +249,30 @@
     },
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        {
+          "target": "deb",
+          "arch": [
+            "armv7l"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "armv7l"
+          ]
+        }
       ],
-      "category": "Development"
+      "category": "Development",
+      "extraFiles": [
+        {
+          "from": "node_modules/better-sqlite3/build/Release",
+          "to": "resources/node_modules/better-sqlite3/build/Release",
+          "filter": [
+            "better_sqlite3.node"
+          ]
+        }
+      ]
     },
     "directories": {
       "app": "release/app",

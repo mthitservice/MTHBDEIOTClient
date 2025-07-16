@@ -1,0 +1,334 @@
+# Azure DevOps Pipeline für MthBdeIotClient
+# Automatisierte Builds und GitHub Releases
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+      - release/*
+  tags:
+    include:
+      - "v*"
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "18.x"
+
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+
+  # GitHub Repository Info
+  githubRepository: "mthitservice/MthBdeIotClient" # Anpassen!
+  githubConnection: "github-connection" # Service Connection Name
+
+  # Artifact Names
+  artifactName: "MthBdeIotClient-Release"
+
+stages:
+  - stage: Build
+    displayName: "Build Application"
+    jobs:
+      - job: BuildElectronApp
+        displayName: "Build Electron Application"
+        pool:
+          vmImage: "ubuntu-latest"
+
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: NodeTool@0
+            displayName: "Install Node.js"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - task: Cache@2
+            displayName: "Cache node modules"
+            inputs:
+              key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: App/node_modules
+
+          - script: |
+              cd App
+              npm ci
+            displayName: "Install dependencies"
+
+          - task: PowerShell@2
+            displayName: "Set Version and Environment Variables"
+            inputs:
+              targetType: "inline"
+              script: |
+                # Version aus Tag oder automatisch generieren
+                if ($env:ISRELEASE -eq "True") {
+                  $version = $env:RELEASEVERSION
+                  Write-Host "Release Version: $version"
+                } else {
+                  $buildNumber = $env:BUILD_BUILDNUMBER
+                  $shortCommit = $env:BUILD_SOURCEVERSION.Substring(0,7)
+                  $version = "1.0.0-dev.$buildNumber+$shortCommit"
+                  Write-Host "Development Version: $version"
+                }
+
+                # Environment Variables setzen
+                Write-Host "##vso[task.setvariable variable=APP_VERSION]$version"
+                Write-Host "##vso[task.setvariable variable=NODE_ENV]production"
+                Write-Host "##vso[task.setvariable variable=REACT_APP_VERSION]$version"
+                Write-Host "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+                # Package.json Version aktualisieren
+                $packagePath = "App/package.json"
+                $packageJson = Get-Content $packagePath | ConvertFrom-Json
+                $packageJson.version = $version
+                $packageJson | ConvertTo-Json -Depth 10 | Set-Content $packagePath
+
+                Write-Host "Updated package.json version to: $version"
+
+          - script: |
+              cd App
+              # Environment Variables für Build setzen
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export REACT_APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+
+              # Build ausführen
+              npm run build
+            displayName: "Build Application"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              REACT_APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - script: |
+              cd App
+              # Electron Builder für alle Plattformen
+              npm run package
+
+              # Raspberry Pi Build (ARMv7l)
+              npm run package:raspberry-deb
+              npm run package:raspberry
+            displayName: "Package Electron App"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              REACT_APP_VERSION: $(APP_VERSION)
+              GH_TOKEN: $(GITHUB_TOKEN)
+
+          - task: CopyFiles@2
+            displayName: "Copy Build Artifacts"
+            inputs:
+              sourceFolder: "App/release/build"
+              contents: "**/*"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/release"
+              cleanTargetFolder: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Installation Scripts"
+            inputs:
+              sourceFolder: "App"
+              contents: |
+                RASPBERRY_INSTALLATION.md
+                deploy.ps1
+                generate-inventory.sh
+                Dockerfile.raspberry
+              targetFolder: "$(Build.ArtifactStagingDirectory)/installation"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Build Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: $(artifactName)
+              publishLocation: "Container"
+
+  - stage: Release
+    displayName: "GitHub Release"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Build
+    jobs:
+      - deployment: GitHubRelease
+        displayName: "Create GitHub Release"
+        environment: "Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: $(artifactName)
+
+                - task: PowerShell@2
+                  displayName: "Prepare Release Notes"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $version = "$(releaseVersion)"
+                      $releaseNotes = @"
+                      # MthBdeIotClient Release $version
+
+                      ## 🚀 Neue Features und Verbesserungen
+
+                      ### 📦 Verfügbare Downloads:
+                      - **Windows:** `MthBdeIotClient-Setup-$version.exe`
+                      - **Raspberry Pi 3+ (ARMv7l):** `mthbdeiotclient_$version_armhf.deb`
+                      - **Raspberry Pi (tar.gz):** `MthBdeIotClient-$version-linux-armv7l.tar.gz`
+
+                      ### 🔧 Installation:
+
+                      #### Windows:
+                      ```bash
+                      # Download und Installation
+                      ./MthBdeIotClient-Setup-$version.exe
+                      ```
+
+                      #### Raspberry Pi:
+                      ```bash
+                      # .deb Installation
+                      sudo dpkg -i mthbdeiotclient_$version_armhf.deb
+                      sudo apt-get install -f
+
+                      # Oder tar.gz
+                      tar -xzf MthBdeIotClient-$version-linux-armv7l.tar.gz
+                      ```
+
+                      ### 📋 Automatische Raspberry Pi Installation:
+                      Siehe [RASPBERRY_INSTALLATION.md](./RASPBERRY_INSTALLATION.md) für detaillierte Ansible-Deployment Anweisungen.
+
+                      ### 🔗 Schnell-Installation:
+                      ```bash
+                      # Direkter Download und Installation (Raspberry Pi)
+                      curl -L https://github.com/$(githubRepository)/releases/download/v$version/mthbdeiotclient_$version_armhf.deb -o mthbdeiotclient.deb
+                      sudo dpkg -i mthbdeiotclient.deb
+                      sudo apt-get install -f
+                      ```
+
+                      ---
+                      **Build:** $(Build.BuildNumber)  
+                      **Commit:** $(Build.SourceVersion)  
+                      **Datum:** $(Build.QueueTime)
+                      "@
+
+                      $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/release-notes.md" -Encoding UTF8
+                      Write-Host "Release notes prepared for version $version"
+
+                - task: GitHubRelease@1
+                  displayName: "Create GitHub Release"
+                  inputs:
+                    gitHubConnection: $(githubConnection)
+                    repositoryName: $(githubRepository)
+                    action: "create"
+                    target: "$(Build.SourceVersion)"
+                    tagSource: "gitTag"
+                    tagPattern: "v*"
+                    title: "MthBdeIotClient v$(releaseVersion)"
+                    releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
+                    assets: |
+                      $(Pipeline.Workspace)/$(artifactName)/release/**/*
+                      $(Pipeline.Workspace)/$(artifactName)/installation/**/*
+                    assetUploadMode: "replace"
+                    isDraft: false
+                    isPreRelease: false
+                    addChangeLog: true
+                    changeLogCompareToRelease: "lastFullRelease"
+                    changeLogType: "commitBased"
+                    changeLogLabels: |
+                      [
+                        {"label":"enhancement","displayName":"🚀 Enhancements"},
+                        {"label":"bug","displayName":"🐛 Bug Fixes"},
+                        {"label":"documentation","displayName":"📖 Documentation"},
+                        {"label":"breaking","displayName":"⚠️ Breaking Changes"}
+                      ]
+
+  - stage: UpdateLatest
+    displayName: "Update Latest Release"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Release
+    jobs:
+      - job: UpdateLatestTag
+        displayName: "Update Latest Tag"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: PowerShell@2
+            displayName: "Update Latest Tag"
+            inputs:
+              targetType: "inline"
+              script: |
+                # Git konfigurieren
+                git config user.name "Azure DevOps"
+                git config user.email "devops@mth-it-service.com"
+
+                # Latest Tag auf aktuellen Release setzen
+                $version = "$(releaseVersion)"
+                Write-Host "Updating latest tag to version: $version"
+
+                # Bestehenden latest Tag löschen (lokal und remote)
+                git tag -d latest 2>$null || true
+                git push origin --delete latest 2>$null || true
+
+                # Neuen latest Tag erstellen
+                git tag latest
+                git push origin latest
+
+                Write-Host "Latest tag updated successfully"
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - stage: Documentation
+    displayName: "Update Documentation"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Release
+    jobs:
+      - job: UpdateDocs
+        displayName: "Update Installation Documentation"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: PowerShell@2
+            displayName: "Update Installation Links"
+            inputs:
+              targetType: "inline"
+              script: |
+                $version = "$(releaseVersion)"
+                $repoUrl = "https://github.com/$(githubRepository)"
+
+                # README.md Update mit aktuellen Download-Links
+                $readmePath = "README.md"
+                if (Test-Path $readmePath) {
+                  $content = Get-Content $readmePath -Raw
+                  
+                  # Update Download-Badges
+                  $content = $content -replace 'download/v[\d\.]+/', "download/v$version/"
+                  $content = $content -replace 'releases/latest/', "releases/download/v$version/"
+                  
+                  Set-Content $readmePath $content
+                }
+
+                # RASPBERRY_INSTALLATION.md Update
+                $installPath = "App/RASPBERRY_INSTALLATION.md"
+                if (Test-Path $installPath) {
+                  $content = Get-Content $installPath -Raw
+                  
+                  # Update Download-URLs
+                  $content = $content -replace 'releases/download/v[\d\.]+/', "releases/download/v$version/"
+                  $content = $content -replace 'mthbdeiotclient_[\d\.]+_armhf\.deb', "mthbdeiotclient_$version`_armhf.deb"
+                  
+                  Set-Content $installPath $content
+                }
+
+                Write-Host "Documentation updated with version $version"

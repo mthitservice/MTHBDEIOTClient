@@ -21,14 +21,17 @@
 }
 .fc-white {
   color: white !important;
+  font-weight: normal;
 }
 tr.blink-blue td {
-  -webkit-animation: blinkBlue 1s infinite !important;
-  animation: blinkBlue 1s infinite !important;
+  color: white !important;
+  font-weight: bold;
+  background-color: #ff9800 !important;
 }
 
 tr.problem td {
-  color: red !important;
+  color: white !important;
+  background: rgb(242, 49, 49);
 }
 
 .selected-row td {

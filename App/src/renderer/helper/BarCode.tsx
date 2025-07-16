@@ -24,16 +24,11 @@ class BarCode extends React.Component<BarCodeProps> {
               ean128={false}
               format={'CODE39'}
               height={60}
-              width={2}
+              width={3}
               className="BdeBarCode"
               background="#ffffff"
               lineColor="#000000"
-              margin={}
-              marginTop={undefined}
-              marginBottom={undefined}
-              marginLeft={undefined}
-              marginRight={undefined}
-              id={undefined}
+              margin={2}
             />
           </div>
         </div>

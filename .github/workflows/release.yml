@@ -1,0 +1,104 @@
+# GitHub Actions Workflow für automatische Releases
+# Diese Datei ist optional - primär wird Azure DevOps verwendet
+
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18.x'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: App/package-lock.json
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        else
+          VERSION="1.0.0-dev.${GITHUB_RUN_NUMBER}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Install dependencies
+      run: |
+        cd App
+        npm ci
+
+    - name: Set version and environment
+      run: |
+        cd App
+        export APP_VERSION=${{ steps.version.outputs.version }}
+        export NODE_ENV=production
+        export REACT_APP_VERSION=${{ steps.version.outputs.version }}
+        npm run version:set
+      env:
+        APP_VERSION: ${{ steps.version.outputs.version }}
+
+    - name: Build application
+      run: |
+        cd App
+        npm run build
+      env:
+        NODE_ENV: production
+        APP_VERSION: ${{ steps.version.outputs.version }}
+        REACT_APP_VERSION: ${{ steps.version.outputs.version }}
+
+    - name: Package applications
+      run: |
+        cd App
+        npm run package:all
+        npm run package:raspberry
+        npm run package:raspberry-deb
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          App/release/build/**/*
+        tag_name: ${{ github.ref_name }}
+        name: MthBdeIotClient ${{ steps.version.outputs.version }}
+        body: |
+          # MthBdeIotClient Release ${{ steps.version.outputs.version }}
+          
+          ## 📦 Downloads
+          - Windows: `MthBdeIotClient-Setup-${{ steps.version.outputs.version }}.exe`
+          - Raspberry Pi: `mthbdeiotclient_${{ steps.version.outputs.version }}_armhf.deb`
+          
+          ## 🚀 Installation
+          
+          ### Raspberry Pi Schnell-Installation:
+          ```bash
+          curl -L https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/mthbdeiotclient_${{ steps.version.outputs.version }}_armhf.deb -o mthbdeiotclient.deb
+          sudo dpkg -i mthbdeiotclient.deb
+          sudo apt-get install -f
+          ```
+          
+          Siehe [Installation Guide](./RASPBERRY_INSTALLATION.md) für Details.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

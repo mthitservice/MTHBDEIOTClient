@@ -1,0 +1,42 @@
+[
+  {
+    "ID": "1",
+    "Datum": "2025-06-25 08:15",
+    "Schritt": "Anlage",
+    "Status": "Erstellt",
+    "Bearbeiter": "Anna Müller",
+    "Info": "Auftrag wurde angelegt"
+  },
+  {
+    "ID": "2",
+    "Datum": "2025-06-25 09:10",
+    "Schritt": "Druckvorbereitung",
+    "Status": "In Arbeit",
+    "Bearbeiter": "Max Mustermann",
+    "Info": "Daten geprüft und freigegeben"
+  },
+  {
+    "ID": "3",
+    "Datum": "2025-06-25 10:30",
+    "Schritt": "Druck",
+    "Status": "Gestartet",
+    "Bearbeiter": "Julia Schmidt",
+    "Info": "Druckmaschine läuft"
+  },
+  {
+    "ID": "4",
+    "Datum": "2025-06-25 12:00",
+    "Schritt": "Weiterverarbeitung",
+    "Status": "Wartet",
+    "Bearbeiter": "Lukas Schneider",
+    "Info": "Warten auf Material"
+  },
+  {
+    "ID": "5",
+    "Datum": "2025-06-25 13:45",
+    "Schritt": "Fertigstellung",
+    "Status": "Abgeschlossen",
+    "Bearbeiter": "Sophie Fischer",
+    "Info": "Auftrag abgeschlossen und bereit zur Auslieferung"
+  }
+]

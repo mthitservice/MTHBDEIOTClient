@@ -35,6 +35,7 @@ const UserSelect: React.FC<UserSelectProps> = ({
     <div className="TaskViewArea container mt-4">
       <h2 className="mb-4">Mitarbeiterauswahl</h2>
       <div
+        className="MainPageBarcodeArea row mb-4"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -43,33 +44,11 @@ const UserSelect: React.FC<UserSelectProps> = ({
         }}
       >
         {data.map((user, idx) => (
-          <Card
-            key={user.MitarbeiterNr}
-            className="m-2"
-            style={{
-              width: '200px',
-              cursor: 'pointer',
-              background:
-                selectedUser?.MitarbeiterNr === user.MitarbeiterNr
-                  ? '#ffe0b2'
-                  : undefined,
-              flex: '0 1 calc(20% - 16px)', // 5 Karten pro Reihe, 16px gap
-              minWidth: '150px',
-              maxWidth: '150px',
-            }}
+          <BarCode
+            code={user.MitarbeiterNr}
+            text={user.Name}
             onClick={() => onUserSelect(user)}
-          >
-            <Card.ImgOverlay>
-              <Card.Text className="text-end"></Card.Text>
-            </Card.ImgOverlay>
-            <Card.Body className="text-center">
-              <Card.Title>{user.Name}</Card.Title>
-              <Card.Text>{user.Abteilung}</Card.Text>
-            </Card.Body>
-            <Card.Footer className="text-muted text-start">
-              <i class="bi bi-person-bounding-box"></i> {user.MitarbeiterNr}
-            </Card.Footer>
-          </Card>
+          />
         ))}
       </div>
 

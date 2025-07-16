@@ -1,0 +1,31 @@
+# Dockerfile für Raspberry Pi 3+ Build (ARMv7l)
+FROM arm32v7/node:18-alpine
+
+WORKDIR /app
+
+# System-Abhängigkeiten installieren
+RUN apk add --no-cache \
+  build-base \
+  cairo-dev \
+  jpeg-dev \
+  pango-dev \
+  musl-dev \
+  giflib-dev \
+  pixman-dev \
+  pangomm-dev \
+  libjpeg-turbo-dev \
+  freetype-dev
+
+# Package files kopieren
+COPY package*.json ./
+
+# Node modules installieren
+RUN npm ci --only=production
+
+# App-Dateien kopieren
+COPY dist/ ./dist/
+COPY public/ ./public/
+COPY assets/ ./assets/
+
+# Start-Skript
+CMD ["npm", "start"]

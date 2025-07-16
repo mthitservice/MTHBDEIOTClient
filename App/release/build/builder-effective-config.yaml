@@ -1,0 +1,64 @@
+directories:
+  output: release/build
+  buildResources: assets
+  app: release/app
+productName: MthBdeIotClient
+appId: com.mth-it-service.apps.mthbdeiotclient
+asar: true
+afterSign: .erb/scripts/notarize.js
+asarUnpack:
+  - '**\*.{node,dll}'
+  - '**/node_modules/better-sqlite3/**/*'
+files:
+  - filter:
+      - dist
+      - node_modules
+      - package.json
+      - public/database/**/*
+extraResources:
+  - filter:
+      - ./assets/**
+  - from: public/database/
+    to: public/database
+    filter:
+      - '**/*.sqlite'
+mac:
+  notarize: false
+  target:
+    target: default
+    arch:
+      - arm64
+      - x64
+  type: distribution
+  hardenedRuntime: true
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
+  gatekeeperAssess: false
+dmg:
+  contents:
+    - x: 130
+      'y': 220
+    - x: 410
+      'y': 220
+      type: link
+      path: /Applications
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - target: deb
+      arch:
+        - armv7l
+        - arm64
+    - target: tar.gz
+      arch:
+        - armv7l
+        - arm64
+  category: Development
+publish:
+  provider: github
+  owner: electron-react-boilerplate
+  repo: electron-react-boilerplate
+electronVersion: 35.6.0

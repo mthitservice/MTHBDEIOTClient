@@ -1,9 +1,7 @@
 .UserSelectArea {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  font-size: 12px;
+  background: #eeeeee;
+  margin-top: 10px;
+  padding: 10px;
 }
 .noborder-cell {
   background: transparent !important;
@@ -14,10 +12,10 @@
 }
 
 .TaskNr {
-  font-size: 18px !important;
+  font-size: 14px !important;
 }
 .TaskWarning {
   background: #ffffff !important;
   color: #b4520c !important;
-  font-size: 14px;
+  font-size: 13px;
 }

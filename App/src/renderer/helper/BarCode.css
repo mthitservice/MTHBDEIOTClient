@@ -1,5 +1,5 @@
 .BdeBarCode {
-  margin: 5px;
+  margin: 1px;
   padding: 1px;
   width: 100%;
   text-align: left;
@@ -7,7 +7,8 @@
 .BdeBarCodeArea {
   background: #ffffff;
   margin: 1px;
-  min-width: 200px;
-  max-width: 250px;
+  min-width: 220px;
+  max-width: 280px;
   text-align: left;
+  font-size: 16px !important;
 }

@@ -4,6 +4,7 @@ import ToastContainer from 'react-bootstrap/ToastContainer';
 import TableView from '../helper/TableView';
 import TaskView from '../helper/TaskView';
 import dataRaw from '../helper/bde_tasks_test.json';
+import LogRaw from '../helper/bde_log_test.json';
 import { Layout } from './Layout';
 import BarCode from '../helper/BarCode';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -210,7 +211,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
               <div className="row MainPageCodeArea">
                 {selectedTask ? (
                   <>
-                    <TaskView Task={selectedTask} />
+                    <TaskView Task={selectedTask} LogData={LogRaw} />
                     <div className="row MainPageBarcodeArea">
                       <div className="col-sm">
                         <BarCode

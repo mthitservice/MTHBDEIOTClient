@@ -10,7 +10,7 @@ body {
   font-size: 14px !important;
   height: 100vh;
   background: #cccccc;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
   overflow-y: hidden;
   display: block !important;
   justify-content: center;
