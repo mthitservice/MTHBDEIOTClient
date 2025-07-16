@@ -20,7 +20,7 @@ variables:
   releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
 
   # GitHub Repository Info
-  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubRepository: "MTHBDEIOTClient"
   githubConnection: "github-connection" # Service Connection Name
 
   # Artifact Names
