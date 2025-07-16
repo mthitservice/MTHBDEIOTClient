@@ -8,8 +8,10 @@ Diese Anleitung beschreibt die Installation der MthBdeIotClient Electron-Anwendu
 
 - Raspberry Pi 3+ (ARMv7l)
 - Raspberry Pi OS (32-bit) - neueste Version
-- Mindestens 1GB RAM
+- Mindestens 1GB RAM (empfohlen: 2GB+)
 - 8GB+ SD-Karte (empfohlen: 16GB+)
+- Node.js 22.x oder höher
+- NPM 9.x oder höher
 - Netzwerkverbindung
 
 ---
@@ -49,13 +51,23 @@ sudo apt install -y \
 ### 1.2 Node.js Version aktualisieren
 
 ```bash
-# Node.js 18 installieren (für bessere Electron-Kompatibilität)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# Node.js 22 installieren (erforderlich für Electron 35+ und aktuelle Dependencies)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# Version prüfen
+# Version prüfen (sollte 22.x oder höher sein)
 node --version
 npm --version
+
+# Überprüfung der Mindestanforderungen
+echo "Node.js Version: $(node --version)"
+echo "NPM Version: $(npm --version)"
+if node -e "if (process.version.slice(1).split('.')[0] < 22) process.exit(1)"; then
+  echo "✅ Node.js Version ist kompatibel"
+else
+  echo "❌ Node.js Version zu alt - mindestens 22.x erforderlich"
+  exit 1
+fi
 ```
 
 ### 1.3 Anwendung installieren
@@ -212,7 +224,7 @@ tee playbooks/deploy-mthbdeiotclient.yml > /dev/null <<EOF
   hosts: raspberry_pis
   become: yes
   vars:
-    node_version: "18"
+    node_version: "22"
     
   tasks:
     - name: Update system packages
@@ -509,6 +521,14 @@ sudo apt-get install -f
 sudo tee /usr/local/bin/update-mthbdeiot.sh > /dev/null <<'EOF'
 #!/bin/bash
 echo "🔄 Updating MthBdeIotClient..."
+
+# Überprüfe Node.js Version
+if ! node -e "if (process.version.slice(1).split('.')[0] < 22) process.exit(1)"; then
+  echo "❌ Node.js Version zu alt - mindestens 22.x erforderlich"
+  echo "Führe 'curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs' aus"
+  exit 1
+fi
+
 cd /tmp
 curl -s https://api.github.com/repos/mthitservice/MthBdeIotClient/releases/latest \
   | grep "browser_download_url.*armhf.deb" \
@@ -565,28 +585,43 @@ sudo apt-get install -f
 
 ## 4. Troubleshooting
 
-### Häufige Probleme:
+### Häufige Probleme
 
-1. **Electron startet nicht:**
+1. **Node.js Version zu alt:**
+   ```bash
+   # Überprüfe aktuelle Version
+   node --version
+   
+   # Update auf Node.js 22
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+   
+   # Neuinstallation der Abhängigkeiten
+   cd /home/pi/apps/MthBdeIotClient/App
+   rm -rf node_modules package-lock.json
+   npm install --production
+   ```
+
+2. **Electron startet nicht:**
    ```bash
    # Debug-Modus starten
    /home/pi/apps/MthBdeIotClient/App/node_modules/.bin/electron /home/pi/apps/MthBdeIotClient/App/dist/main/main.js --verbose
    ```
 
-2. **Netzwerk funktioniert nicht:**
+3. **Netzwerk funktioniert nicht:**
    ```bash
    # IP-Konfiguration prüfen
    ip addr show
    ping 10.10.0.1
    ```
 
-3. **Autostart funktioniert nicht:**
+4. **Autostart funktioniert nicht:**
    ```bash
    # Autostart-Dateien prüfen
    ls -la /home/pi/.config/autostart/
    ```
 
-4. **Performance-Probleme:**
+5. **Performance-Probleme:**
    ```bash
    # GPU-Memory erhöhen
    echo "gpu_mem=128" | sudo tee -a /boot/config.txt

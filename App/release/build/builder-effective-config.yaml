@@ -51,14 +51,18 @@ linux:
     - target: deb
       arch:
         - armv7l
-        - arm64
     - target: tar.gz
       arch:
         - armv7l
-        - arm64
   category: Development
+  extraFiles:
+    - from: node_modules/better-sqlite3/build/Release
+      to: resources/node_modules/better-sqlite3/build/Release
+      filter:
+        - better_sqlite3.node
 publish:
   provider: github
   owner: electron-react-boilerplate
   repo: electron-react-boilerplate
+nodeGypRebuild: false
 electronVersion: 35.6.0
