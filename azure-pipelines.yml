@@ -898,7 +898,7 @@ stages:
                     else
                       echo "  ⚠️ Installation directory missing"
                     fi
-                    
+
                     if [ -d "$workspace/dist" ]; then
                       echo "  ✅ Distribution directory exists"
                       echo "  📄 Distribution files:"
@@ -906,7 +906,7 @@ stages:
                     else
                       echo "  ⚠️ Distribution directory missing"
                     fi
-                    
+
                     if [ -d "$workspace/release" ]; then
                       echo "  ✅ Release directory exists"
                       echo "  📄 Release files (.deb, .tar.gz, etc.):"
