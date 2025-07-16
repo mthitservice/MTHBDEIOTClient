@@ -13,7 +13,7 @@ trigger:
 variables:
   # Build-Konfiguration
   buildConfiguration: "Release"
-  nodeVersion: "18.x"
+  nodeVersion: "20.x"
 
   # Versioning
   isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
@@ -55,7 +55,8 @@ stages:
 
           - script: |
               cd App
-              npm ci
+              # Engine-Checks überspringen für Kompatibilität
+              npm ci --engine-strict=false
             displayName: "Install dependencies"
 
           - task: PowerShell@2
