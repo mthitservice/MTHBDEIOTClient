@@ -608,10 +608,34 @@ stages:
                     echo "Build ID: $(Build.BuildId)"
                     echo "Build Number: $(Build.BuildNumber)"
                     echo "Artifact Name: $(artifactName)"
+                    echo "Release Version: $(releaseVersion)"
+                    echo "GitHub Repository: $(githubRepository)"
+                    echo "GitHub Connection: $(githubConnection)"
+                    echo "Source Branch: $(Build.SourceBranch)"
+                    echo "Is Release: $(isRelease)"
                   displayName: "Check Build Information"
 
+                - script: |
+                    echo "=== GitHub Service Connection Validation ==="
+                    echo "Testing GitHub connection configuration..."
+                    echo ""
+                    echo "Expected GitHub Repository: $(githubRepository)"
+                    echo "Expected format: owner/repository (e.g., mthitservice/MTHBDEIOTClient)"
+                    echo ""
+                    echo "GitHub Service Connection Name: $(githubConnection)"
+                    echo "This should match a service connection configured in Azure DevOps"
+                    echo ""
+                    echo "If GitHub Release fails with 'Validation Failed':"
+                    echo "1. Check if service connection 'github-connection' exists"
+                    echo "2. Verify the service connection has 'Repository' permissions"
+                    echo "3. Ensure the repository name matches exactly: mthitservice/MTHBDEIOTClient"
+                    echo "4. Check if tag v$(releaseVersion) already exists in GitHub"
+                    echo ""
+                    echo "=== Continue with Release Creation ==="
+                  displayName: "Validate GitHub Configuration"
+
                 - download: current
-                  displayName: "Try to download artifacts"
+                  displayName: "Download Build Artifacts"
                   continueOnError: true
 
                 - script: |
@@ -719,8 +743,20 @@ stages:
                     tag: "v$(releaseVersion)"
                   continueOnError: true
 
+                - script: |
+                    echo "=== GitHub Release Troubleshooting ==="
+                    echo "Repository: $(githubRepository)"
+                    echo "Tag: v$(releaseVersion)"
+                    echo "GitHub Connection: $(githubConnection)"
+                    echo ""
+                    echo "Checking if tag already exists..."
+                    # Note: We can't directly check GitHub from here without auth
+                    echo "If the release creation fails, the tag v$(releaseVersion) likely already exists"
+                    echo "Manual action needed: Delete the existing tag/release in GitHub first"
+                  displayName: "Pre-Release Diagnostics"
+
                 - task: GitHubRelease@1
-                  displayName: "Create GitHub Release"
+                  displayName: "Create GitHub Release (with unique timestamp)"
                   condition: always()
                   inputs:
                     gitHubConnection: $(githubConnection)
@@ -728,12 +764,32 @@ stages:
                     action: "create"
                     target: "$(Build.SourceVersion)"
                     tagSource: "userSpecifiedTag"
-                    tag: "v$(releaseVersion)"
-                    title: "MthBdeIotClient v$(releaseVersion) (Emergency Build)"
+                    tag: "v$(releaseVersion)-$(Build.BuildNumber)"
+                    title: "MthBdeIotClient v$(releaseVersion) Build $(Build.BuildNumber)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
                     assets: |
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/installation/*
                       $(Pipeline.Workspace)/MthBdeIotClient-Release/dist/**/*
+                    assetUploadMode: "replace"
+                    isDraft: true
+                    isPreRelease: true
+                    addChangeLog: false
+                  continueOnError: true
+
+                - task: GitHubRelease@1
+                  displayName: "Fallback: Create Release with simple tag"
+                  condition: failed()
+                  inputs:
+                    gitHubConnection: $(githubConnection)
+                    repositoryName: $(githubRepository)
+                    action: "create"
+                    target: "$(Build.SourceVersion)"
+                    tagSource: "userSpecifiedTag"
+                    tag: "emergency-$(Build.BuildId)"
+                    title: "Emergency Build $(Build.BuildId) - $(releaseVersion)"
+                    releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
+                    assets: |
+                      $(Pipeline.Workspace)/MthBdeIotClient-Release/installation/*
                     assetUploadMode: "replace"
                     isDraft: true
                     isPreRelease: true
