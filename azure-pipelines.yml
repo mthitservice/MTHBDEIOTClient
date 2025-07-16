@@ -21,7 +21,7 @@ variables:
   releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
 
   # GitHub Repository Info
-  githubRepository: "mthitservice/MthBdeIotClient" # Anpassen!
+  githubRepository: "mthitservice/MTHBDEIOTClient"
   githubConnection: "github-connection" # Service Connection Name
 
   # Artifact Names
