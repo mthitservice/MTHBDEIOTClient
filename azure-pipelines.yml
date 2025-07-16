@@ -57,21 +57,25 @@ stages:
               cd App
               # Vollständige Installation mit allen DevDependencies
               npm install --engine-strict=false --ignore-scripts
-              
+
               # Electron manuell installieren (für electron-builder)
               npm install electron@^35.0.2 --save-dev --engine-strict=false
-              
+
+              # Binaries explizit verlinken
+              echo "Linking binaries..."
+              npm rebuild || echo "Rebuild completed with warnings"
+
               # Postinstall Schritte manuell ausführen
               echo "Running postinstall steps manually..."
-              
+
               # 1. Check native dependencies (optional)
-              ./node_modules/.bin/ts-node .erb/scripts/check-native-dep.js || echo "Native dep check skipped"
-              
+              npx ts-node .erb/scripts/check-native-dep.js || echo "Native dep check skipped"
+
               # 2. Install app dependencies for electron-builder
-              ./node_modules/.bin/electron-builder install-app-deps || echo "Electron app deps skipped"
-              
-              # 3. Build DLL
-              ./node_modules/.bin/cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts || echo "DLL build skipped"
+              npx electron-builder install-app-deps || echo "Electron app deps skipped"
+
+              # 3. Build DLL mit npx (falls cross-env nicht verfügbar)
+              npx cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" npx webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts || echo "DLL build skipped"
             displayName: "Install dependencies"
 
           - script: |
@@ -115,29 +119,31 @@ stages:
               export APP_VERSION=$(APP_VERSION)
               export REACT_APP_VERSION=$(APP_VERSION)
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              export TS_NODE_TRANSPILE_ONLY=true
+              export NODE_OPTIONS="-r ts-node/register --no-warnings"
 
               # Build Scripts manuell ausführen (parallel mit &)
               echo "Building main and renderer in parallel..."
-              
+
               # Build main
-              ./node_modules/.bin/cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.main.prod.ts &
+              NODE_ENV=production ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.main.prod.ts &
               MAIN_PID=$!
-              
+
               # Build renderer  
-              ./node_modules/.bin/cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.renderer.prod.ts &
+              NODE_ENV=production ./node_modules/.bin/webpack --config ./.erb/configs/webpack.config.renderer.prod.ts &
               RENDERER_PID=$!
-              
+
               # Warten auf beide Builds
               wait $MAIN_PID
               MAIN_EXIT=$?
               wait $RENDERER_PID  
               RENDERER_EXIT=$?
-              
+
               if [ $MAIN_EXIT -ne 0 ] || [ $RENDERER_EXIT -ne 0 ]; then
                 echo "Build failed. Main exit: $MAIN_EXIT, Renderer exit: $RENDERER_EXIT"
                 exit 1
               fi
-              
+
               echo "Build completed successfully"
             displayName: "Build Application"
             env:
@@ -150,18 +156,18 @@ stages:
               cd App
               # Electron Builder mit lokalen Binaries
               echo "Starting Electron packaging..."
-              
+
               # Clean dist folder first
               ./node_modules/.bin/ts-node ./.erb/scripts/clean.js dist || echo "Clean skipped"
-              
+
               # Standard package (Windows, Linux x64, macOS)
               ./node_modules/.bin/electron-builder build --publish never --config.nodeGypRebuild=false
-              
+
               # Raspberry Pi Builds
               echo "Building for Raspberry Pi..."
               ./node_modules/.bin/electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false
               ./node_modules/.bin/electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false
-              
+
               echo "Packaging completed successfully"
             displayName: "Package Electron App"
             env:
