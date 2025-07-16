@@ -152,10 +152,20 @@ stages:
           - task: CopyFiles@2
             displayName: "Copy Build Artifacts"
             inputs:
-              sourceFolder: "App/release/build"
+              sourceFolder: "App/release"
               contents: "**/*"
               targetFolder: "$(Build.ArtifactStagingDirectory)/release"
               cleanTargetFolder: true
+            condition: succeededOrFailed()
+
+          - script: |
+              echo "=== Debugging Release Structure ==="
+              find App/release -type f -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" | head -20 || echo "No release files found"
+              ls -la App/release/ || echo "Release directory not found"
+              echo "=== Staging Directory ==="
+              ls -la $(Build.ArtifactStagingDirectory)/ || echo "Staging directory empty"
+            displayName: "Debug Release Files"
+            condition: succeededOrFailed()
 
           - task: CopyFiles@2
             displayName: "Copy Installation Scripts"
@@ -191,6 +201,13 @@ stages:
               steps:
                 - download: current
                   artifact: $(artifactName)
+                  displayName: "Download Build Artifacts"
+
+                - script: |
+                    echo "=== Debugging Artifact Structure ==="
+                    find $(Pipeline.Workspace) -type f -name "*.exe" -o -name "*.deb" -o -name "*.tar.gz" | head -20
+                    ls -la $(Pipeline.Workspace)/$(artifactName)/ || echo "Artifact directory not found"
+                  displayName: "Debug Artifact Structure"
 
                 - task: PowerShell@2
                   displayName: "Prepare Release Notes"
@@ -257,9 +274,7 @@ stages:
                     tagPattern: "v*"
                     title: "MthBdeIotClient v$(releaseVersion)"
                     releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
-                    assets: |
-                      $(Pipeline.Workspace)/$(artifactName)/release/**/*
-                      $(Pipeline.Workspace)/$(artifactName)/installation/**/*
+                    assets: "$(Pipeline.Workspace)/$(artifactName)/**/*"
                     assetUploadMode: "replace"
                     isDraft: false
                     isPreRelease: false
