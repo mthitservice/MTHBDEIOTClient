@@ -45,8 +45,8 @@ $githubTokenPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.
 
 az pipelines variable create --organization $OrganizationUrl --project $ProjectName --pipeline-id $PipelineId --name "GITHUB_TOKEN" --value $githubTokenPlain --secret true
 
-$githubRepo = Read-Host -Prompt "GitHub Repository (owner/name) [Standard: mthitservice/MthBdeIotClient]"
-if (-not $githubRepo) { $githubRepo = "mthitservice/MthBdeIotClient" }
+$githubRepo = Read-Host -Prompt "GitHub Repository (owner/name) [Standard:MthBdeIotClient]"
+if (-not $githubRepo) { $githubRepo = "MthBdeIotClient" }
 az pipelines variable create --organization $OrganizationUrl --project $ProjectName --pipeline-id $PipelineId --name "GITHUB_REPOSITORY" --value $githubRepo
 
 # API Configuration
