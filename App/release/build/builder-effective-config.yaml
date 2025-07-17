@@ -55,14 +55,31 @@ linux:
       arch:
         - armv7l
   category: Development
+  description: MTH BDE IoT Client for Raspberry Pi
+  maintainer: MTH IT Service <info@mth-it-service.com>
+  synopsis: IoT Client Application for Raspberry Pi
+  compression: normal
+  packageCategory: devel
+  desktop:
+    Name: MTH BDE IoT Client
+    Comment: IoT Client Application for Raspberry Pi
+    Keywords: IoT;Raspberry;Client;BDE;MTH;
+    Categories: Development;Utility;System;
+    Terminal: 'false'
+    Type: Application
+    StartupNotify: 'true'
+    MimeType: application/x-mthbdeiotclient
+    Icon: mthbdeiotclient
   extraFiles:
     - from: node_modules/better-sqlite3/build/Release
       to: resources/node_modules/better-sqlite3/build/Release
       filter:
         - better_sqlite3.node
+deb:
+  compression: gz
 publish:
   provider: github
-  owner: electron-react-boilerplate
-  repo: electron-react-boilerplate
+  owner: mthitservice
+  repo: MTHBDEIOTClient
 nodeGypRebuild: false
 electronVersion: 35.6.0

@@ -166,6 +166,7 @@ stages:
               export NODE_ENV=production
               export APP_VERSION=$(APP_VERSION)
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              export ELECTRON_BUILDER_CACHE_DIR=/tmp/.electron-builder-cache
               
               # Erstelle .env file wenn nicht vorhanden
               if [ ! -f ".env" ]; then
@@ -231,6 +232,7 @@ stages:
               NODE_ENV: production
               APP_VERSION: $(APP_VERSION)
               ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+              ELECTRON_BUILDER_CACHE_DIR: /tmp/.electron-builder-cache
 
           - task: CopyFiles@2
             displayName: "Copy Raspberry Pi Packages"
