@@ -110,16 +110,18 @@ function coloredOutput(message, color = 'white', emoji = '') {
 
 function execCommand(command, options = {}) {
     try {
-        return execSync(command, { 
+        const result = execSync(command, { 
             encoding: 'utf8', 
             stdio: options.silent ? 'pipe' : 'inherit',
+            cwd: options.cwd || process.cwd(),
             ...options 
-        }).trim();
+        });
+        return result || '';
     } catch (error) {
         if (!options.silent) {
             throw error;
         }
-        return null;
+        return '';
     }
 }
 
