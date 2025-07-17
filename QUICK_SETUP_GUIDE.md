@@ -71,12 +71,12 @@ Gehen Sie zu: **Pipelines → Ihre Pipeline → Edit → Variables**
 
 #### Erforderliche Variables:
 
-| Variable Name        | Beispiel Wert                     | Secret |
-| -------------------- | --------------------------------- | ------ |
-| `GITHUB_TOKEN`       | `ghp_xxxxxxxxxxxx`                | ✅      |
+| Variable Name        | Beispiel Wert                    | Secret |
+| -------------------- | -------------------------------- | ------ |
+| `GITHUB_TOKEN`       | `ghp_xxxxxxxxxxxx`               | ✅      |
 | `GITHUB_REPOSITORY`  | `mth-it-service/MTHBDEIOTClient` | ❌      |
-| `API_ENDPOINT_URL`   | `https://api.mth-it-service.com`  | ❌      |
-| `API_KEY_PRODUCTION` | `prod_api_key_123`                | ✅      |
+| `API_ENDPOINT_URL`   | `https://api.mth-it-service.com` | ❌      |
+| `API_KEY_PRODUCTION` | `prod_api_key_123`               | ✅      |
 
 #### Optionale Variables:
 
