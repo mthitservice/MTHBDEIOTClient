@@ -56,24 +56,37 @@ if ! wget -q "$RELEASES_URL/SHA256SUMS" -O SHA256SUMS; then
     exit 1
 fi
 
-# Extrahiere DEB-Dateinamen
-DEB_FILES=$(grep '\.deb$' SHA256SUMS | awk '{print $2}' | head -5)
-DEB_COUNT=$(echo "$DEB_FILES" | wc -l)
-
-if [[ $DEB_COUNT -eq 0 ]]; then
-    echo "❌ Fehler: Keine DEB-Dateien in SHA256SUMS gefunden."
-    echo "Inhalt von SHA256SUMS:"
-    cat SHA256SUMS
+# Extrahiere DEB-Dateinamen mit Priorität für die korrekte Namenskonvention
+echo "🔍 Erkenne verfügbare DEB-Dateien..."
+if ! wget -q "$RELEASES_URL/SHA256SUMS" -O SHA256SUMS; then
+    echo "❌ Fehler: Kann SHA256SUMS nicht herunterladen."
+    echo "   URL: $RELEASES_URL/SHA256SUMS"
+    echo "   Prüfe Internetverbindung und Repository-Verfügbarkeit."
     exit 1
 fi
 
-echo "📦 Verfügbare DEB-Dateien gefunden: $DEB_COUNT"
-echo "$DEB_FILES" | while read file; do
-    echo "  - $file"
+# Mögliche Dateinamen (in Prioritätsreihenfolge)
+POSSIBLE_PATTERNS=(
+    "MthBdeIotClient_.*_armv7l\.deb"
+    "MthBdeIotClient_.*_armhf\.deb"
+    "mthbdeiotclient_.*_armv7l\.deb"
+    "mthbdeiotclient_.*_armhf\.deb"
+)
+
+DEB_FILENAME=""
+for pattern in "${POSSIBLE_PATTERNS[@]}"; do
+    if DEB_FILENAME=$(grep -oE "$pattern" SHA256SUMS | head -1); then
+        echo "✅ Gefundene DEB-Datei: $DEB_FILENAME"
+        break
+    fi
 done
 
-# Wähle die erste DEB-Datei
-DEB_FILENAME=$(echo "$DEB_FILES" | head -1)
+if [[ -z "$DEB_FILENAME" ]]; then
+    echo "❌ Fehler: Keine passende DEB-Datei in SHA256SUMS gefunden!"
+    echo "📋 Verfügbare Dateien:"
+    cat SHA256SUMS
+    exit 1
+fi
 echo ""
 echo "🎯 Ausgewählte DEB-Datei: $DEB_FILENAME"
 

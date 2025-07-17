@@ -300,17 +300,17 @@ stages:
                       ## 🍓 Raspberry Pi 3+ Installation Package
 
                       ### 📦 Download:
-                      - **Raspberry Pi 3+ (ARMv7l):** ``mthbdeiotclient_$version_armhf.deb``
+                      - **Raspberry Pi 3+ (ARMv7l):** ``MthBdeIotClient_$version_armv7l.deb``
 
                       ### 🔧 Installation auf Raspberry Pi:
 
                       #### Direkte Installation:
                       ``````bash
                       # Download des DEB Pakets
-                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$version_armhf.deb
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/MthBdeIotClient_$version_armv7l.deb
 
                       # Installation
-                      sudo dpkg -i mthbdeiotclient_$version_armhf.deb
+                      sudo dpkg -i MthBdeIotClient_$version_armv7l.deb
 
                       # Abhängigkeiten reparieren falls nötig
                       sudo apt-get install -f
@@ -318,8 +318,8 @@ stages:
 
                       #### Automatische Installation:
                       ``````bash
-                      # Schnell-Installation (korrekter Dateiname)
-                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      # Schnell-Installation Script (erkennt automatisch korrekte Dateinamen)
+                      wget -qO- https://raw.githubusercontent.com/$(githubRepository)/main/install-latest.sh | bash
                       ``````
 
                       ### 🚀 Starten der Anwendung:
@@ -447,14 +447,30 @@ stages:
                       
                       $foundDebFiles = @()
                       
-                      foreach ($searchPath in $searchPaths) {
-                          if (Test-Path $searchPath) {
-                              Write-Host "Searching in: $searchPath"
-                              $debFiles = Get-ChildItem -Path $searchPath -Filter "*.deb" -Recurse -ErrorAction SilentlyContinue
-                              foreach ($file in $debFiles) {
-                                  $foundDebFiles += $file
-                                  Write-Host "  Found: $($file.Name) (Size: $([math]::Round($file.Length/1MB, 2)) MB)"
+                      # Priorisiere korrekte Dateinamenskonvention
+                      $priorityPatterns = @(
+                          "*MthBdeIotClient*armv7l*.deb",
+                          "*MthBdeIotClient*armhf*.deb",
+                          "*mthbdeiotclient*armv7l*.deb",
+                          "*mthbdeiotclient*armhf*.deb"
+                      )
+                      
+                      $foundDebFiles = @()
+                      
+                      foreach ($pattern in $priorityPatterns) {
+                          foreach ($searchPath in $searchPaths) {
+                              if (Test-Path $searchPath) {
+                                  Write-Host "Searching for pattern '$pattern' in: $searchPath"
+                                  $debFiles = Get-ChildItem -Path $searchPath -Filter $pattern -Recurse -ErrorAction SilentlyContinue
+                                  foreach ($file in $debFiles) {
+                                      $foundDebFiles += $file
+                                      Write-Host "  Found: $($file.Name) (Size: $([math]::Round($file.Length/1MB, 2)) MB)"
+                                  }
                               }
+                          }
+                          # Verwende das erste gefundene File mit diesem Pattern
+                          if ($foundDebFiles.Count -gt 0) {
+                              break
                           }
                       }
                       
