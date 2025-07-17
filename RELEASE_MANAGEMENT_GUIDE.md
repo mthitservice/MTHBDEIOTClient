@@ -2,7 +2,11 @@
 
 ## Übersicht
 
-Das **MthBdeIotClient Release Management System** bietet eine vollständige Automatisierung für Versionierung, Building und Deployment der Electron-App für Raspberry Pi Systeme. Das System umfasst:
+Das **MthBdeIotClient Release Management System** bietet eine vollständige Automatisierung für Versionierung, Building und Deployment der Electron-App für Raspberry Pi Systeme. D## 🔗 Nützliche Links
+
+- **Azure DevOps Builds**: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build
+- **GitHub Repository**: https://github.com/mthitservice/MTHBDEIOTClient
+- **Latest Release**: https://github.com/mthitservice/MTHBDEIOTClient/tree/master/releases/lateststem umfasst:
 
 - **Automatische Versionierung** mit Semantic Versioning
 - **Cross-Platform Skripte** für Windows, Linux und macOS
@@ -253,7 +257,7 @@ git tag -l --sort=-version:refname "v*" | head -5
 az pipelines show --name "MthBdeIotClient-Raspberry-CI" --organization https://dev.azure.com/mth-it-service
 
 # GitHub Release Status
-curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/mth-it-service/MTHBDEIOTClient/releases/latest
+curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest
 ```
 
 ## 🎉 Best Practices

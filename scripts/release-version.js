@@ -748,10 +748,10 @@ sudo apt-get install -f`;
     "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
   );
   console.log(
-    "  • GitHub Repository: https://github.com/mth-it-service/MTHBDEIOTClient"
+    "  • GitHub Repository: https://github.com/mthitservice/MTHBDEIOTClient"
   );
   console.log(
-    "  • Latest Release: https://github.com/mth-it-service/MTHBDEIOTClient/tree/master/releases/latest"
+    "  • Latest Release: https://github.com/mthitservice/MTHBDEIOTClient/tree/master/releases/latest"
   );
   console.log("");
   coloredOutput(

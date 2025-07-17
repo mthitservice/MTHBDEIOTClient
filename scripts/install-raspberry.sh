@@ -27,7 +27,7 @@ echo "   Modell: $(cat /proc/device-tree/model | tr -d '\0')"
 echo ""
 
 # GitHub Repository
-GITHUB_REPO="mth-it-service/MTHBDEIOTClient"
+GITHUB_REPO="mthitservice/MTHBDEIOTClient"
 TEMP_DIR="/tmp/mthbdeiot-install"
 
 echo "🔍 Neueste Version ermitteln..."
@@ -105,7 +105,7 @@ sudo tee /usr/local/bin/update-mthbdeiot.sh > /dev/null <<'EOF'
 #!/bin/bash
 echo "🔄 Updating MthBdeIotClient..."
 
-GITHUB_REPO="mth-it-service/MTHBDEIOTClient"
+GITHUB_REPO="mthitservice/MTHBDEIOTClient"
 TEMP_DIR="/tmp/mthbdeiot-update"
 
 mkdir -p "$TEMP_DIR"

@@ -1,0 +1,42 @@
+# Setup GitHub Mirror für MthBdeIotClient
+# Dieses Script erstellt ein GitHub-Repository als Mirror des Azure DevOps Repos
+
+Write-Host "=== GITHUB MIRROR SETUP ==="
+Write-Host "Dieses Script hilft beim Einrichten eines GitHub-Mirrors"
+Write-Host ""
+
+# Aktuelles Repository prüfen
+Write-Host "Aktuelles Repository:"
+git remote -v
+
+Write-Host ""
+Write-Host "ANLEITUNG:"
+Write-Host "1. Erstellen Sie ein GitHub Repository:"
+Write-Host "   - Gehen Sie zu: https://github.com/new"
+Write-Host "   - Repository Name: MTHBDEIOTClient"
+Write-Host "   - Owner: mth-it-service"
+Write-Host "   - Visibility: Public"
+Write-Host "   - WICHTIG: Repository LEER lassen (kein README, .gitignore)"
+Write-Host ""
+Write-Host "2. Erstellen Sie ein GitHub Personal Access Token:"
+Write-Host "   - Gehen Sie zu: https://github.com/settings/tokens"
+Write-Host "   - Generate new token (classic)"
+Write-Host "   - Berechtigungen: repo, contents:write"
+Write-Host ""
+Write-Host "3. Führen Sie diese Befehle aus:"
+Write-Host ""
+Write-Host "   # GitHub Remote hinzufügen"
+Write-Host "   git remote add github https://github.com/mth-it-service/MTHBDEIOTClient.git"
+Write-Host ""
+Write-Host "   # Alle Branches und Tags zu GitHub pushen"
+Write-Host "   git push github --all"
+Write-Host "   git push github --tags"
+Write-Host ""
+Write-Host "4. Fügen Sie das GitHub Token in Azure DevOps hinzu:"
+Write-Host "   - Gehen Sie zu Ihrer Pipeline"
+Write-Host "   - Edit -> Variables"
+Write-Host "   - Name: GITHUB_TOKEN"
+Write-Host "   - Value: Ihr GitHub Personal Access Token"
+Write-Host "   - Keep this value secret: ✓"
+Write-Host ""
+Write-Host "=== FERTIG ==="

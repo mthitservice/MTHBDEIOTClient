@@ -23,7 +23,7 @@ variables:
   artifactName: "MthBdeIotClient-RaspberryPi"
   
   # GitHub Configuration
-  githubRepository: "mth-it-service/MTHBDEIOTClient"
+  githubRepository: "mthitservice/MTHBDEIOTClient"
   githubConnection: "github-connection"
   
   # HINWEIS: Für GitHub-Authentifizierung wird ein Personal Access Token benötigt

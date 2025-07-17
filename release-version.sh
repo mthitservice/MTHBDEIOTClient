@@ -262,7 +262,7 @@ Features:
 - GitHub Release Integration
 
 Installation:
-wget https://raw.githubusercontent.com/mth-it-service/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb
+wget https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb
 sudo dpkg -i mthbdeiotclient_${NEW_VERSION}_armhf.deb
 sudo apt-get install -f
 "
@@ -295,8 +295,8 @@ echo "  4. Package will be available as 'latest' release"
 echo ""
 echo -e "${INFO} ${BLUE}Useful links:${NC}"
 echo "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
-echo "  • GitHub Repository: https://github.com/mth-it-service/MTHBDEIOTClient"
-echo "  • Latest Release: https://github.com/mth-it-service/MTHBDEIOTClient/tree/master/releases/latest"
-echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/mth-it-service/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"
+echo "  • GitHub Repository: https://github.com/mthitservice/MTHBDEIOTClient"
+echo "  • Latest Release: https://github.com/mthitservice/MTHBDEIOTClient/tree/master/releases/latest"
+echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"
 echo ""
 echo -e "${SUCCESS} ${GREEN}Version $NEW_VERSION released successfully!${NC}"
