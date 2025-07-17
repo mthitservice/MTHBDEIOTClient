@@ -11,11 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
-CYAN='\0echo -e "${INFO} ${BLUE}Useful links:${NC}"
-echo "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
-echo "  • GitHub Repository: https://github.com/mth-it-service/MTHBDEIOTClient"
-echo "  • Latest Release: https://github.com/mth-it-service/MTHBDEIOTClient/tree/master/releases/latest"
-echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/mth-it-service/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"36m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Emoji für bessere Lesbarkeit
@@ -299,8 +295,8 @@ echo "  4. Package will be available as 'latest' release"
 echo ""
 echo -e "${INFO} ${BLUE}Useful links:${NC}"
 echo "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
-echo "  • GitHub Repository: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient"
-echo "  • Latest Release: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient/tree/master/releases/latest"
-echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"
+echo "  • GitHub Repository: https://github.com/mth-it-service/MTHBDEIOTClient"
+echo "  • Latest Release: https://github.com/mth-it-service/MTHBDEIOTClient/tree/master/releases/latest"
+echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/mth-it-service/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"
 echo ""
 echo -e "${SUCCESS} ${GREEN}Version $NEW_VERSION released successfully!${NC}"
