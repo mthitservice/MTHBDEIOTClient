@@ -26,7 +26,16 @@ variables:
   githubRepository: "mthitservice/MTHBDEIOTClient"
   githubConnection: "github-connection"
   
-  # HINWEIS: Für GitHub-Authentifizierung wird ein Personal Access Token benötigt
+  # HINWEIS: Für GitHub-Authentifizieru                               echo "📦 Direct Download: https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo "📦 INSTALLATION COMMANDS:"
+                echo "wget https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo "sudo dpkg -i mthbdeiotclient_$(releaseVersion)_armhf.deb && sudo apt-get install -f" "📁 Latest Release: https://github.com/$(githubRepository)/tree/main/releases/latest"
+                echo "📦 Direct Download: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armv7l.deb"
+                echo ""
+                echo "📦 INSTALLATION COMMANDS (KORREKTER DATEINAME):"
+                echo "# Prüfe zuerst den korrekten Dateinamen auf GitHub, dann:"
+                echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/[KORREKTE_DATEINAME].deb"
+                echo "sudo dpkg -i [KORREKTE_DATEINAME].deb && sudo apt-get install -f"d ein Personal Access Token benötigt
   # Erstellen Sie ein GitHub Personal Access Token mit 'repo' und 'contents:write' Berechtigungen
   # Fügen Sie es als Pipeline-Variable 'GITHUB_TOKEN' hinzu (als Secret markiert)
 
@@ -296,7 +305,7 @@ stages:
                       #### Direkte Installation:
                       ``````bash
                       # Download des DEB Pakets
-                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$version_armhf.deb
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$version_armhf.deb
 
                       # Installation
                       sudo dpkg -i mthbdeiotclient_$version_armhf.deb
@@ -307,8 +316,8 @@ stages:
 
                       #### Automatische Installation:
                       ``````bash
-                      # Schnell-Installation
-                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$version_armhf.deb && sudo dpkg -i mthbdeiotclient_$version_armhf.deb && sudo apt-get install -f
+                      # Schnell-Installation (korrekter Dateiname)
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
                       ``````
 
                       ### 🚀 Starten der Anwendung:
@@ -327,7 +336,7 @@ stages:
                       - Desktop-Umgebung (X11)
 
                       ### 📖 Detaillierte Anweisungen:
-                      Siehe [RASPBERRY_INSTALLATION.md](https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/RASPBERRY_INSTALLATION.md) für:
+                      Siehe [RASPBERRY_INSTALLATION.md](https://github.com/$(githubRepository)/raw/main/releases/latest/RASPBERRY_INSTALLATION.md) für:
                       - Ansible Deployment
                       - Automatische Installation
                       - Konfiguration
@@ -410,6 +419,12 @@ stages:
                   displayName: "Prepare GitHub Deploy"
 
                 - task: PowerShell@2
+                  displayName: "Detect Actual DEB Filename"
+                  inputs:
+                    filePath: "detect-deb-filename.ps1"
+                    arguments: "-WorkspacePath '$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi' -Version '$(releaseVersion)'"
+
+                - task: PowerShell@2
                   displayName: "Prepare Release Files"
                   inputs:
                     targetType: "inline"
@@ -422,7 +437,20 @@ stages:
                       # Finde DEB-Dateiname
                       $workspace = "$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
                       $debFiles = Get-ChildItem -Path "$workspace/packages" -Filter "*.deb" -ErrorAction SilentlyContinue
-                      $debFileName = if ($debFiles) { $debFiles[0].Name } else { "mthbdeiotclient_$($version)_armhf.deb" }
+                      
+                      # Prüfe verschiedene mögliche Dateinamen
+                      $debFileName = if ($debFiles) { 
+                        $debFiles[0].Name 
+                      } else { 
+                        # Fallback-Namen basierend auf electron-builder Konventionen
+                        @(
+                          "mthbdeiotclient_$($version)_armv7l.deb",
+                          "mthbdeiotclient_$($version)_armhf.deb",
+                          "mthbdeiotclient-$($version)-armv7l.deb"
+                        )[0]
+                      }
+                      
+                      Write-Host "Expected DEB filename: $debFileName"
                       
                       # Erstelle README für releases Ordner
                       $releaseReadme = @"
@@ -438,14 +466,17 @@ stages:
                       
                       #### Direkte Installation (Empfohlen):
                       ``````bash
-                      # Eine Zeile Installation - Latest Release
-                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      # Eine Zeile Installation - Latest Release (prüfe korrekten Dateinamen)
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      
+                      # ODER - Automatische Erkennung des Dateinamens:
+                      wget -O /tmp/install-latest.sh https://github.com/$(githubRepository)/raw/main/install-latest.sh && chmod +x /tmp/install-latest.sh && /tmp/install-latest.sh
                       ``````
                       
                       #### Manuelle Installation:
                       ``````bash
-                      # 1. Download Latest Release
-                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$debFileName
+                      # 1. Download Latest Release (prüfe den korrekten Dateinamen auf GitHub)
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName
                       
                       # 2. Installation
                       sudo dpkg -i $debFileName
@@ -511,6 +542,25 @@ stages:
                     echo "=== AVAILABLE FILES IN WORKSPACE ==="
                     find "$workspace" -type f -name "*.deb" -exec ls -la {} \; || echo "No DEB files found"
                     
+                    echo "=== DETAILED FILE SEARCH ==="
+                    echo "Searching for DEB files in all subdirectories:"
+                    find "$workspace" -name "*.deb" -type f | while read file; do
+                      echo "Found: $file"
+                      echo "  Size: $(ls -lh "$file" | awk '{print $5}')"
+                      echo "  Basename: $(basename "$file")"
+                    done
+                    
+                    # Bestimme den korrekten Dateinamen
+                    actual_deb_file=$(find "$workspace" -name "*.deb" -type f | head -1)
+                    if [ -n "$actual_deb_file" ]; then
+                      actual_deb_filename=$(basename "$actual_deb_file")
+                      echo "=== ACTUAL DEB FILENAME: $actual_deb_filename ==="
+                      # Setze Variable für später
+                      echo "##vso[task.setvariable variable=ACTUAL_DEB_FILENAME]$actual_deb_filename"
+                    else
+                      echo "❌ ERROR: No DEB file found!"
+                    fi
+                    
                     # Kopiere DEB-Dateien (alle möglichen Pfade prüfen)
                     echo "=== COPYING DEB FILES ==="
                     deb_copied=false
@@ -571,10 +621,12 @@ stages:
                       echo "✅ SHA256SUMS created in v$(releaseVersion)/"
                     fi
                     
-                    # Kopiere nur README (KEINE Dokumentationsdateien)
-                    cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
-                    
-                    # Erstelle Update-Ordner für Electron AutoUpdater
+                      # Kopiere nur README und Installationsskript (KEINE Dokumentationsdateien)
+                      cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
+                      cp "install-latest.sh" "$temp_releases/install-latest.sh"
+                      
+                      # Mache Installationsskript ausführbar
+                      chmod +x "$temp_releases/install-latest.sh"                    # Erstelle Update-Ordner für Electron AutoUpdater
                     echo "=== CREATING UPDATE FOLDER FOR ELECTRON AUTOUPDATER ==="
                     mkdir -p "$temp_releases/update"
                     
@@ -774,25 +826,25 @@ stages:
                     echo "📁 Releases Folder: https://github.com/$(githubRepository)/tree/main/releases"
                     echo ""
                     echo "📦 DEPLOYED FILES (DEB, CHECKSUMS & AUTOUPDATER):"
-                    echo "- releases/latest/$(DEB_FILENAME)"
-                    echo "- releases/v$(releaseVersion)/$(DEB_FILENAME)"
+                    echo "- releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "- releases/v$(releaseVersion)/$(ACTUAL_DEB_FILENAME)"
                     echo "- releases/README.md"
                     echo "- releases/latest/SHA256SUMS"
                     echo "- releases/v$(releaseVersion)/SHA256SUMS"
-                    echo "- releases/update/$(DEB_FILENAME) (for AutoUpdater)"
+                    echo "- releases/update/$(ACTUAL_DEB_FILENAME) (for AutoUpdater)"
                     echo "- releases/update/latest.yml (AutoUpdater config)"
                     echo "- releases/update/SHA512SUMS"
                     echo ""
-                    echo "🍓 RASPBERRY PI INSTALLATION:"
-                    echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
-                    echo "sudo dpkg -i $(DEB_FILENAME) && sudo apt-get install -f"
+                    echo "🍓 RASPBERRY PI INSTALLATION (KORREKTER DATEINAME):"
+                    echo "wget https://github.com/$(githubRepository)/raw/main/releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "sudo dpkg -i $(ACTUAL_DEB_FILENAME) && sudo apt-get install -f"
                     echo ""
-                    echo "🔗 ÖFFENTLICHE LINKS:"
-                    echo "Latest DEB: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
-                    echo "Latest SHA256: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/SHA256SUMS"
-                    echo "AutoUpdater DEB: https://raw.githubusercontent.com/$(githubRepository)/main/releases/update/$(DEB_FILENAME)"
-                    echo "AutoUpdater Config: https://raw.githubusercontent.com/$(githubRepository)/main/releases/update/latest.yml"
-                    echo "Installation Guide: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/RASPBERRY_INSTALLATION.md"
+                    echo "🔗 ÖFFENTLICHE LINKS (KORREKTE DATEINAMEN):"
+                    echo "Latest DEB: https://github.com/$(githubRepository)/raw/main/releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "Latest SHA256: https://github.com/$(githubRepository)/raw/main/releases/latest/SHA256SUMS"
+                    echo "AutoUpdater DEB: https://github.com/$(githubRepository)/raw/main/releases/update/$(ACTUAL_DEB_FILENAME)"
+                    echo "AutoUpdater Config: https://github.com/$(githubRepository)/raw/main/releases/update/latest.yml"
+                    echo "Installation Guide: https://github.com/$(githubRepository)/raw/main/releases/latest/RASPBERRY_INSTALLATION.md"
                     echo ""
                     echo "🎉 Release ist jetzt öffentlich verfügbar!"
                     echo "=========================================="
