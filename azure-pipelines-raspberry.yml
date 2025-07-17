@@ -25,6 +25,10 @@ variables:
   # GitHub Configuration
   githubRepository: "mth-it-service/MTHBDEIOTClient"
   githubConnection: "github-connection"
+  
+  # HINWEIS: Für GitHub-Authentifizierung wird ein Personal Access Token benötigt
+  # Erstellen Sie ein GitHub Personal Access Token mit 'repo' und 'contents:write' Berechtigungen
+  # Fügen Sie es als Pipeline-Variable 'GITHUB_TOKEN' hinzu (als Secret markiert)
 
 stages:
   - stage: Build
@@ -546,39 +550,47 @@ stages:
                     script: |
                       # Aktiviere ausführliches Logging
                       $VerbosePreference = "Continue"
-                      $DebugPreference = "Continue"
                       
                       Write-Host "=== DETAILED GITHUB DEPLOYMENT DEBUG ==="
                       Write-Host "Release Version: $(releaseVersion)"
                       Write-Host "DEB Filename: $(DEB_FILENAME)"
                       Write-Host "GitHub Repository: $(githubRepository)"
-                      Write-Host "GitHub Connection: $(githubConnection)"
-                      Write-Host "System Access Token Length: $('$(System.AccessToken)'.Length)"
                       
-                      # Git konfigurieren mit Debug
+                      # Prüfe GitHub Token
+                      $githubToken = "$(GITHUB_TOKEN)"
+                      if ([string]::IsNullOrEmpty($githubToken)) {
+                        Write-Host "❌ ERROR: GITHUB_TOKEN Pipeline-Variable ist nicht gesetzt!"
+                        Write-Host "Bitte erstellen Sie ein GitHub Personal Access Token und fügen Sie es als Pipeline-Variable hinzu."
+                        Write-Host "Erforderliche Berechtigungen: repo, contents:write"
+                        exit 1
+                      }
+                      Write-Host "✅ GitHub Token found (Length: $($githubToken.Length))"
+                      
+                      # Git konfigurieren
                       Write-Host "=== CONFIGURING GIT ==="
                       git config --global user.email "azure-devops@mth-it-service.com"
                       git config --global user.name "Azure DevOps Pipeline"
-                      git config --global --list
-                      
-                      # Test Git-Konfiguration
                       Write-Host "Git Version: $(git --version)"
                       Write-Host "Git Config User: $(git config user.name)"
                       Write-Host "Git Config Email: $(git config user.email)"
                       
-                      # Repository klonen mit Debug
+                      # Repository klonen mit GitHub Token
                       Write-Host "=== CLONING REPOSITORY ==="
-                      $repoUrl = "https://$(githubConnection):$(System.AccessToken)@github.com/$(githubRepository).git"
-                      $repoUrlMasked = "https://$(githubConnection):***@github.com/$(githubRepository).git"
+                      $repoUrl = "https://$($githubToken)@github.com/$(githubRepository).git"
+                      $repoUrlMasked = "https://***@github.com/$(githubRepository).git"
                       Write-Host "Repository URL (masked): $repoUrlMasked"
                       
                       try {
                         Write-Host "Starting git clone..."
-                        git clone $repoUrl repo-clone --verbose
+                        git clone $repoUrl repo-clone --quiet
                         Write-Host "✅ Git clone completed successfully"
                       } catch {
                         Write-Host "❌ Git clone failed: $($_.Exception.Message)"
                         Write-Host "Git clone exit code: $LASTEXITCODE"
+                        Write-Host "Mögliche Ursachen:"
+                        Write-Host "- GitHub Token ist ungültig oder abgelaufen"
+                        Write-Host "- Token hat keine 'repo' Berechtigung"
+                        Write-Host "- Repository-Name ist falsch: $(githubRepository)"
                         exit 1
                       }
                       
@@ -586,14 +598,8 @@ stages:
                       Write-Host "=== REPOSITORY STATUS ==="
                       cd repo-clone
                       Write-Host "Current directory: $(Get-Location)"
-                      Write-Host "Repository contents:"
-                      Get-ChildItem -Force | Format-Table -AutoSize
-                      
-                      # Git Status prüfen
                       Write-Host "Git remote origin: $(git remote get-url origin)"
                       Write-Host "Git branch: $(git branch --show-current)"
-                      Write-Host "Git status:"
-                      git status --porcelain
                       
                       # Releases Ordner erstellen
                       Write-Host "=== CREATING RELEASES DIRECTORY ==="
