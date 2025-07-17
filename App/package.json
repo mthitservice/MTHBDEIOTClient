@@ -1,5 +1,6 @@
 {
-  "name": "MthBdeIotClient",
+  "name": "mthbdeiotclient",
+  "version": "1.0.21",
   "description": "Anwendung zum Erfassen von Betriebsdaten",
   "keywords": [
     "electron",
@@ -49,7 +50,11 @@
     "start:main": "concurrently -k -P \"cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --watch --config ./.erb/configs/webpack.config.main.dev.ts\" \"electronmon . -- {@}\" --",
     "start:preload": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS=\"-r ts-node/register --no-warnings\" webpack --config ./.erb/configs/webpack.config.preload.dev.ts",
     "start:renderer": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS=\"-r ts-node/register --no-warnings\" webpack serve --config ./.erb/configs/webpack.config.renderer.dev.ts",
-    "test": "jest"
+    "test": "jest",
+    "release": "node ../scripts/release-version.js",
+    "release:patch": "node ../scripts/release-version.js --type patch",
+    "release:minor": "node ../scripts/release-version.js --type minor",
+    "release:major": "node ../scripts/release-version.js --type major"
   },
   "browserslist": [
     "extends browserslist-config-erb"

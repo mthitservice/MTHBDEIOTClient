@@ -17,7 +17,7 @@ variables:
   releaseEnvironment: "RaspberryPi-Production"
   artifactName: "MthBdeIotClient-RaspberryPi"
   
-  # GitHub Configuration (später für GitHub Releases)
+  # GitHub Configuration für automatische Releases
   githubRepository: "mthitservice/MTHBDEIOTClient"
   githubConnection: "github-connection"
 
@@ -332,3 +332,209 @@ stages:
               pathToPublish: "$(Pipeline.Workspace)/RaspberryPi-Release-$(RELEASE_VERSION)"
               artifactName: "GitHub-Release-Assets"
               publishLocation: "Container"
+
+  - stage: PublishGitHubRelease
+    displayName: "Publish GitHub Release"
+    dependsOn: CreateInternalRelease
+    condition: succeeded()
+    jobs:
+      - deployment: GitHubRelease
+        displayName: "Create GitHub Release"
+        environment: "GitHub-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download Release Package"
+                  artifact: "RaspberryPi-Release-$(RELEASE_VERSION)"
+
+                - script: |
+                    echo "=== GITHUB RELEASE PREPARATION ==="
+                    echo "Version: $(RELEASE_VERSION)"
+                    echo "Package: $(PACKAGE_NAME)"
+                    echo "Repository: $(githubRepository)"
+                    echo "Connection: $(githubConnection)"
+                    
+                    release_path="$(Pipeline.Workspace)/RaspberryPi-Release-$(RELEASE_VERSION)"
+                    echo "Release path: $release_path"
+                    
+                    if [ -d "$release_path" ]; then
+                      echo "✅ Release package found"
+                      echo "📦 Available files:"
+                      find "$release_path" -type f | head -20
+                    else
+                      echo "❌ Release package not found"
+                      exit 1
+                    fi
+                  displayName: "Prepare GitHub Release"
+
+                - task: PowerShell@2
+                  displayName: "Generate GitHub Release Notes"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $version = "$(RELEASE_VERSION)"
+                      $packageName = "$(PACKAGE_NAME)"
+                      $buildId = "$(resources.pipeline.BuildPipeline.runID)"
+                      $today = Get-Date -Format "dd.MM.yyyy"
+                      
+                      # Extrahiere DEB-Dateinamen
+                      $releasePath = "$(Pipeline.Workspace)/RaspberryPi-Release-$(RELEASE_VERSION)"
+                      $debFiles = Get-ChildItem -Path "$releasePath/packages" -Filter "*.deb" -ErrorAction SilentlyContinue
+                      $debFileName = if ($debFiles) { $debFiles[0].Name } else { "$($packageName)_$($version)_armhf.deb" }
+                      
+                      $releaseNotes = @"
+                      # 🍓 MthBdeIotClient Raspberry Pi Release v$version
+                      
+                      ## Raspberry Pi 3+ Installation Package
+                      
+                      Automatisch erstellt am $today durch Azure DevOps Pipeline.
+                      
+                      ### 📦 Download
+                      - **Raspberry Pi 3+ (ARMv7l):** [$debFileName]($debFileName)
+                      
+                      ### 🔧 Schnell-Installation
+                      ``````bash
+                      # Download und Installation
+                      wget https://github.com/$(githubRepository)/releases/latest/download/$debFileName
+                      sudo dpkg -i $debFileName
+                      sudo apt-get install -f
+                      ``````
+                      
+                      ### 🚀 Anwendung starten
+                      ``````bash
+                      mthbdeiotclient
+                      ``````
+                      
+                      ### 📋 Systemanforderungen
+                      - Raspberry Pi 3, 3+, 4 oder Zero 2 W
+                      - Raspberry Pi OS (32-bit, ARMv7l)
+                      - Mindestens 1GB RAM
+                      - Desktop-Umgebung (X11)
+                      
+                      ### 🔧 Troubleshooting
+                      ``````bash
+                      # Bei fehlenden Abhängigkeiten
+                      sudo apt-get update
+                      sudo apt-get install -f
+                      
+                      # Bei Berechtigungsproblemen
+                      sudo chmod +x /usr/bin/mthbdeiotclient
+                      
+                      # Bei Display-Problemen
+                      export DISPLAY=:0
+                      mthbdeiotclient
+                      ``````
+                      
+                      ### 📖 Weitere Informationen
+                      - [Raspberry Pi Installation Guide](https://github.com/$(githubRepository)/blob/master/App/RASPBERRY_INSTALLATION.md)
+                      - [Deployment Guide](https://github.com/$(githubRepository)/blob/master/DEPLOYMENT_GUIDE.md)
+                      
+                      ---
+                      **Build:** $buildId | **Datum:** $today | **Architektur:** ARMv7l
+                      "@
+                      
+                      $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/github-release-notes.md" -Encoding UTF8
+                      Write-Host "GitHub release notes generated"
+                      
+                      # Setze Tag Name
+                      $tagName = "v$version"
+                      Write-Host "##vso[task.setvariable variable=TAG_NAME]$tagName"
+                      Write-Host "##vso[task.setvariable variable=DEB_FILENAME]$debFileName"
+
+                - script: |
+                    echo "=== PREPARING GITHUB ASSETS ==="
+                    
+                    release_path="$(Pipeline.Workspace)/RaspberryPi-Release-$(RELEASE_VERSION)"
+                    assets_path="$(Agent.TempDirectory)/github-assets"
+                    
+                    # Erstelle Assets-Ordner
+                    mkdir -p "$assets_path"
+                    
+                    # Kopiere DEB-Dateien
+                    if [ -d "$release_path/packages" ]; then
+                      echo "Copying DEB packages..."
+                      cp "$release_path/packages"/*.deb "$assets_path/" 2>/dev/null || echo "No DEB files found"
+                      cp "$release_path/packages/SHA256SUMS" "$assets_path/" 2>/dev/null || echo "No SHA256SUMS found"
+                    fi
+                    
+                    # Kopiere wichtige Dokumentation
+                    if [ -d "$release_path/installation" ]; then
+                      echo "Copying installation files..."
+                      cp "$release_path/installation/RASPBERRY_INSTALLATION.md" "$assets_path/" 2>/dev/null || echo "No RASPBERRY_INSTALLATION.md found"
+                      cp "$release_path/installation/deploy.ps1" "$assets_path/" 2>/dev/null || echo "No deploy.ps1 found"
+                    fi
+                    
+                    # Kopiere Release-Dokumentation
+                    if [ -f "$release_path/documentation/release-documentation.md" ]; then
+                      cp "$release_path/documentation/release-documentation.md" "$assets_path/INSTALL_GUIDE.md"
+                    fi
+                    
+                    echo "✅ GitHub assets prepared:"
+                    ls -la "$assets_path"
+                  displayName: "Prepare GitHub Assets"
+
+                - task: GitHubRelease@1
+                  displayName: "Create GitHub Release"
+                  inputs:
+                    gitHubConnection: $(githubConnection)
+                    repositoryName: $(githubRepository)
+                    action: "create"
+                    target: "$(Build.SourceVersion)"
+                    tagSource: "userSpecifiedTag"
+                    tag: "$(TAG_NAME)"
+                    title: "MthBdeIotClient Raspberry Pi v$(RELEASE_VERSION)"
+                    releaseNotesSource: "filePath"
+                    releaseNotesFilePath: "$(Agent.TempDirectory)/github-release-notes.md"
+                    assets: "$(Agent.TempDirectory)/github-assets/*"
+                    isPreRelease: false
+                    isDraft: false
+                    changeLogCompareToRelease: "lastFullRelease"
+                    changeLogType: "commitBased"
+
+                - task: GitHubRelease@1
+                  displayName: "Update Latest Release"
+                  inputs:
+                    gitHubConnection: $(githubConnection)
+                    repositoryName: $(githubRepository)
+                    action: "edit"
+                    target: "$(Build.SourceVersion)"
+                    tag: "$(TAG_NAME)"
+                    title: "MthBdeIotClient Raspberry Pi v$(RELEASE_VERSION) [LATEST]"
+                    releaseNotesSource: "filePath"
+                    releaseNotesFilePath: "$(Agent.TempDirectory)/github-release-notes.md"
+                    assets: "$(Agent.TempDirectory)/github-assets/*"
+                    isPreRelease: false
+                    isDraft: false
+                    changeLogCompareToRelease: "lastFullRelease"
+                    changeLogType: "commitBased"
+                  condition: succeededOrFailed()
+
+                - script: |
+                    echo "=========================================="
+                    echo "🚀 GITHUB RELEASE PUBLISHED"
+                    echo "=========================================="
+                    echo ""
+                    echo "✅ Release Status: SUCCESS"
+                    echo "🏷️ Tag: $(TAG_NAME)"
+                    echo "📦 Version: $(RELEASE_VERSION)"
+                    echo "🔗 Repository: https://github.com/$(githubRepository)"
+                    echo "📋 Release URL: https://github.com/$(githubRepository)/releases/tag/$(TAG_NAME)"
+                    echo "📥 Latest URL: https://github.com/$(githubRepository)/releases/latest"
+                    echo ""
+                    echo "📦 PUBLISHED ASSETS:"
+                    echo "- $(DEB_FILENAME)"
+                    echo "- SHA256SUMS"
+                    echo "- RASPBERRY_INSTALLATION.md"
+                    echo "- INSTALL_GUIDE.md"
+                    echo ""
+                    echo "🍓 RASPBERRY PI INSTALLATION:"
+                    echo "wget https://github.com/$(githubRepository)/releases/latest/download/$(DEB_FILENAME)"
+                    echo "sudo dpkg -i $(DEB_FILENAME)"
+                    echo "sudo apt-get install -f"
+                    echo ""
+                    echo "=========================================="
+                  displayName: "GitHub Release Summary"
