@@ -695,7 +695,11 @@ sudo apt-get install -f`;
   coloredOutput("Pushing changes and tag to origin...", "blue", emojis.gear);
   try {
     execCommand(`git push origin HEAD ${newTag}`);
-    coloredOutput("Pushed changes and tag to origin (triggers pipeline)", "green", emojis.success);
+    coloredOutput(
+      "Pushed changes and tag to origin (triggers pipeline)",
+      "green",
+      emojis.success
+    );
   } catch (error) {
     coloredOutput(
       `Error pushing to origin: ${error.message}`,
