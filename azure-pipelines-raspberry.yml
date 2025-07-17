@@ -175,7 +175,7 @@ stages:
 - stage: Deploy
   displayName: 'Deploy Stage'
   dependsOn: Build
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   jobs:
   - job: Deploy
     displayName: 'Deploy to GitHub Releases'
@@ -224,9 +224,77 @@ stages:
             }
           }
 
+    # Alternative: GitHub CLI Release (falls Service Connection nicht verfügbar)
+    - task: PowerShell@2
+      displayName: 'Create GitHub Release with GitHub CLI'
+      condition: failed()
+      inputs:
+        targetType: 'inline'
+        script: |
+          # Prüfe ob GitHub CLI verfügbar ist
+          try {
+            $ghVersion = & gh --version
+            Write-Host "GitHub CLI verfügbar: $ghVersion"
+          } catch {
+            Write-Host "GitHub CLI nicht verfügbar, überspringe Release-Erstellung"
+            Write-Host "Manuelle Schritte:"
+            Write-Host "1. Gehe zu https://github.com/mthitservice/MTHBDEIOTClient/releases"
+            Write-Host "2. Klicke 'Create a new release'"
+            Write-Host "3. Lade die Artifacts aus $(Build.ArtifactStagingDirectory)/release hoch"
+            return
+          }
+          
+          # Erstelle Release mit GitHub CLI
+          $releaseDir = "$(Build.ArtifactStagingDirectory)/release"
+          $tagName = "v$(Build.BuildNumber)"
+          
+          Write-Host "Erstelle Release $tagName..."
+          
+          # Release Notes erstellen
+          $releaseNotes = @"
+          ## Raspberry Pi Release $(Build.BuildNumber)
+          
+          ### What's New
+          - Automated build and deployment for Raspberry Pi
+          - Validated DEB package for ARM architecture
+          - Updated installation script with proper GitHub URLs
+          
+          ### Installation
+          ```bash
+          # Download and run the installation script
+          wget https://github.com/mthitservice/MTHBDEIOTClient/blob/main/scripts/install-raspberry.sh
+          chmod +x install-raspberry.sh
+          sudo ./install-raspberry.sh
+          ```
+          
+          ### Files in this release
+          - `*.deb` - Debian package for Raspberry Pi (ARM)
+          - `install-raspberry.sh` - Automated installation script
+          
+          ### Requirements
+          - Raspberry Pi OS (32-bit or 64-bit)
+          - ARM architecture (ARMv7l)
+          - Minimum 1GB RAM
+          
+          Built with Azure DevOps Pipeline
+          "@
+          
+          # GitHub CLI Release erstellen
+          $files = Get-ChildItem -Path $releaseDir -File
+          $fileArgs = $files | ForEach-Object { "$($_.FullName)" }
+          
+          & gh release create $tagName $fileArgs --repo mthitservice/MTHBDEIOTClient --title "Raspberry Pi Release $(Build.BuildNumber)" --notes $releaseNotes
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Release erfolgreich erstellt mit GitHub CLI"
+          } else {
+            Write-Error "❌ Fehler beim Erstellen des Releases mit GitHub CLI"
+          }
+
+    # Primäre GitHub Release Task mit korrektem Service Connection Namen
     - task: GitHubRelease@1
       inputs:
-        gitHubConnection: 'github-service-connection'
+        gitHubConnection: 'github-connection'
         repositoryName: 'mthitservice/MTHBDEIOTClient'
         action: 'create'
         target: '$(Build.SourceVersion)'
@@ -263,7 +331,17 @@ stages:
         addChangeLog: true
         changeLogCompareToRelease: 'lastFullRelease'
         changeLogType: 'commitBased'
-      displayName: 'Create GitHub Release'
+      displayName: 'Create GitHub Release (Primary)'
+      continueOnError: true
+
+    # Fallback: Nur Artefakte publizieren
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish release artifacts (Fallback)'
+      condition: always()
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/release'
+        artifactName: 'raspberry-pi-release'
+        publishLocation: 'Container'
 
     - task: PowerShell@2
       displayName: 'Update latest release info'
