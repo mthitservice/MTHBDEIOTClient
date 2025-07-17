@@ -1,0 +1,407 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi 3+ Build
+# Optimierte Pipeline für Raspberry Pi ARMv7l .deb Pakete
+
+trigger:
+  branches:
+    include:
+      - master
+      - release/*
+      - develop
+  tags:
+    include:
+      - "v*"
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  
+  # Artifact Names
+  artifactName: "MthBdeIotClient-RaspberryPi"
+
+stages:
+  - stage: Build
+    displayName: "Build Raspberry Pi Application"
+    jobs:
+      - job: BuildRaspberryPi
+        displayName: "Build Electron App für Raspberry Pi 3+"
+        pool:
+          vmImage: "ubuntu-latest"
+
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - task: Cache@2
+            displayName: "Cache node modules"
+            inputs:
+              key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: App/node_modules
+
+          - script: |
+              cd App
+              echo "=== SYSTEM INFORMATION ==="
+              echo "Node version: $(node --version)"
+              echo "NPM version: $(npm --version)"
+              echo "Working directory: $(pwd)"
+              echo "Available memory: $(free -h)"
+              echo "Disk space: $(df -h)"
+              
+              echo "=== PROJECT VERIFICATION ==="
+              echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+              echo "Package-lock.json exists: $(test -f package-lock.json && echo 'YES' || echo 'NO')"
+              
+              echo "=== NPM CONFIGURATION ==="
+              npm config set fund false
+              npm config set audit false
+              npm config set progress false
+              npm config list
+            displayName: "System Information & NPM Setup"
+
+          - script: |
+              cd App
+              echo "=== INSTALLING DEPENDENCIES ==="
+              echo "Starting npm install at $(date)"
+              
+              # Clean install
+              npm ci --ignore-scripts --no-audit --no-fund
+              
+              echo "=== VERIFYING CRITICAL PACKAGES ==="
+              echo "dotenv-cli: $(npx dotenv-cli --version || echo 'NOT INSTALLED')"
+              echo "cross-env: $(npx cross-env --version || echo 'NOT INSTALLED')"
+              echo "electron-builder: $(npx electron-builder --version || echo 'NOT INSTALLED')"
+              
+              echo "Dependencies installed successfully at $(date)"
+            displayName: "Install Dependencies"
+            timeoutInMinutes: 10
+
+          - script: |
+              cd App
+              echo "=== SETTING VERSION ==="
+              
+              # Version aus Tag oder automatisch generieren
+              if [ "$ISRELEASE" = "True" ]; then
+                VERSION="$RELEASEVERSION"
+                echo "Release Version: $VERSION"
+              else
+                BUILD_NUMBER="$BUILD_BUILDNUMBER"
+                SHORT_COMMIT=$(echo "$BUILD_SOURCEVERSION" | cut -c1-7)
+                VERSION="1.0.0-dev.$BUILD_NUMBER+$SHORT_COMMIT"
+                echo "Development Version: $VERSION"
+              fi
+
+              # Environment Variables setzen
+              echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=NODE_ENV]production"
+              echo "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+              # Package.json Version aktualisieren
+              node -e "
+                const fs = require('fs');
+                const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                packageJson.version = '$VERSION';
+                fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+                console.log('Updated package.json version to: $VERSION');
+              "
+              
+              echo "Version set to: $VERSION"
+            displayName: "Set Application Version"
+
+          - script: |
+              cd App
+              echo "=== BUILDING APPLICATION ==="
+              
+              # Environment Variables für Build
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              echo "Building main process..."
+              npm run build:main
+              
+              echo "Building renderer process..."
+              npm run build:renderer
+              
+              echo "=== BUILD VERIFICATION ==="
+              if [ -d "dist" ]; then
+                echo "✅ Dist folder created"
+                echo "Main files: $(find dist -name "*.js" | wc -l) JS files"
+                echo "Total files: $(find dist -type f | wc -l) files"
+              else
+                echo "❌ No dist folder found"
+                exit 1
+              fi
+              
+              echo "Application build completed successfully"
+            displayName: "Build Application"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - script: |
+              cd App
+              echo "=== PACKAGING RASPBERRY PI DEB ==="
+              
+              # Environment Variables
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              # Erstelle .env file wenn nicht vorhanden
+              if [ ! -f ".env" ]; then
+                echo "Creating .env file..."
+                echo "NODE_ENV=production" > .env
+                echo "APP_VERSION=$(APP_VERSION)" >> .env
+                echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
+              fi
+              
+              echo "Running Raspberry Pi DEB packaging..."
+              npm run package:raspberry-deb
+              
+              echo "=== PACKAGE VERIFICATION ==="
+              echo "Looking for .deb files:"
+              find . -name "*.deb" -exec ls -lh {} \; || echo "❌ No .deb files found"
+              
+              echo "Looking for .tar.gz files:"
+              find . -name "*.tar.gz" -exec ls -lh {} \; || echo "❌ No .tar.gz files found"
+              
+              echo "Release folder structure:"
+              if [ -d "release" ]; then
+                find release -type f -name "*.deb" -o -name "*.tar.gz" | head -10
+              else
+                echo "❌ No release folder found"
+              fi
+              
+              echo "Raspberry Pi packaging completed"
+            displayName: "Package Raspberry Pi DEB"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Raspberry Pi Packages"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/packages"
+              flattenFolders: false
+
+          - task: CopyFiles@2
+            displayName: "Copy Installation Files"
+            inputs:
+              sourceFolder: "App"
+              contents: |
+                RASPBERRY_INSTALLATION.md
+                deploy.ps1
+                generate-inventory.sh
+                Dockerfile.raspberry
+                *.md
+              targetFolder: "$(Build.ArtifactStagingDirectory)/installation"
+
+          - script: |
+              echo "=== FINAL PACKAGE VERIFICATION ==="
+              echo "Staging directory contents:"
+              find $(Build.ArtifactStagingDirectory) -type f -exec ls -lh {} \;
+              
+              echo "=== PACKAGE SUMMARY ==="
+              deb_count=$(find $(Build.ArtifactStagingDirectory) -name "*.deb" | wc -l)
+              echo "DEB packages found: $deb_count"
+              
+              if [ $deb_count -gt 0 ]; then
+                echo "✅ Raspberry Pi DEB package created successfully"
+                find $(Build.ArtifactStagingDirectory) -name "*.deb" -exec basename {} \;
+              else
+                echo "❌ No DEB packages found"
+                echo "Available files:"
+                find $(Build.ArtifactStagingDirectory) -type f
+              fi
+            displayName: "Verify Packages"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Raspberry Pi Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: $(artifactName)
+              publishLocation: "Container"
+            condition: always()
+
+  - stage: Release
+    displayName: "Release Raspberry Pi Package"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Build
+    jobs:
+      - deployment: RaspberryPiRelease
+        displayName: "Create Raspberry Pi Release"
+        environment: "RaspberryPi-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download Build Artifacts"
+
+                - script: |
+                    echo "=== RELEASE INFORMATION ==="
+                    echo "Version: $(releaseVersion)"
+                    echo "Build Number: $(Build.BuildNumber)"
+                    echo "Commit: $(Build.SourceVersion)"
+                    echo "Branch: $(Build.SourceBranch)"
+                    
+                    echo "=== AVAILABLE ARTIFACTS ==="
+                    find $(Pipeline.Workspace) -name "*.deb" -exec ls -lh {} \;
+                  displayName: "Release Information"
+
+                - task: PowerShell@2
+                  displayName: "Generate Release Notes"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $version = "$(releaseVersion)"
+                      $buildNumber = "$(Build.BuildNumber)"
+                      $sourceVersion = "$(Build.SourceVersion)"
+                      
+                      $releaseNotes = @"
+                      # MthBdeIotClient Raspberry Pi Release v$version
+
+                      ## 🍓 Raspberry Pi 3+ Installation Package
+
+                      ### 📦 Download:
+                      - **Raspberry Pi 3+ (ARMv7l):** ``mthbdeiotclient_$version_armhf.deb``
+
+                      ### 🔧 Installation auf Raspberry Pi:
+
+                      #### Direkte Installation:
+                      ``````bash
+                      # Download des DEB Pakets
+                      wget https://your-release-url/mthbdeiotclient_$version_armhf.deb
+
+                      # Installation
+                      sudo dpkg -i mthbdeiotclient_$version_armhf.deb
+
+                      # Abhängigkeiten reparieren falls nötig
+                      sudo apt-get install -f
+                      ``````
+
+                      #### Automatische Installation:
+                      ``````bash
+                      # Schnell-Installation
+                      curl -L https://your-release-url/mthbdeiotclient_$version_armhf.deb -o mthbdeiotclient.deb
+                      sudo dpkg -i mthbdeiotclient.deb
+                      sudo apt-get install -f
+                      ``````
+
+                      ### 🚀 Starten der Anwendung:
+                      ``````bash
+                      # Desktop-Umgebung
+                      mthbdeiotclient
+
+                      # Oder über Anwendungsmenü
+                      # Kategorie: Development oder Office
+                      ``````
+
+                      ### 📋 Systemanforderungen:
+                      - Raspberry Pi 3, 3+, 4 oder Zero 2 W
+                      - Raspberry Pi OS (32-bit, ARMv7l)
+                      - Mindestens 1GB RAM
+                      - Desktop-Umgebung (X11)
+
+                      ### 📖 Detaillierte Anweisungen:
+                      Siehe [RASPBERRY_INSTALLATION.md](./RASPBERRY_INSTALLATION.md) für:
+                      - Ansible Deployment
+                      - Automatische Installation
+                      - Konfiguration
+                      - Troubleshooting
+
+                      ---
+                      **Build:** $buildNumber  
+                      **Commit:** $sourceVersion  
+                      **Pipeline:** Azure DevOps - Raspberry Pi Specialized  
+                      **Architektur:** ARMv7l (32-bit)
+                      "@
+
+                      $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/raspberry-release-notes.md" -Encoding UTF8
+                      Write-Host "Release notes prepared for Raspberry Pi version $version"
+
+                - script: |
+                    echo "=== RELEASE PACKAGE SUMMARY ==="
+                    
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                    echo "Workspace: $workspace"
+                    
+                    if [ -d "$workspace" ]; then
+                      echo "✅ Artifact workspace found"
+                      
+                      echo "📦 DEB Packages:"
+                      find "$workspace" -name "*.deb" -exec ls -lh {} \; | while read line; do
+                        echo "  $line"
+                      done
+                      
+                      echo "📄 Installation Files:"
+                      find "$workspace" -name "*.md" -o -name "*.ps1" -o -name "*.sh" | while read file; do
+                        echo "  $(basename "$file")"
+                      done
+                      
+                      echo "📊 Total Files: $(find "$workspace" -type f | wc -l)"
+                      echo "📊 Package Size: $(du -sh "$workspace" | cut -f1)"
+                    else
+                      echo "❌ Artifact workspace not found"
+                      echo "Available directories:"
+                      ls -la "$(Pipeline.Workspace)/"
+                    fi
+                  displayName: "Release Package Summary"
+
+  - stage: Documentation
+    displayName: "Documentation & Next Steps"
+    condition: succeeded()
+    dependsOn: Build
+    jobs:
+      - job: DocumentationSummary
+        displayName: "Show Next Steps"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "=========================================="
+              echo "🍓 RASPBERRY PI BUILD COMPLETED"
+              echo "=========================================="
+              echo ""
+              echo "✅ Build Status: SUCCESS"
+              echo "📦 Artifact: $(artifactName)"
+              echo "🎯 Target: Raspberry Pi 3+ (ARMv7l)"
+              echo "📋 Package: .deb (Debian Package)"
+              echo ""
+              echo "📖 NEXT STEPS:"
+              echo "1. Download the artifacts from this build"
+              echo "2. Test installation on Raspberry Pi 3+"
+              echo "3. Update GitHub releases (manual step)"
+              echo "4. Deploy using Ansible (see RASPBERRY_INSTALLATION.md)"
+              echo ""
+              echo "🔧 MANUAL TESTING:"
+              echo "1. Copy .deb file to Raspberry Pi"
+              echo "2. Run: sudo dpkg -i mthbdeiotclient_*.deb"
+              echo "3. Run: sudo apt-get install -f"
+              echo "4. Test: mthbdeiotclient"
+              echo ""
+              echo "📋 ARTIFACT DOWNLOAD:"
+              echo "- Go to this build's summary page"
+              echo "- Download '$(artifactName)' artifact"
+              echo "- Extract and use the .deb file"
+              echo ""
+              echo "=========================================="
+            displayName: "Build Summary & Next Steps"

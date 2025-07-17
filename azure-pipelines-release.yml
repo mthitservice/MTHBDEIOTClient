@@ -1,0 +1,334 @@
+# Azure DevOps Release Pipeline für MthBdeIotClient Raspberry Pi
+# Separate Pipeline für Release-Management
+
+trigger: none # Keine automatischen Trigger - nur manuell oder über andere Pipeline
+
+resources:
+  pipelines:
+    - pipeline: BuildPipeline
+      source: "MthBdeIotClient-RaspberryPi-Build"
+      trigger:
+        tags:
+          include:
+            - "v*"
+
+variables:
+  # Release-Konfiguration
+  releaseEnvironment: "RaspberryPi-Production"
+  artifactName: "MthBdeIotClient-RaspberryPi"
+  
+  # GitHub Configuration (später für GitHub Releases)
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubConnection: "github-connection"
+
+stages:
+  - stage: ValidateRelease
+    displayName: "Validate Release Artifacts"
+    jobs:
+      - job: ValidateArtifacts
+        displayName: "Validate Raspberry Pi Artifacts"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - download: BuildPipeline
+            displayName: "Download Build Artifacts"
+            artifact: $(artifactName)
+
+          - script: |
+              echo "=== RELEASE ARTIFACT VALIDATION ==="
+              
+              artifact_path="$(Pipeline.Workspace)/BuildPipeline/$(artifactName)"
+              echo "Artifact path: $artifact_path"
+              
+              if [ ! -d "$artifact_path" ]; then
+                echo "❌ Artifact directory not found"
+                exit 1
+              fi
+              
+              echo "✅ Artifact directory found"
+              
+              # Validate DEB packages
+              deb_files=$(find "$artifact_path" -name "*.deb" | wc -l)
+              echo "DEB packages found: $deb_files"
+              
+              if [ $deb_files -eq 0 ]; then
+                echo "❌ No DEB packages found"
+                exit 1
+              fi
+              
+              echo "✅ DEB packages validated"
+              
+              # Show package details
+              echo "=== PACKAGE DETAILS ==="
+              find "$artifact_path" -name "*.deb" | while read deb_file; do
+                echo "📦 $(basename "$deb_file")"
+                echo "   Size: $(ls -lh "$deb_file" | awk '{print $5}')"
+                echo "   Path: $deb_file"
+                
+                # Validate DEB package structure
+                if dpkg --info "$deb_file" > /tmp/deb_info.txt 2>&1; then
+                  echo "   ✅ Valid DEB package"
+                  echo "   Package: $(grep "Package:" /tmp/deb_info.txt | cut -d' ' -f2-)"
+                  echo "   Version: $(grep "Version:" /tmp/deb_info.txt | cut -d' ' -f2-)"
+                  echo "   Architecture: $(grep "Architecture:" /tmp/deb_info.txt | cut -d' ' -f2-)"
+                else
+                  echo "   ❌ Invalid DEB package"
+                  cat /tmp/deb_info.txt
+                fi
+                echo ""
+              done
+              
+              # Validate installation files
+              echo "=== INSTALLATION FILES ==="
+              if [ -d "$artifact_path/installation" ]; then
+                echo "✅ Installation directory found"
+                find "$artifact_path/installation" -type f | while read file; do
+                  echo "   📄 $(basename "$file")"
+                done
+              else
+                echo "⚠️ No installation directory found"
+              fi
+              
+              echo "=== VALIDATION COMPLETE ==="
+              echo "✅ All artifacts validated successfully"
+            displayName: "Validate Package Quality"
+
+          - script: |
+              echo "=== RELEASE READINESS CHECK ==="
+              
+              artifact_path="$(Pipeline.Workspace)/BuildPipeline/$(artifactName)"
+              
+              # Check if this is a tagged release
+              if [ -n "$(resources.pipeline.BuildPipeline.runName)" ]; then
+                echo "Build Run: $(resources.pipeline.BuildPipeline.runName)"
+              fi
+              
+              # Extract version information from DEB package
+              deb_file=$(find "$artifact_path" -name "*.deb" | head -1)
+              if [ -n "$deb_file" ]; then
+                echo "Extracting version from DEB package..."
+                version=$(dpkg --field "$deb_file" Version)
+                echo "Package Version: $version"
+                echo "##vso[task.setvariable variable=RELEASE_VERSION]$version"
+                
+                package_name=$(dpkg --field "$deb_file" Package)
+                echo "Package Name: $package_name"
+                echo "##vso[task.setvariable variable=PACKAGE_NAME]$package_name"
+              fi
+              
+              echo "✅ Release is ready for deployment"
+            displayName: "Release Readiness Check"
+
+  - stage: CreateInternalRelease
+    displayName: "Create Internal Release"
+    dependsOn: ValidateRelease
+    jobs:
+      - deployment: InternalRelease
+        displayName: "Create Internal Release Package"
+        environment: $(releaseEnvironment)
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: BuildPipeline
+                  displayName: "Download Validated Artifacts"
+                  artifact: $(artifactName)
+
+                - task: PowerShell@2
+                  displayName: "Generate Release Documentation"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $version = "$(RELEASE_VERSION)"
+                      $packageName = "$(PACKAGE_NAME)"
+                      $buildId = "$(resources.pipeline.BuildPipeline.runID)"
+                      
+                      $releaseDoc = @"
+                      # MthBdeIotClient Raspberry Pi Release
+                      
+                      ## Release Information
+                      - **Version:** $version
+                      - **Package:** $packageName
+                      - **Build ID:** $buildId
+                      - **Release Date:** $(Get-Date -Format "dd.MM.yyyy HH:mm")
+                      - **Architecture:** ARMv7l (Raspberry Pi 3+)
+                      
+                      ## Installation Instructions
+                      
+                      ### Quick Installation
+                      ``````bash
+                      # Download und Installation
+                      sudo dpkg -i $packageName_$version_armhf.deb
+                      sudo apt-get install -f
+                      ``````
+                      
+                      ### Verification
+                      ``````bash
+                      # Prüfe Installation
+                      dpkg -l | grep mthbdeiotclient
+                      
+                      # Starte Anwendung
+                      mthbdeiotclient
+                      ``````
+                      
+                      ## Troubleshooting
+                      
+                      ### Common Issues
+                      1. **Missing Dependencies:**
+                         ``````bash
+                         sudo apt-get update
+                         sudo apt-get install -f
+                         ``````
+                      
+                      2. **Permission Issues:**
+                         ``````bash
+                         sudo chmod +x /usr/bin/mthbdeiotclient
+                         ``````
+                      
+                      3. **Display Issues:**
+                         ``````bash
+                         export DISPLAY=:0
+                         mthbdeiotclient
+                         ``````
+                      
+                      ## Deinstallation
+                      ``````bash
+                      sudo dpkg -r $packageName
+                      ``````
+                      
+                      ## Support
+                      - GitHub: https://github.com/$(githubRepository)
+                      - Issues: https://github.com/$(githubRepository)/issues
+                      "@
+                      
+                      $releaseDoc | Out-File -FilePath "$(Agent.TempDirectory)/release-documentation.md" -Encoding UTF8
+                      Write-Host "Release documentation generated"
+
+                - script: |
+                    echo "=== CREATING INTERNAL RELEASE PACKAGE ==="
+                    
+                    artifact_path="$(Pipeline.Workspace)/BuildPipeline/$(artifactName)"
+                    release_path="$(Agent.TempDirectory)/release-package"
+                    
+                    # Create release package structure
+                    mkdir -p "$release_path/packages"
+                    mkdir -p "$release_path/documentation"
+                    mkdir -p "$release_path/installation"
+                    
+                    # Copy DEB packages
+                    echo "Copying DEB packages..."
+                    find "$artifact_path" -name "*.deb" -exec cp {} "$release_path/packages/" \;
+                    
+                    # Copy installation files
+                    echo "Copying installation files..."
+                    if [ -d "$artifact_path/installation" ]; then
+                      cp -r "$artifact_path/installation/"* "$release_path/installation/"
+                    fi
+                    
+                    # Add release documentation
+                    cp "$(Agent.TempDirectory)/release-documentation.md" "$release_path/documentation/"
+                    
+                    # Create checksums
+                    echo "Creating checksums..."
+                    cd "$release_path/packages"
+                    sha256sum *.deb > SHA256SUMS
+                    
+                    # Create release info
+                    echo "=== RELEASE PACKAGE INFO ===" > "$release_path/RELEASE_INFO.txt"
+                    echo "Version: $(RELEASE_VERSION)" >> "$release_path/RELEASE_INFO.txt"
+                    echo "Package: $(PACKAGE_NAME)" >> "$release_path/RELEASE_INFO.txt"
+                    echo "Build: $(resources.pipeline.BuildPipeline.runID)" >> "$release_path/RELEASE_INFO.txt"
+                    echo "Date: $(date)" >> "$release_path/RELEASE_INFO.txt"
+                    echo "Architecture: ARMv7l" >> "$release_path/RELEASE_INFO.txt"
+                    echo "" >> "$release_path/RELEASE_INFO.txt"
+                    echo "Files:" >> "$release_path/RELEASE_INFO.txt"
+                    find "$release_path" -type f -exec basename {} \; | sort >> "$release_path/RELEASE_INFO.txt"
+                    
+                    echo "✅ Internal release package created"
+                    echo "📦 Package location: $release_path"
+                    echo "📊 Total files: $(find "$release_path" -type f | wc -l)"
+                  displayName: "Create Release Package"
+
+                - task: PublishBuildArtifacts@1
+                  displayName: "Publish Internal Release"
+                  inputs:
+                    pathToPublish: "$(Agent.TempDirectory)/release-package"
+                    artifactName: "RaspberryPi-Release-$(RELEASE_VERSION)"
+                    publishLocation: "Container"
+
+  - stage: PrepareGitHubRelease
+    displayName: "Prepare GitHub Release (Manual)"
+    dependsOn: CreateInternalRelease
+    condition: succeeded()
+    jobs:
+      - job: PrepareGitHubAssets
+        displayName: "Prepare Assets for GitHub"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - download: current
+            displayName: "Download Release Package"
+            artifact: "RaspberryPi-Release-$(RELEASE_VERSION)"
+
+          - script: |
+              echo "=========================================="
+              echo "🚀 GITHUB RELEASE PREPARATION"
+              echo "=========================================="
+              echo ""
+              echo "✅ Release Package Ready"
+              echo "📦 Version: $(RELEASE_VERSION)"
+              echo "🎯 Package: $(PACKAGE_NAME)"
+              echo ""
+              echo "📋 MANUAL STEPS FOR GITHUB RELEASE:"
+              echo ""
+              echo "1. 📥 DOWNLOAD ARTIFACTS:"
+              echo "   - Go to this pipeline run"
+              echo "   - Download 'RaspberryPi-Release-$(RELEASE_VERSION)' artifact"
+              echo ""
+              echo "2. 🏷️ CREATE GITHUB RELEASE:"
+              echo "   - Go to: https://github.com/$(githubRepository)/releases"
+              echo "   - Click 'Create a new release'"
+              echo "   - Tag: v$(RELEASE_VERSION)"
+              echo "   - Title: 'MthBdeIotClient Raspberry Pi v$(RELEASE_VERSION)'"
+              echo ""
+              echo "3. 📤 UPLOAD ASSETS:"
+              release_path="$(Pipeline.Workspace)/RaspberryPi-Release-$(RELEASE_VERSION)"
+              if [ -d "$release_path/packages" ]; then
+                echo "   DEB Packages:"
+                find "$release_path/packages" -name "*.deb" | while read deb; do
+                  echo "   - $(basename "$deb")"
+                done
+                echo "   - SHA256SUMS"
+              fi
+              if [ -d "$release_path/installation" ]; then
+                echo "   Installation Files:"
+                find "$release_path/installation" -type f | while read file; do
+                  echo "   - $(basename "$file")"
+                done
+              fi
+              echo ""
+              echo "4. 📝 RELEASE NOTES:"
+              if [ -f "$release_path/documentation/release-documentation.md" ]; then
+                echo "   - Use content from: documentation/release-documentation.md"
+              fi
+              echo ""
+              echo "5. ✅ PUBLISH RELEASE"
+              echo ""
+              echo "🔗 QUICK LINKS:"
+              echo "   Repository: https://github.com/$(githubRepository)"
+              echo "   Releases: https://github.com/$(githubRepository)/releases"
+              echo "   New Release: https://github.com/$(githubRepository)/releases/new"
+              echo ""
+              echo "=========================================="
+            displayName: "GitHub Release Instructions"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish GitHub Assets"
+            inputs:
+              pathToPublish: "$(Pipeline.Workspace)/RaspberryPi-Release-$(RELEASE_VERSION)"
+              artifactName: "GitHub-Release-Assets"
+              publishLocation: "Container"
