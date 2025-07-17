@@ -10,6 +10,17 @@ trigger:
     include:
       - "v*"  # Nur bei Tags die mit "v" beginnen (z.B. v1.0.0)
 
+# Alternativ: Trigger für alle Branches aktivieren
+# trigger:
+#   branches:
+#     include:
+#       - main
+#       - master
+#       - develop
+#   tags:
+#     include:
+#       - "v*"
+
 variables:
   # Build-Konfiguration
   buildConfiguration: "Release"
@@ -26,16 +37,7 @@ variables:
   githubRepository: "mthitservice/MTHBDEIOTClient"
   githubConnection: "github-connection"
   
-  # HINWEIS: Für GitHub-Authentifizieru                               echo "📦 Direct Download: https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
-                echo "📦 INSTALLATION COMMANDS:"
-                echo "wget https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
-                echo "sudo dpkg -i mthbdeiotclient_$(releaseVersion)_armhf.deb && sudo apt-get install -f" "📁 Latest Release: https://github.com/$(githubRepository)/tree/main/releases/latest"
-                echo "📦 Direct Download: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armv7l.deb"
-                echo ""
-                echo "📦 INSTALLATION COMMANDS (KORREKTER DATEINAME):"
-                echo "# Prüfe zuerst den korrekten Dateinamen auf GitHub, dann:"
-                echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/[KORREKTE_DATEINAME].deb"
-                echo "sudo dpkg -i [KORREKTE_DATEINAME].deb && sudo apt-get install -f"d ein Personal Access Token benötigt
+  # HINWEIS: Für GitHub-Authentifizierung wird ein Personal Access Token benötigt
   # Erstellen Sie ein GitHub Personal Access Token mit 'repo' und 'contents:write' Berechtigungen
   # Fügen Sie es als Pipeline-Variable 'GITHUB_TOKEN' hinzu (als Secret markiert)
 

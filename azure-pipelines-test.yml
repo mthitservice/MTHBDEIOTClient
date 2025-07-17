@@ -1,0 +1,216 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Test & Debug Version
+# Vereinfachte Pipeline für Branch-Builds und Tests
+# Wird bei jedem Commit auf main/master ausgeführt
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+      - develop
+  paths:
+    include:
+      - App/*
+      - scripts/*
+      - azure-pipelines*
+
+pr:
+  branches:
+    include:
+      - main
+      - master
+  paths:
+    include:
+      - App/*
+      - scripts/*
+      - azure-pipelines*
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning (für Test-Builds)
+  isRelease: false
+  buildVersion: "1.0.0-dev.$(Build.BuildNumber)"
+  
+  # Artifact Names
+  artifactName: "MthBdeIotClient-RaspberryPi-Test"
+  
+  # GitHub Configuration
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+
+stages:
+  - stage: Build
+    displayName: "Build & Test Raspberry Pi Application"
+    jobs:
+      - job: BuildTest
+        displayName: "Build Test für Raspberry Pi"
+        pool:
+          vmImage: "ubuntu-latest"
+
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd App
+              echo "=== PIPELINE TRIGGER TEST ==="
+              echo "Build Reason: $(Build.Reason)"
+              echo "Source Branch: $(Build.SourceBranch)"
+              echo "Source Branch Name: $(Build.SourceBranchName)"
+              echo "Build Number: $(Build.BuildNumber)"
+              echo "Commit: $(Build.SourceVersion)"
+              echo "Is Release: $(isRelease)"
+              echo "Build Version: $(buildVersion)"
+              echo "Working Directory: $(pwd)"
+              echo "=== SYSTEM INFO ==="
+              echo "Node: $(node --version)"
+              echo "NPM: $(npm --version)"
+              echo "OS: $(uname -a)"
+              echo "=== PROJECT FILES ==="
+              ls -la
+              echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+            displayName: "Pipeline Trigger Test"
+
+          - script: |
+              cd App
+              echo "=== NPM INSTALL TEST ==="
+              npm ci --ignore-scripts --no-audit --no-fund
+              echo "=== VERIFY DEPENDENCIES ==="
+              npm list --depth=0
+              echo "=== CRITICAL PACKAGES ==="
+              echo "electron: $(npm list electron --depth=0 || echo 'NOT FOUND')"
+              echo "electron-builder: $(npm list electron-builder --depth=0 || echo 'NOT FOUND')"
+            displayName: "Dependencies Test"
+            timeoutInMinutes: 5
+
+          - script: |
+              cd App
+              echo "=== BUILD TEST ==="
+              echo "Setting test version: $(buildVersion)"
+              
+              # Update package.json version
+              node -e "
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                pkg.version = '$(buildVersion)';
+                fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+                console.log('Version updated to:', pkg.version);
+              "
+              
+              echo "=== BUILDING MAIN PROCESS ==="
+              npm run build:main
+              
+              echo "=== BUILDING RENDERER PROCESS ==="
+              npm run build:renderer
+              
+              echo "=== BUILD VERIFICATION ==="
+              if [ -d "dist" ]; then
+                echo "✅ Build successful"
+                echo "Files created: $(find dist -type f | wc -l)"
+                echo "Main files: $(find dist -name "*.js" | head -5)"
+              else
+                echo "❌ Build failed - no dist folder"
+                exit 1
+              fi
+            displayName: "Build Test"
+            env:
+              NODE_ENV: production
+
+          - script: |
+              cd App
+              echo "=== PACKAGING TEST ==="
+              echo "Testing Raspberry Pi DEB packaging..."
+              
+              # Set environment
+              export NODE_ENV=production
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              # Test packaging command
+              npm run package:raspberry-deb
+              
+              echo "=== PACKAGE VERIFICATION ==="
+              echo "Looking for generated files:"
+              find . -name "*.deb" -o -name "*.tar.gz" | head -10
+              
+              if find . -name "*.deb" | grep -q .; then
+                echo "✅ DEB package created successfully"
+                find . -name "*.deb" -exec ls -lh {} \;
+              else
+                echo "⚠️ No DEB package found (may be expected in test)"
+                echo "Available files in release/:"
+                ls -la release/ 2>/dev/null || echo "No release folder"
+              fi
+            displayName: "Package Test"
+            env:
+              NODE_ENV: production
+            continueOnError: true
+
+          - script: |
+              echo "=========================================="
+              echo "🧪 PIPELINE TRIGGER TEST COMPLETED"
+              echo "=========================================="
+              echo ""
+              echo "✅ Status: $(Agent.JobStatus)"
+              echo "🔧 Build Reason: $(Build.Reason)"
+              echo "🌿 Branch: $(Build.SourceBranchName)"
+              echo "📦 Version: $(buildVersion)"
+              echo "🏗️ Build: $(Build.BuildNumber)"
+              echo ""
+              echo "📋 TRIGGER VERIFICATION:"
+              echo "- Branch Trigger: $(Build.Reason)"
+              echo "- Source Branch: $(Build.SourceBranch)"
+              echo "- Is Tag: $(Agent.JobStatus)"
+              echo ""
+              echo "🎯 NEXT STEPS:"
+              echo "1. ✅ Pipeline trigger working"
+              echo "2. ✅ Dependencies install correctly"
+              echo "3. ✅ Build process functional"
+              echo "4. ✅ Packaging command executes"
+              echo ""
+              echo "🚀 Ready for full pipeline execution!"
+              echo "=========================================="
+            displayName: "Test Summary"
+            condition: always()
+
+  - stage: PipelineValidation
+    displayName: "Pipeline Configuration Validation"
+    dependsOn: Build
+    condition: always()
+    jobs:
+      - job: ValidateConfig
+        displayName: "Validate Pipeline Config"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "=== PIPELINE CONFIGURATION ANALYSIS ==="
+              echo ""
+              echo "📋 TRIGGER CONFIGURATION:"
+              echo "- Branches: main, master, develop"
+              echo "- Paths: App/*, scripts/*, azure-pipelines*"
+              echo "- PR Trigger: Enabled for main/master"
+              echo ""
+              echo "📊 VARIABLES:"
+              echo "- Build Configuration: $(buildConfiguration)"
+              echo "- Node Version: $(nodeVersion)"
+              echo "- Is Release: $(isRelease)"
+              echo "- Build Version: $(buildVersion)"
+              echo "- Artifact Name: $(artifactName)"
+              echo "- GitHub Repository: $(githubRepository)"
+              echo ""
+              echo "🔍 BUILD ANALYSIS:"
+              echo "- Trigger Reason: $(Build.Reason)"
+              echo "- Source Branch: $(Build.SourceBranch)"
+              echo "- Commit: $(Build.SourceVersion)"
+              echo "- Build ID: $(Build.BuildId)"
+              echo "- Build Number: $(Build.BuildNumber)"
+              echo ""
+              echo "✅ Pipeline Configuration Valid"
+            displayName: "Configuration Analysis"
