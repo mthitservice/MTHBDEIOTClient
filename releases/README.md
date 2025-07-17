@@ -1,26 +1,26 @@
 # MthBdeIotClient Raspberry Pi Releases
 
-## Latest Release: v1.0.43
+## Latest Release: v1.0.44
 
-**Erstellt:** 17.07.2025 18:24  
-**Build:** 20250717.41  
-**Commit:** 98d0446
+**Erstellt:** 17.07.2025 18:44  
+**Build:** 20250717.42  
+**Commit:** 1aaaaf6
 
 ### 📦 Download & Installation
 
 #### Direkte Installation (Empfohlen):
 ```bash
 # Eine Zeile Installation - Latest Release
-wget https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/main/releases/latest/mthbdeiotclient_1.0.43_armhf.deb && sudo dpkg -i mthbdeiotclient_1.0.43_armhf.deb && sudo apt-get install -f
+wget https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/main/releases/latest/mthbdeiotclient_1.0.44_armhf.deb && sudo dpkg -i mthbdeiotclient_1.0.44_armhf.deb && sudo apt-get install -f
 ```
 
 #### Manuelle Installation:
 ```bash
 # 1. Download Latest Release
-wget https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/main/releases/latest/mthbdeiotclient_1.0.43_armhf.deb
+wget https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/main/releases/latest/mthbdeiotclient_1.0.44_armhf.deb
 
 # 2. Installation
-sudo dpkg -i mthbdeiotclient_1.0.43_armhf.deb
+sudo dpkg -i mthbdeiotclient_1.0.44_armhf.deb
 
 # 3. Abhängigkeiten installieren
 sudo apt-get install -f
