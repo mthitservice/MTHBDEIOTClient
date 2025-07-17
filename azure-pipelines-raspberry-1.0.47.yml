@@ -1,0 +1,905 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi 3+ Build
+# Optimierte Pipeline für Raspberry Pi ARMv7l .deb Pakete
+# Wird nur bei Git-Tags ausgeführt (nicht bei Master-Commits)
+
+trigger:
+  branches:
+    exclude:
+      - "*"  # Keine Branch-Trigger
+  tags:
+    include:
+      - "v*"  # Nur bei Tags die mit "v" beginnen (z.B. v1.0.0)
+
+# Alternativ: Trigger für alle Branches aktivieren
+# trigger:
+#   branches:
+#     include:
+#       - main
+#       - master
+#       - develop
+#   tags:
+#     include:
+#       - "v*"
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  
+  # Artifact Names
+  artifactName: "MthBdeIotClient-RaspberryPi"
+  
+  # GitHub Configuration
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubConnection: "github-connection"
+  
+  # HINWEIS: Für GitHub-Authentifizierung wird ein Personal Access Token benötigt
+  # Erstellen Sie ein GitHub Personal Access Token mit 'repo' und 'contents:write' Berechtigungen
+  # Fügen Sie es als Pipeline-Variable 'GITHUB_TOKEN' hinzu (als Secret markiert)
+
+stages:
+  - stage: Build
+    displayName: "Build Raspberry Pi Application"
+    jobs:
+      - job: BuildRaspberryPi
+        displayName: "Build Electron App für Raspberry Pi 3+"
+        pool:
+          vmImage: "ubuntu-latest"
+
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - task: Cache@2
+            displayName: "Cache node modules"
+            inputs:
+              key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: App/node_modules
+
+          - script: |
+              cd App
+              echo "=== SYSTEM INFORMATION ==="
+              echo "Node version: $(node --version)"
+              echo "NPM version: $(npm --version)"
+              echo "Working directory: $(pwd)"
+              echo "Available memory: $(free -h)"
+              echo "Disk space: $(df -h)"
+              
+              echo "=== PROJECT VERIFICATION ==="
+              echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+              echo "Package-lock.json exists: $(test -f package-lock.json && echo 'YES' || echo 'NO')"
+              
+              echo "=== NPM CONFIGURATION ==="
+              npm config set fund false
+              npm config set audit false
+              npm config set progress false
+              npm config list
+            displayName: "System Information & NPM Setup"
+
+          - script: |
+              cd App
+              echo "=== INSTALLING DEPENDENCIES ==="
+              echo "Starting npm install at $(date)"
+              
+              # Clean install
+              npm ci --ignore-scripts --no-audit --no-fund
+              
+              echo "=== VERIFYING CRITICAL PACKAGES ==="
+              echo "dotenv-cli: $(npx dotenv-cli --version || echo 'NOT INSTALLED')"
+              echo "cross-env: $(npx cross-env --version || echo 'NOT INSTALLED')"
+              echo "electron-builder: $(npx electron-builder --version || echo 'NOT INSTALLED')"
+              
+              echo "Dependencies installed successfully at $(date)"
+            displayName: "Install Dependencies"
+            timeoutInMinutes: 10
+
+          - script: |
+              cd App
+              echo "=== SETTING VERSION ==="
+              
+              # Version aus Tag oder automatisch generieren
+              if [ "$ISRELEASE" = "True" ]; then
+                VERSION="$RELEASEVERSION"
+                echo "Release Version: $VERSION"
+              else
+                BUILD_NUMBER="$BUILD_BUILDNUMBER"
+                SHORT_COMMIT=$(echo "$BUILD_SOURCEVERSION" | cut -c1-7)
+                VERSION="1.0.0-dev.$BUILD_NUMBER+$SHORT_COMMIT"
+                echo "Development Version: $VERSION"
+              fi
+
+              # Environment Variables setzen
+              echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=NODE_ENV]production"
+              echo "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+              # Package.json Version aktualisieren
+              node -e "
+                const fs = require('fs');
+                const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                packageJson.version = '$VERSION';
+                fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+                console.log('Updated package.json version to: $VERSION');
+              "
+              
+              echo "Version set to: $VERSION"
+            displayName: "Set Application Version"
+
+          - script: |
+              cd App
+              echo "=== BUILDING APPLICATION ==="
+              
+              # Environment Variables für Build
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              echo "Building main process..."
+              npm run build:main
+              
+              echo "Building renderer process..."
+              npm run build:renderer
+              
+              echo "=== BUILD VERIFICATION ==="
+              if [ -d "dist" ]; then
+                echo "✅ Dist folder created"
+                echo "Main files: $(find dist -name "*.js" | wc -l) JS files"
+                echo "Total files: $(find dist -type f | wc -l) files"
+              else
+                echo "❌ No dist folder found"
+                exit 1
+              fi
+              
+              echo "Application build completed successfully"
+            displayName: "Build Application"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - script: |
+              cd App
+              echo "=== PACKAGING RASPBERRY PI DEB ==="
+              
+              # Environment Variables
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              # Erstelle .env file wenn nicht vorhanden
+              if [ ! -f ".env" ]; then
+                echo "Creating .env file..."
+                echo "NODE_ENV=production" > .env
+                echo "APP_VERSION=$(APP_VERSION)" >> .env
+                echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
+              fi
+              
+              echo "Running Raspberry Pi DEB packaging..."
+              npm run package:raspberry-deb
+              
+              echo "=== PACKAGE VERIFICATION ==="
+              echo "Looking for .deb files:"
+              find . -name "*.deb" -exec ls -lh {} \; || echo "❌ No .deb files found"
+              
+              echo "Looking for .tar.gz files:"
+              find . -name "*.tar.gz" -exec ls -lh {} \; || echo "❌ No .tar.gz files found"
+              
+              echo "Release folder structure:"
+              if [ -d "release" ]; then
+                find release -type f -name "*.deb" -o -name "*.tar.gz" | head -10
+              else
+                echo "❌ No release folder found"
+              fi
+              
+              echo "Raspberry Pi packaging completed"
+            displayName: "Package Raspberry Pi DEB"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Raspberry Pi Packages"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/packages"
+              flattenFolders: false
+
+          - task: CopyFiles@2
+            displayName: "Copy Installation Files"
+            inputs:
+              sourceFolder: "App"
+              contents: |
+                RASPBERRY_INSTALLATION.md
+                deploy.ps1
+                generate-inventory.sh
+                Dockerfile.raspberry
+                *.md
+              targetFolder: "$(Build.ArtifactStagingDirectory)/installation"
+
+          - script: |
+              echo "=== FINAL PACKAGE VERIFICATION ==="
+              echo "Staging directory contents:"
+              find $(Build.ArtifactStagingDirectory) -type f -exec ls -lh {} \;
+              
+              echo "=== PACKAGE SUMMARY ==="
+              deb_count=$(find $(Build.ArtifactStagingDirectory) -name "*.deb" | wc -l)
+              echo "DEB packages found: $deb_count"
+              
+              if [ $deb_count -gt 0 ]; then
+                echo "✅ Raspberry Pi DEB package created successfully"
+                find $(Build.ArtifactStagingDirectory) -name "*.deb" -exec basename {} \;
+              else
+                echo "❌ No DEB packages found"
+                echo "Available files:"
+                find $(Build.ArtifactStagingDirectory) -type f
+              fi
+            displayName: "Verify Packages"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Raspberry Pi Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: $(artifactName)
+              publishLocation: "Container"
+            condition: always()
+
+  - stage: Release
+    displayName: "Release Raspberry Pi Package"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Build
+    jobs:
+      - deployment: RaspberryPiRelease
+        displayName: "Create Raspberry Pi Release"
+        environment: "RaspberryPi-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download Build Artifacts"
+
+                - script: |
+                    echo "=== RELEASE INFORMATION ==="
+                    echo "Version: $(releaseVersion)"
+                    echo "Build Number: $(Build.BuildNumber)"
+                    echo "Commit: $(Build.SourceVersion)"
+                    echo "Branch: $(Build.SourceBranch)"
+                    
+                    echo "=== AVAILABLE ARTIFACTS ==="
+                    find $(Pipeline.Workspace) -name "*.deb" -exec ls -lh {} \;
+                  displayName: "Release Information"
+
+                - task: PowerShell@2
+                  displayName: "Generate Release Notes"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $version = "$(releaseVersion)"
+                      $buildNumber = "$(Build.BuildNumber)"
+                      $sourceVersion = "$(Build.SourceVersion)"
+                      
+                      $releaseNotes = @"
+                      # MthBdeIotClient Raspberry Pi Release v$version
+
+                      ## 🍓 Raspberry Pi 3+ Installation Package
+
+                      ### 📦 Download:
+                      - **Raspberry Pi 3+ (ARMv7l):** ``mthbdeiotclient_$version_armhf.deb``
+
+                      ### 🔧 Installation auf Raspberry Pi:
+
+                      #### Direkte Installation:
+                      ``````bash
+                      # Download des DEB Pakets
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/mthbdeiotclient_$version_armhf.deb
+
+                      # Installation
+                      sudo dpkg -i mthbdeiotclient_$version_armhf.deb
+
+                      # Abhängigkeiten reparieren falls nötig
+                      sudo apt-get install -f
+                      ``````
+
+                      #### Automatische Installation:
+                      ``````bash
+                      # Schnell-Installation (korrekter Dateiname)
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      ``````
+
+                      ### 🚀 Starten der Anwendung:
+                      ``````bash
+                      # Desktop-Umgebung
+                      mthbdeiotclient
+
+                      # Oder über Anwendungsmenü
+                      # Kategorie: Development oder Office
+                      ``````
+
+                      ### 📋 Systemanforderungen:
+                      - Raspberry Pi 3, 3+, 4 oder Zero 2 W
+                      - Raspberry Pi OS (32-bit, ARMv7l)
+                      - Mindestens 1GB RAM
+                      - Desktop-Umgebung (X11)
+
+                      ### 📖 Detaillierte Anweisungen:
+                      Siehe [RASPBERRY_INSTALLATION.md](https://github.com/$(githubRepository)/raw/main/releases/latest/RASPBERRY_INSTALLATION.md) für:
+                      - Ansible Deployment
+                      - Automatische Installation
+                      - Konfiguration
+                      - Troubleshooting
+
+                      ---
+                      **Build:** $buildNumber  
+                      **Commit:** $sourceVersion  
+                      **Pipeline:** Azure DevOps - Raspberry Pi Specialized  
+                      **Architektur:** ARMv7l (32-bit)
+                      "@
+
+                      $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/raspberry-release-notes.md" -Encoding UTF8
+                      Write-Host "Release notes prepared for Raspberry Pi version $version"
+
+                - script: |
+                    echo "=== RELEASE PACKAGE SUMMARY ==="
+                    
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                    echo "Workspace: $workspace"
+                    
+                    if [ -d "$workspace" ]; then
+                      echo "✅ Artifact workspace found"
+                      
+                      echo "📦 DEB Packages:"
+                      find "$workspace" -name "*.deb" -exec ls -lh {} \; | while read line; do
+                        echo "  $line"
+                      done
+                      
+                      echo "📄 Installation Files:"
+                      find "$workspace" -name "*.md" -o -name "*.ps1" -o -name "*.sh" | while read file; do
+                        echo "  $(basename "$file")"
+                      done
+                      
+                      echo "📊 Total Files: $(find "$workspace" -type f | wc -l)"
+                      echo "📊 Package Size: $(du -sh "$workspace" | cut -f1)"
+                    else
+                      echo "❌ Artifact workspace not found"
+                      echo "Available directories:"
+                      ls -la "$(Pipeline.Workspace)/"
+                    fi
+                  displayName: "Release Package Summary"
+
+  - stage: GitHubDeploy
+    displayName: "Deploy to GitHub Repository"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Release
+    jobs:
+      - deployment: DeployToGitHub
+        displayName: "Deploy DEB to GitHub releases folder"
+        environment: "GitHub-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download Build Artifacts"
+
+                - script: |
+                    echo "=== GITHUB DEPLOY PREPARATION ==="
+                    echo "Version: $(releaseVersion)"
+                    echo "Tag: v$(releaseVersion)"
+                    echo "Repository: $(githubRepository)"
+                    echo "Build: $(Build.BuildNumber)"
+                    echo "Commit: $(Build.SourceVersion)"
+                    
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                    echo "Workspace: $workspace"
+                    
+                    if [ -d "$workspace" ]; then
+                      echo "✅ Artifacts found"
+                      echo "📦 DEB Files:"
+                      find "$workspace" -name "*.deb" -exec ls -lh {} \;
+                    else
+                      echo "❌ Artifacts not found"
+                      exit 1
+                    fi
+                  displayName: "Prepare GitHub Deploy"
+
+                - task: PowerShell@2
+                  displayName: "Detect Actual DEB Filename"
+                  inputs:
+                    filePath: "detect-deb-filename.ps1"
+                    arguments: "-WorkspacePath '$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi' -Version '$(releaseVersion)'"
+
+                - task: PowerShell@2
+                  displayName: "Prepare Release Files"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $version = "$(releaseVersion)"
+                      $buildNumber = "$(Build.BuildNumber)"
+                      $commit = "$(Build.SourceVersion)".Substring(0, 7)
+                      $today = Get-Date -Format "dd.MM.yyyy HH:mm"
+                      
+                      # Finde DEB-Dateiname
+                      $workspace = "$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                      $debFiles = Get-ChildItem -Path "$workspace/packages" -Filter "*.deb" -ErrorAction SilentlyContinue
+                      
+                      # Prüfe verschiedene mögliche Dateinamen
+                      $debFileName = if ($debFiles) { 
+                        $debFiles[0].Name 
+                      } else { 
+                        # Fallback-Namen basierend auf electron-builder Konventionen
+                        @(
+                          "mthbdeiotclient_$($version)_armv7l.deb",
+                          "mthbdeiotclient_$($version)_armhf.deb",
+                          "mthbdeiotclient-$($version)-armv7l.deb"
+                        )[0]
+                      }
+                      
+                      Write-Host "Expected DEB filename: $debFileName"
+                      
+                      # Erstelle README für releases Ordner
+                      $releaseReadme = @"
+                      # MthBdeIotClient Raspberry Pi Releases
+                      
+                      ## Latest Release: v$version
+                      
+                      **Erstellt:** $today  
+                      **Build:** $buildNumber  
+                      **Commit:** $commit
+                      
+                      ### 📦 Download & Installation
+                      
+                      #### Direkte Installation (Empfohlen):
+                      ``````bash
+                      # Eine Zeile Installation - Latest Release (prüfe korrekten Dateinamen)
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      
+                      # ODER - Automatische Erkennung des Dateinamens:
+                      wget -O /tmp/install-latest.sh https://github.com/$(githubRepository)/raw/main/install-latest.sh && chmod +x /tmp/install-latest.sh && /tmp/install-latest.sh
+                      ``````
+                      
+                      #### Manuelle Installation:
+                      ``````bash
+                      # 1. Download Latest Release (prüfe den korrekten Dateinamen auf GitHub)
+                      wget https://github.com/$(githubRepository)/raw/main/releases/latest/$debFileName
+                      
+                      # 2. Installation
+                      sudo dpkg -i $debFileName
+                      
+                      # 3. Abhängigkeiten installieren
+                      sudo apt-get install -f
+                      
+                      # 4. Anwendung starten
+                      mthbdeiotclient
+                      ``````
+                      
+                      ### 📋 Systemanforderungen
+                      - ✅ Raspberry Pi 3, 3+, 4 oder Zero 2 W
+                      - ✅ Raspberry Pi OS (32-bit, ARMv7l)
+                      - ✅ Mindestens 1GB RAM
+                      - ✅ Desktop-Umgebung (X11)
+                      
+                      ### 🔧 Troubleshooting
+                      ``````bash
+                      # Fehlende Abhängigkeiten
+                      sudo apt-get update && sudo apt-get install -f
+                      
+                      # Berechtigungsprobleme
+                      sudo chmod +x /usr/bin/mthbdeiotclient
+                      
+                      # Display-Probleme
+                      export DISPLAY=:0 && mthbdeiotclient
+                      
+                      # Deinstallation
+                      sudo dpkg -r mthbdeiotclient
+                      ``````
+                      
+                      ### 📖 Weitere Informationen
+                      - [📋 Raspberry Pi Installation Guide](../App/RASPBERRY_INSTALLATION.md)
+                      - [🚀 Deployment Guide](../DEPLOYMENT_GUIDE.md)
+                      - [❓ Issues & Support](https://github.com/$(githubRepository)/issues)
+                      
+                      ---
+                      **🔧 Technische Details:**  
+                      Architektur: ARMv7l | Package: DEB | Build System: Azure DevOps
+                      "@
+                      
+                      $releaseReadme | Out-File -FilePath "$(Agent.TempDirectory)/releases-README.md" -Encoding UTF8
+                      Write-Host "Release README generated for version $version"
+                      
+                      # Setze Variablen
+                      Write-Host "##vso[task.setvariable variable=DEB_FILENAME]$debFileName"
+
+                - script: |
+                    echo "=== PREPARING RELEASE FILES ==="
+                    
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                    temp_releases="$(Agent.TempDirectory)/releases"
+                    
+                    echo "Workspace: $workspace"
+                    echo "Temp releases: $temp_releases"
+                    
+                    # Erstelle releases Ordnerstruktur
+                    mkdir -p "$temp_releases/latest"
+                    mkdir -p "$temp_releases/v$(releaseVersion)"
+                    
+                    # Debug: Zeige verfügbare Dateien
+                    echo "=== AVAILABLE FILES IN WORKSPACE ==="
+                    find "$workspace" -type f -name "*.deb" -exec ls -la {} \; || echo "No DEB files found"
+                    
+                    echo "=== DETAILED FILE SEARCH ==="
+                    echo "Searching for DEB files in all subdirectories:"
+                    find "$workspace" -name "*.deb" -type f | while read file; do
+                      echo "Found: $file"
+                      echo "  Size: $(ls -lh "$file" | awk '{print $5}')"
+                      echo "  Basename: $(basename "$file")"
+                    done
+                    
+                    # Bestimme den korrekten Dateinamen
+                    actual_deb_file=$(find "$workspace" -name "*.deb" -type f | head -1)
+                    if [ -n "$actual_deb_file" ]; then
+                      actual_deb_filename=$(basename "$actual_deb_file")
+                      echo "=== ACTUAL DEB FILENAME: $actual_deb_filename ==="
+                      # Setze Variable für später
+                      echo "##vso[task.setvariable variable=ACTUAL_DEB_FILENAME]$actual_deb_filename"
+                    else
+                      echo "❌ ERROR: No DEB file found!"
+                    fi
+                    
+                    # Kopiere DEB-Dateien (alle möglichen Pfade prüfen)
+                    echo "=== COPYING DEB FILES ==="
+                    deb_copied=false
+                    
+                    # Prüfe packages Ordner
+                    if [ -d "$workspace/packages" ]; then
+                      echo "Found packages directory"
+                      if find "$workspace/packages" -name "*.deb" | head -1 | grep -q .; then
+                        echo "Copying from packages directory..."
+                        cp "$workspace/packages"/*.deb "$temp_releases/latest/" 2>/dev/null && deb_copied=true
+                        cp "$workspace/packages"/*.deb "$temp_releases/v$(releaseVersion)/" 2>/dev/null
+                      fi
+                    fi
+                    
+                    # Prüfe direkten workspace
+                    if [ "$deb_copied" = false ]; then
+                      echo "Trying workspace root..."
+                      if find "$workspace" -maxdepth 1 -name "*.deb" | head -1 | grep -q .; then
+                        echo "Copying from workspace root..."
+                        cp "$workspace"/*.deb "$temp_releases/latest/" 2>/dev/null && deb_copied=true
+                        cp "$workspace"/*.deb "$temp_releases/v$(releaseVersion)/" 2>/dev/null
+                      fi
+                    fi
+                    
+                    # Prüfe alle Unterordner
+                    if [ "$deb_copied" = false ]; then
+                      echo "Searching all subdirectories..."
+                      deb_files=$(find "$workspace" -name "*.deb" | head -5)
+                      if [ -n "$deb_files" ]; then
+                        echo "Found DEB files:"
+                        echo "$deb_files"
+                        for deb_file in $deb_files; do
+                          echo "Copying: $deb_file"
+                          cp "$deb_file" "$temp_releases/latest/" && deb_copied=true
+                          cp "$deb_file" "$temp_releases/v$(releaseVersion)/"
+                        done
+                      fi
+                    fi
+                    
+                    if [ "$deb_copied" = false ]; then
+                      echo "❌ ERROR: No DEB files found to copy!"
+                      echo "Available files in workspace:"
+                      find "$workspace" -type f | head -20
+                      exit 1
+                    fi
+                    
+                    # Erstelle SHA256 Checksums nur für DEB-Dateien
+                    echo "=== CREATING CHECKSUMS ==="
+                    cd "$temp_releases/latest"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                      sha256sum *.deb > SHA256SUMS
+                      echo "✅ SHA256SUMS created in latest/"
+                    fi
+                    
+                    cd "$temp_releases/v$(releaseVersion)"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                      sha256sum *.deb > SHA256SUMS
+                      echo "✅ SHA256SUMS created in v$(releaseVersion)/"
+                    fi
+                    
+                      # Kopiere nur README und Installationsskript (KEINE Dokumentationsdateien)
+                      cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
+                      cp "install-latest.sh" "$temp_releases/install-latest.sh"
+                      
+                      # Mache Installationsskript ausführbar
+                      chmod +x "$temp_releases/install-latest.sh"                    # Erstelle Update-Ordner für Electron AutoUpdater
+                    echo "=== CREATING UPDATE FOLDER FOR ELECTRON AUTOUPDATER ==="
+                    mkdir -p "$temp_releases/update"
+                    
+                    # Kopiere DEB-Dateien auch in update Ordner
+                    if [ -d "$temp_releases/latest" ]; then
+                      cp "$temp_releases/latest"/*.deb "$temp_releases/update/" 2>/dev/null || echo "No DEB files for update folder"
+                      
+                      # Erstelle latest.yml für AutoUpdater
+                      cd "$temp_releases/update"
+                      if ls *.deb 1> /dev/null 2>&1; then
+                        deb_file=$(ls *.deb | head -1)
+                        file_size=$(stat -c%s "$deb_file")
+                        deb_sha512=$(sha512sum "$deb_file" | cut -d' ' -f1)
+                        
+                        # Erstelle latest.yml für Electron AutoUpdater
+                        echo "version: $(releaseVersion)" > latest.yml
+                        echo "files:" >> latest.yml
+                        echo "  - url: $deb_file" >> latest.yml
+                        echo "    sha512: $deb_sha512" >> latest.yml
+                        echo "    size: $file_size" >> latest.yml
+                        echo "path: $deb_file" >> latest.yml
+                        echo "sha512: $deb_sha512" >> latest.yml
+                        echo "releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")" >> latest.yml
+                        
+                        echo "✅ latest.yml created for AutoUpdater"
+                        cat latest.yml
+                        
+                        # Erstelle auch SHA512SUMS für Konsistenz
+                        sha512sum *.deb > SHA512SUMS
+                        echo "✅ SHA512SUMS created in update/"
+                      fi
+                    fi
+                    
+                    echo "=== RELEASE FILES PREPARED ==="
+                    echo "✅ DEB files, checksums, and AutoUpdater files ready"
+                    find "$temp_releases" -type f -exec ls -la {} \;
+                  displayName: "Prepare Release Files"
+
+                - task: PowerShell@2
+                  displayName: "Clone Repository and Update Releases"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      # Aktiviere ausführliches Logging
+                      $VerbosePreference = "Continue"
+                      
+                      Write-Host "=== DETAILED GITHUB DEPLOYMENT DEBUG ==="
+                      Write-Host "Release Version: $(releaseVersion)"
+                      Write-Host "DEB Filename: $(DEB_FILENAME)"
+                      Write-Host "GitHub Repository: $(githubRepository)"
+                      
+                      # Prüfe GitHub Token
+                      $githubToken = "$(GITHUB_TOKEN)"
+                      if ([string]::IsNullOrEmpty($githubToken)) {
+                        Write-Host "❌ ERROR: GITHUB_TOKEN Pipeline-Variable ist nicht gesetzt!"
+                        Write-Host "Bitte erstellen Sie ein GitHub Personal Access Token und fügen Sie es als Pipeline-Variable hinzu."
+                        Write-Host "Erforderliche Berechtigungen: repo, contents:write"
+                        exit 1
+                      }
+                      Write-Host "✅ GitHub Token found (Length: $($githubToken.Length))"
+                      
+                      # Git konfigurieren
+                      Write-Host "=== CONFIGURING GIT ==="
+                      git config --global user.email "azure-devops@mth-it-service.com"
+                      git config --global user.name "Azure DevOps Pipeline"
+                      Write-Host "Git Version: $(git --version)"
+                      Write-Host "Git Config User: $(git config user.name)"
+                      Write-Host "Git Config Email: $(git config user.email)"
+                      
+                      # Repository klonen mit GitHub Token
+                      Write-Host "=== CLONING REPOSITORY ==="
+                      $repoUrl = "https://$($githubToken)@github.com/$(githubRepository).git"
+                      $repoUrlMasked = "https://***@github.com/$(githubRepository).git"
+                      Write-Host "Repository URL (masked): $repoUrlMasked"
+                      
+                      try {
+                        Write-Host "Starting git clone..."
+                        git clone $repoUrl repo-clone --quiet
+                        Write-Host "✅ Git clone completed successfully"
+                      } catch {
+                        Write-Host "❌ Git clone failed: $($_.Exception.Message)"
+                        Write-Host "Git clone exit code: $LASTEXITCODE"
+                        Write-Host "Mögliche Ursachen:"
+                        Write-Host "- GitHub Token ist ungültig oder abgelaufen"
+                        Write-Host "- Token hat keine 'repo' Berechtigung"
+                        Write-Host "- Repository-Name ist falsch: $(githubRepository)"
+                        exit 1
+                      }
+                      
+                      # Verzeichnis wechseln und Status prüfen
+                      Write-Host "=== REPOSITORY STATUS ==="
+                      cd repo-clone
+                      Write-Host "Current directory: $(Get-Location)"
+                      Write-Host "Git remote origin: $(git remote get-url origin)"
+                      Write-Host "Git branch: $(git branch --show-current)"
+                      
+                      # Releases Ordner erstellen
+                      Write-Host "=== CREATING RELEASES DIRECTORY ==="
+                      if (-not (Test-Path "releases")) {
+                        New-Item -ItemType Directory -Path "releases"
+                        Write-Host "✅ Created releases directory"
+                      } else {
+                        Write-Host "ℹ️ releases directory already exists"
+                        Write-Host "Existing releases content:"
+                        Get-ChildItem "releases" -Recurse | Format-Table -AutoSize
+                      }
+                      
+                      # Kopiere neue Release-Dateien mit Debug
+                      Write-Host "=== COPYING RELEASE FILES ==="
+                      $tempReleases = "$(Agent.TempDirectory)/releases"
+                      Write-Host "Source: $tempReleases"
+                      Write-Host "Destination: releases/"
+                      
+                      if (Test-Path $tempReleases) {
+                        Write-Host "Source files to copy:"
+                        Get-ChildItem "$tempReleases" -Recurse | Format-Table -AutoSize
+                        
+                        Copy-Item -Path "$tempReleases/*" -Destination "releases/" -Recurse -Force -Verbose
+                        Write-Host "✅ Files copied successfully"
+                      } else {
+                        Write-Host "❌ Source directory not found: $tempReleases"
+                        exit 1
+                      }
+                      
+                      # Git add mit Debug
+                      Write-Host "=== ADDING FILES TO GIT ==="
+                      Write-Host "Files to add:"
+                      Get-ChildItem "releases" -Recurse | Format-Table -AutoSize
+                      
+                      git add releases/ --verbose
+                      Write-Host "Git add exit code: $LASTEXITCODE"
+                      
+                      # Git Status nach add
+                      Write-Host "Git status after add:"
+                      git status --porcelain
+                      git status
+                      
+                      # Git commit mit Debug
+                      Write-Host "=== COMMITTING CHANGES ==="
+                      $commitMessage = "Release v$(releaseVersion) - Add Raspberry Pi DEB package
+                      
+                      - Added $(DEB_FILENAME) to releases/latest/
+                      - Added versioned release in releases/v$(releaseVersion)/
+                      - Updated releases README
+                      - SHA256SUMS included
+                      
+                      Build: $(Build.BuildNumber)
+                      Commit: $(Build.SourceVersion)"
+                      
+                      Write-Host "Commit message:"
+                      Write-Host $commitMessage
+                      
+                      try {
+                        git commit -m $commitMessage --verbose
+                        Write-Host "✅ Git commit completed successfully"
+                        Write-Host "Git commit exit code: $LASTEXITCODE"
+                      } catch {
+                        Write-Host "❌ Git commit failed: $($_.Exception.Message)"
+                        Write-Host "Git commit exit code: $LASTEXITCODE"
+                        
+                        # Zusätzliche Debug-Informationen
+                        Write-Host "Git diff --staged:"
+                        git diff --staged
+                        Write-Host "Git diff:"
+                        git diff
+                        exit 1
+                      }
+                      
+                      # Push mit Debug
+                      Write-Host "=== PUSHING TO GITHUB ==="
+                      try {
+                        git push origin main --verbose
+                        Write-Host "✅ Git push completed successfully"
+                        Write-Host "Git push exit code: $LASTEXITCODE"
+                      } catch {
+                        Write-Host "❌ Git push failed: $($_.Exception.Message)"
+                        Write-Host "Git push exit code: $LASTEXITCODE"
+                        
+                        # Zusätzliche Debug-Informationen
+                        Write-Host "Git remote -v:"
+                        git remote -v
+                        Write-Host "Git log --oneline -5:"
+                        git log --oneline -5
+                        exit 1
+                      }
+                      
+                      Write-Host "✅ GitHub deployment completed successfully"
+
+                - script: |
+                    echo "=========================================="
+                    echo "🚀 GITHUB DEPLOY COMPLETED"
+                    echo "=========================================="
+                    echo ""
+                    echo "✅ Status: SUCCESS"
+                    echo "📦 Version: $(releaseVersion)"
+                    echo "🔗 Repository: https://github.com/$(githubRepository)"
+                    echo "📁 Releases Folder: https://github.com/$(githubRepository)/tree/main/releases"
+                    echo ""
+                    echo "📦 DEPLOYED FILES (DEB, CHECKSUMS & AUTOUPDATER):"
+                    echo "- releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "- releases/v$(releaseVersion)/$(ACTUAL_DEB_FILENAME)"
+                    echo "- releases/README.md"
+                    echo "- releases/latest/SHA256SUMS"
+                    echo "- releases/v$(releaseVersion)/SHA256SUMS"
+                    echo "- releases/update/$(ACTUAL_DEB_FILENAME) (for AutoUpdater)"
+                    echo "- releases/update/latest.yml (AutoUpdater config)"
+                    echo "- releases/update/SHA512SUMS"
+                    echo ""
+                    echo "🍓 RASPBERRY PI INSTALLATION (KORREKTER DATEINAME):"
+                    echo "wget https://github.com/$(githubRepository)/raw/main/releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "sudo dpkg -i $(ACTUAL_DEB_FILENAME) && sudo apt-get install -f"
+                    echo ""
+                    echo "🔗 ÖFFENTLICHE LINKS (KORREKTE DATEINAMEN):"
+                    echo "Latest DEB: https://github.com/$(githubRepository)/raw/main/releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "Latest SHA256: https://github.com/$(githubRepository)/raw/main/releases/latest/SHA256SUMS"
+                    echo "AutoUpdater DEB: https://github.com/$(githubRepository)/raw/main/releases/update/$(ACTUAL_DEB_FILENAME)"
+                    echo "AutoUpdater Config: https://github.com/$(githubRepository)/raw/main/releases/update/latest.yml"
+                    echo "Installation Guide: https://github.com/$(githubRepository)/raw/main/releases/latest/RASPBERRY_INSTALLATION.md"
+                    echo ""
+                    echo "🎉 Release ist jetzt öffentlich verfügbar!"
+                    echo "=========================================="
+                  displayName: "GitHub Deploy Summary"
+
+  - stage: Documentation
+    displayName: "Documentation & Next Steps"
+    condition: succeeded()
+    dependsOn: 
+      - Build
+      - GitHubDeploy
+    jobs:
+      - job: DocumentationSummary
+        displayName: "Show Next Steps"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "=========================================="
+              echo "🍓 RASPBERRY PI BUILD COMPLETED"
+              echo "=========================================="
+              echo ""
+              echo "✅ Build Status: SUCCESS"
+              echo "📦 Artifact: $(artifactName)"
+              echo "🎯 Target: Raspberry Pi 3+ (ARMv7l)"
+              echo "📋 Package: .deb (Debian Package)"
+              echo ""
+              if [ "$(isRelease)" = "True" ]; then
+                echo "🚀 GITHUB RELEASE DEPLOYED:"
+                echo "📁 Latest Release: https://github.com/$(githubRepository)/tree/main/releases/latest"
+                echo "� Direct Download: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo ""
+                echo "📦 INSTALLATION COMMANDS:"
+                echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo "sudo dpkg -i mthbdeiotclient_$(releaseVersion)_armhf.deb && sudo apt-get install -f"
+                echo ""
+              fi
+              echo "�📖 NEXT STEPS:"
+              echo "1. Download the artifacts from this build"
+              echo "2. Test installation on Raspberry Pi 3+"
+              echo "3. Use public GitHub links for distribution"
+              echo "4. Deploy using Ansible (see RASPBERRY_INSTALLATION.md)"
+              echo ""
+              echo "🔧 MANUAL TESTING:"
+              echo "1. Copy .deb file to Raspberry Pi"
+              echo "2. Run: sudo dpkg -i mthbdeiotclient_*.deb"
+              echo "3. Run: sudo apt-get install -f"
+              echo "4. Test: mthbdeiotclient"
+              echo ""
+              echo "📋 ARTIFACT DOWNLOAD:"
+              echo "- Go to this build's summary page"
+              echo "- Download '$(artifactName)' artifact"
+              echo "- Extract and use the .deb file"
+              echo ""
+              echo "=========================================="
+            displayName: "Build Summary & Next Steps"

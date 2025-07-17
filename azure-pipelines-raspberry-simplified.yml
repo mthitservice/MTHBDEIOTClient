@@ -1,0 +1,295 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi 3+ Build
+# Optimierte Pipeline für Raspberry Pi ARMv7l .deb Pakete
+# Verbesserte DEB-Paket-Validierung
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+      - develop
+  tags:
+    include:
+      - "v*"  # Auch bei Tags die mit "v" beginnen
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  
+  # Artifact Names
+  artifactName: "MthBdeIotClient-RaspberryPi"
+  
+  # GitHub Configuration
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubConnection: "github-connection"
+
+stages:
+  - stage: Build
+    displayName: "Build Raspberry Pi Application"
+    jobs:
+      - job: BuildRaspberryPi
+        displayName: "Build for Raspberry Pi ARMv7l"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+        - checkout: self
+          fetchDepth: 0
+          displayName: "Checkout Source Code"
+        
+        - task: NodeTool@0
+          displayName: "Install Node.js $(nodeVersion)"
+          inputs:
+            versionSpec: $(nodeVersion)
+        
+        - task: Bash@3
+          displayName: "Install Build Tools"
+          inputs:
+            targetType: 'inline'
+            script: |
+              set -e
+              echo "Installing build tools..."
+              
+              # Install dpkg-deb for validation
+              sudo apt-get update
+              sudo apt-get install -y dpkg-dev build-essential
+              
+              # Verify tools
+              node --version
+              npm --version
+              dpkg-deb --version
+              
+              echo "Build tools installed successfully"
+        
+        - task: Bash@3
+          displayName: "Install Dependencies"
+          inputs:
+            targetType: 'inline'
+            workingDirectory: "App"
+            script: |
+              set -e
+              echo "Installing Node.js dependencies..."
+              
+              # Clean install
+              npm ci --silent
+              
+              # Install electron-builder dependencies
+              npx electron-builder install-app-deps
+              
+              echo "Dependencies installed successfully"
+        
+        - task: Bash@3
+          displayName: "Build Application"
+          inputs:
+            targetType: 'inline'
+            workingDirectory: "App"
+            script: |
+              set -e
+              echo "Building application for Raspberry Pi..."
+              
+              # Set environment variables
+              export NODE_ENV=production
+              export ELECTRON_BUILDER_CACHE_DIR=$(Build.Repository.LocalPath)/.cache
+              
+              # Build the application
+              echo "Running build process..."
+              npm run build
+              
+              echo "Build completed successfully"
+        
+        - task: Bash@3
+          displayName: "Create DEB Package"
+          inputs:
+            targetType: 'inline'
+            workingDirectory: "App"
+            script: |
+              set -e
+              echo "Creating DEB package for Raspberry Pi..."
+              
+              # Set environment variables
+              export NODE_ENV=production
+              export ELECTRON_BUILDER_CACHE_DIR=$(Build.Repository.LocalPath)/.cache
+              
+              # Build DEB package
+              echo "Running electron-builder for DEB package..."
+              npm run package:raspberry-deb
+              
+              echo "DEB package creation completed"
+        
+        - task: Bash@3
+          displayName: "Validate DEB Package"
+          inputs:
+            targetType: 'inline'
+            workingDirectory: "App"
+            script: |
+              set -e
+              
+              echo "=== Enhanced DEB Package Validation ==="
+              
+              # Find all DEB files
+              debfiles=$(find . -name "*.deb" -type f)
+              
+              if [ -z "$debfiles" ]; then
+                echo "ERROR: No DEB files found!"
+                exit 1
+              fi
+              
+              validation_passed=true
+              
+              for debfile in $debfiles; do
+                echo ""
+                echo "Validating: $debfile"
+                echo "===================="
+                
+                # Check file existence and size
+                if [ ! -f "$debfile" ]; then
+                  echo "ERROR: File $debfile does not exist!"
+                  validation_passed=false
+                  continue
+                fi
+                
+                filesize=$(stat -c%s "$debfile")
+                echo "File size: $filesize bytes"
+                
+                if [ "$filesize" -lt 10000 ]; then
+                  echo "ERROR: File too small ($filesize bytes)"
+                  validation_passed=false
+                  continue
+                fi
+                
+                # Check file type
+                filetype=$(file "$debfile")
+                echo "File type: $filetype"
+                
+                # Check if it's a valid AR archive
+                if ! ar t "$debfile" >/dev/null 2>&1; then
+                  echo "ERROR: Not a valid AR archive!"
+                  validation_passed=false
+                  continue
+                fi
+                
+                # List AR archive contents
+                echo "AR archive contents:"
+                ar t "$debfile"
+                
+                # Check for required AR members
+                ar_contents=$(ar t "$debfile")
+                if ! echo "$ar_contents" | grep -q "debian-binary"; then
+                  echo "ERROR: Missing debian-binary file in AR archive!"
+                  validation_passed=false
+                fi
+                
+                if ! echo "$ar_contents" | grep -q "control\.tar"; then
+                  echo "ERROR: Missing control.tar file in AR archive!"
+                  validation_passed=false
+                fi
+                
+                if ! echo "$ar_contents" | grep -q "data\.tar"; then
+                  echo "ERROR: Missing data.tar file in AR archive!"
+                  validation_passed=false
+                fi
+                
+                # Extract and check debian-binary version
+                if ar p "$debfile" debian-binary | grep -q "2.0"; then
+                  echo "✓ Debian binary format version: 2.0"
+                else
+                  echo "ERROR: Invalid debian-binary version!"
+                  validation_passed=false
+                fi
+                
+                # Use dpkg-deb to validate
+                echo "Running dpkg-deb validation..."
+                
+                if dpkg-deb --info "$debfile" >/dev/null 2>&1; then
+                  echo "✓ dpkg-deb validation passed"
+                  
+                  # Show package info
+                  echo "Package info:"
+                  dpkg-deb --info "$debfile"
+                  
+                  # Show package contents (first 20 lines)
+                  echo "Package contents:"
+                  dpkg-deb --contents "$debfile" | head -20
+                  
+                else
+                  echo "ERROR: dpkg-deb validation failed!"
+                  dpkg-deb --info "$debfile" || true
+                  validation_passed=false
+                fi
+                
+                echo "===================="
+              done
+              
+              if [ "$validation_passed" = true ]; then
+                echo ""
+                echo "✓ All DEB packages passed validation!"
+                echo "DEB files ready for deployment:"
+                for debfile in $debfiles; do
+                  echo "  - $debfile ($(stat -c%s "$debfile") bytes)"
+                done
+              else
+                echo ""
+                echo "✗ DEB package validation failed!"
+                echo "Build cannot proceed with invalid DEB packages."
+                exit 1
+              fi
+        
+        - task: CopyFiles@2
+          displayName: "Copy DEB Package"
+          inputs:
+            sourceFolder: "App"
+            contents: "**/*.deb"
+            targetFolder: "$(Build.ArtifactStagingDirectory)"
+            flattenFolders: true
+        
+        - task: PublishBuildArtifacts@1
+          displayName: "Publish DEB Package"
+          inputs:
+            pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            artifactName: "$(artifactName)"
+            publishLocation: "Container"
+        
+        - task: GitHubRelease@1
+          displayName: "GitHub Release"
+          condition: and(succeeded(), eq(variables.isRelease, true))
+          inputs:
+            gitHubConnection: "$(githubConnection)"
+            repositoryName: "$(githubRepository)"
+            action: "edit"
+            tag: "$(Build.SourceBranchName)"
+            title: "Release $(releaseVersion)"
+            releaseNotesSource: "inline"
+            releaseNotesInline: |
+              # Release $(releaseVersion)
+              
+              ## Raspberry Pi Support
+              - DEB package for Raspberry Pi 3+ (ARMv7l)
+              - Optimized for Raspberry Pi OS
+              - Enhanced package validation
+              
+              ## Files
+              - `*.deb` - Debian package for Raspberry Pi
+              
+              ## Installation
+              ```bash
+              # Download and install
+              wget https://github.com/$(githubRepository)/releases/download/$(Build.SourceBranchName)/MthBdeIotClient-*.deb
+              sudo dpkg -i MthBdeIotClient-*.deb
+              
+              # Fix dependencies if needed
+              sudo apt-get install -f
+              ```
+              
+              ## System Requirements
+              - Raspberry Pi 3+ (ARMv7l)
+              - Raspberry Pi OS (32-bit)
+              - 1GB+ RAM
+              - 500MB+ free disk space
+            assets: "$(Build.ArtifactStagingDirectory)/*.deb"
+            changeLogCompareToRelease: "lastFullRelease"
+            changeLogType: "commitBased"

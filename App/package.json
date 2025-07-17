@@ -270,6 +270,14 @@
       "synopsis": "IoT Client Application for Raspberry Pi",
       "compression": "xz",
       "priority": "optional",
+      "packageCategory": "devel",
+      "fpm": [
+        "--deb-compression=xz",
+        "--deb-user=root",
+        "--deb-group=root",
+        "--deb-no-default-config-files",
+        "--deb-build-depends=libnss3-dev,libatk-bridge2.0-dev,libdrm-dev,libxkbcommon-dev,libxdamage-dev,libxrandr-dev,libgbm-dev,libxss-dev,libasound2-dev"
+      ],
       "depends": [
         "libnss3",
         "libatk-bridge2.0-0",
@@ -279,8 +287,33 @@
         "libxrandr2",
         "libgbm1",
         "libxss1",
-        "libasound2"
+        "libasound2",
+        "libgtk-3-0",
+        "libx11-6",
+        "libxcb1",
+        "libxcomposite1",
+        "libxcursor1",
+        "libxfixes3",
+        "libxi6",
+        "libxrender1",
+        "libxtst6",
+        "ca-certificates",
+        "fonts-liberation",
+        "libappindicator3-1",
+        "lsb-release",
+        "xdg-utils"
       ],
+      "desktop": {
+        "Name": "MTH BDE IoT Client",
+        "Comment": "IoT Client Application for Raspberry Pi",
+        "Keywords": "IoT;Raspberry;Client;BDE;MTH;",
+        "Categories": "Development;Utility;System;",
+        "Terminal": "false",
+        "Type": "Application",
+        "StartupNotify": "true",
+        "MimeType": "application/x-mthbdeiotclient",
+        "Icon": "mthbdeiotclient"
+      },
       "extraFiles": [
         {
           "from": "node_modules/better-sqlite3/build/Release",
