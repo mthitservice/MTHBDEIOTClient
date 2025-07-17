@@ -527,62 +527,205 @@ stages:
                       Write-Host "✅ Release README created"
 
                 - task: PowerShell@2
-                  displayName: "Deploy to GitHub"
+                  displayName: "Deploy to GitHub Releases"
                   inputs:
                     targetType: "inline"
                     script: |
-                      # Git konfigurieren
-                      git config --global user.email "azure-devops@mth-it-service.com"
-                      git config --global user.name "Azure DevOps Pipeline"
-                      
-                      # Repository klonen
+                      # GitHub Token prüfen
                       $githubToken = "$(GITHUB_TOKEN)"
                       if ([string]::IsNullOrEmpty($githubToken)) {
                           Write-Host "❌ ERROR: GITHUB_TOKEN nicht gesetzt!"
                           exit 1
                       }
                       
-                      $repoUrl = "https://$githubToken@github.com/$(githubRepository).git"
-                      git clone $repoUrl repo-clone --quiet
+                      $version = "$(releaseVersion)"
+                      $debFileName = "$(ACTUAL_DEB_FILENAME)"
+                      $debFilePath = "$(ACTUAL_DEB_FULLPATH)"
+                      $repo = "$(githubRepository)"
+                      $tagName = "v$version"
                       
-                      # Zu Repository wechseln
-                      cd repo-clone
+                      Write-Host "=== GITHUB RELEASE DEPLOYMENT ==="
+                      Write-Host "Repository: $repo"
+                      Write-Host "Tag: $tagName"
+                      Write-Host "DEB File: $debFileName"
+                      Write-Host "File Path: $debFilePath"
                       
-                      # Releases Ordner erstellen
-                      if (-not (Test-Path "releases")) {
-                          New-Item -ItemType Directory -Path "releases"
+                      # GitHub API Headers
+                      $headers = @{
+                          "Authorization" = "token $githubToken"
+                          "Accept" = "application/vnd.github+json"
+                          "X-GitHub-Api-Version" = "2022-11-28"
                       }
                       
-                      # Release-Dateien kopieren
+                      # 1. Check if release already exists
+                      $releaseUrl = "https://api.github.com/repos/$repo/releases/tags/$tagName"
+                      
+                      try {
+                          $existingRelease = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
+                          Write-Host "✅ Release $tagName already exists"
+                          $releaseId = $existingRelease.id
+                          $uploadUrl = $existingRelease.upload_url -replace '\{\?name,label\}', ''
+                      } catch {
+                          Write-Host "ℹ️ Release $tagName doesn't exist, creating new release..."
+                          
+                          # Create new release
+                          $releaseData = @{
+                              tag_name = $tagName
+                              name = "MthBdeIotClient v$version - Raspberry Pi"
+                              body = @"
+                      # MthBdeIotClient v$version - Raspberry Pi Release
+                      
+                      ## 📦 Installation
+                      
+                      ### Schnell-Installation (Empfohlen)
+                      ``````bash
+                      # Download und Installation in einem Schritt
+                      wget -O $debFileName https://github.com/$repo/releases/download/$tagName/$debFileName
+                      sudo dpkg -i $debFileName && sudo apt-get install -f
+                      ``````
+                      
+                      ### Systemanforderungen
+                      - ✅ Raspberry Pi 3, 3+, 4 oder Zero 2 W
+                      - ✅ Raspberry Pi OS (32-bit, ARMv7l)
+                      - ✅ Mindestens 1GB RAM
+                      - ✅ Desktop-Umgebung (X11)
+                      
+                      ### Troubleshooting
+                      ``````bash
+                      # Berechtigungen reparieren
+                      sudo chmod +x /usr/bin/mthbdeiotclient
+                      
+                      # Abhängigkeiten installieren
+                      sudo apt-get update && sudo apt-get install -f
+                      
+                      # Deinstallation
+                      sudo dpkg -r mthbdeiotclient
+                      ``````
+                      
+                      ---
+                      **Architektur:** ARMv7l | **Format:** DEB | **Build:** Azure DevOps
+                      **Automatisch erstellt am:** $(Get-Date -Format "dd.MM.yyyy HH:mm") UTC
+                      "@
+                              draft = $false
+                              prerelease = $false
+                          }
+                          
+                          $createReleaseUrl = "https://api.github.com/repos/$repo/releases"
+                          $newRelease = Invoke-RestMethod -Uri $createReleaseUrl -Headers $headers -Method Post -Body ($releaseData | ConvertTo-Json) -ContentType "application/json"
+                          
+                          Write-Host "✅ Created new release: $tagName"
+                          $releaseId = $newRelease.id
+                          $uploadUrl = $newRelease.upload_url -replace '\{\?name,label\}', ''
+                      }
+                      
+                      # 2. Upload DEB file as release asset
+                      Write-Host "=== UPLOADING DEB FILE ==="
+                      
+                      $uploadHeaders = @{
+                          "Authorization" = "token $githubToken"
+                          "Content-Type" = "application/octet-stream"
+                      }
+                      
+                      $uploadUrlWithParams = "$uploadUrl" + "?name=$debFileName"
+                      
+                      Write-Host "Upload URL: $uploadUrlWithParams"
+                      Write-Host "File size: $([math]::Round((Get-Item $debFilePath).Length/1MB, 2)) MB"
+                      
+                      try {
+                          $uploadResult = Invoke-RestMethod -Uri $uploadUrlWithParams -Headers $uploadHeaders -Method Post -InFile $debFilePath
+                          Write-Host "✅ Successfully uploaded: $debFileName"
+                          Write-Host "Download URL: $($uploadResult.browser_download_url)"
+                      } catch {
+                          Write-Host "❌ Upload failed: $($_.Exception.Message)"
+                          Write-Host "Response: $($_.Exception.Response)"
+                          exit 1
+                      }
+                      
+                      # 3. Create README file for repository
                       $tempReleases = "$(Agent.TempDirectory)/releases"
-                      Copy-Item -Path "$tempReleases/*" -Destination "releases/" -Recurse -Force
+                      $readmeContent = @"
+                      # MthBdeIotClient Raspberry Pi Releases
                       
-                      # Git add, commit und push
-                      git add releases/
-                      git commit -m "Release v$(releaseVersion) - Add Raspberry Pi DEB package $(ACTUAL_DEB_FILENAME)"
-                      git push origin main
+                      ## Latest Release: v$version
                       
-                      Write-Host "✅ Successfully deployed to GitHub"
+                      **Erstellt:** $(Get-Date -Format "dd.MM.yyyy HH:mm") UTC  
+                      **DEB-Datei:** $debFileName
+                      
+                      ### 📦 Schnell-Installation
+                      
+                      ``````bash
+                      # Download und Installation
+                      wget -O $debFileName https://github.com/$repo/releases/download/$tagName/$debFileName
+                      sudo dpkg -i $debFileName && sudo apt-get install -f
+                      ``````
+                      
+                      ### 📦 Alternative: Automatische Installation
+                      
+                      ``````bash
+                      # Automatisches Download der neuesten Version
+                      wget -qO- https://api.github.com/repos/$repo/releases/latest | grep "browser_download_url.*\.deb" | cut -d '"' -f 4 | wget -i -
+                      sudo dpkg -i *.deb && sudo apt-get install -f
+                      ``````
+                      
+                      ### 📋 Systemanforderungen
+                      - ✅ Raspberry Pi 3, 3+, 4 oder Zero 2 W
+                      - ✅ Raspberry Pi OS (32-bit, ARMv7l)
+                      - ✅ Mindestens 1GB RAM
+                      - ✅ Desktop-Umgebung (X11)
+                      
+                      ### 🔧 Troubleshooting
+                      ``````bash
+                      # Berechtigungen reparieren
+                      sudo chmod +x /usr/bin/mthbdeiotclient
+                      
+                      # Abhängigkeiten installieren
+                      sudo apt-get update && sudo apt-get install -f
+                      
+                      # Deinstallation
+                      sudo dpkg -r mthbdeiotclient
+                      ``````
+                      
+                      ### 🔗 Direkte Links
+                      - [📦 Latest Release](https://github.com/$repo/releases/latest)
+                      - [📦 Alle Releases](https://github.com/$repo/releases)
+                      - [📦 Aktuelle DEB-Datei](https://github.com/$repo/releases/download/$tagName/$debFileName)
+                      
+                      ---
+                      **Architektur:** ARMv7l | **Format:** DEB | **Build:** Azure DevOps
+                      **Automatisch generiert am:** $(Get-Date -Format "dd.MM.yyyy HH:mm") UTC
+                      "@
+                      
+                      # Save README to temp directory
+                      $readmeContent | Out-File -FilePath "$tempReleases/README.md" -Encoding UTF8
+                      
+                      Write-Host "✅ GitHub Release deployment completed successfully!"
+                      Write-Host "🔗 Release URL: https://github.com/$repo/releases/tag/$tagName"
+                      Write-Host "📦 Download URL: https://github.com/$repo/releases/download/$tagName/$debFileName"
 
                 - script: |
                     echo "=========================================="
-                    echo "🚀 GITHUB DEPLOY COMPLETED"
+                    echo "🚀 GITHUB RELEASE DEPLOYMENT COMPLETED"
                     echo "=========================================="
                     echo ""
                     echo "✅ Status: SUCCESS"
                     echo "📦 Version: $(releaseVersion)"
                     echo "📁 DEB-Datei: $(ACTUAL_DEB_FILENAME)"
                     echo ""
-                    echo "🔗 KORREKTE LINKS (beachte Groß-/Kleinschreibung):"
-                    echo "Latest DEB: https://github.com/$(githubRepository)/raw/main/releases/latest/$(ACTUAL_DEB_FILENAME)"
-                    echo "SHA256SUMS: https://github.com/$(githubRepository)/raw/main/releases/latest/SHA256SUMS"
-                    echo "AutoUpdater: https://github.com/$(githubRepository)/raw/main/releases/update/latest.yml"
+                    echo "🔗 GITHUB RELEASE LINKS:"
+                    echo "Release Page: https://github.com/$(githubRepository)/releases/tag/v$(releaseVersion)"
+                    echo "Direct Download: https://github.com/$(githubRepository)/releases/download/v$(releaseVersion)/$(ACTUAL_DEB_FILENAME)"
+                    echo "Latest Release: https://github.com/$(githubRepository)/releases/latest"
                     echo ""
-                    echo "🍓 INSTALLATION (korrekter Dateiname):"
-                    echo "wget https://github.com/$(githubRepository)/raw/main/releases/latest/$(ACTUAL_DEB_FILENAME)"
+                    echo "🍓 INSTALLATION COMMANDS:"
+                    echo "# Direct Download:"
+                    echo "wget -O $(ACTUAL_DEB_FILENAME) https://github.com/$(githubRepository)/releases/download/v$(releaseVersion)/$(ACTUAL_DEB_FILENAME)"
                     echo "sudo dpkg -i $(ACTUAL_DEB_FILENAME) && sudo apt-get install -f"
                     echo ""
-                    echo "🎉 Release ist verfügbar!"
+                    echo "# Auto-latest:"
+                    echo "wget -qO- https://api.github.com/repos/$(githubRepository)/releases/latest | grep \"browser_download_url.*\.deb\" | cut -d '\"' -f 4 | wget -i -"
+                    echo "sudo dpkg -i *.deb && sudo apt-get install -f"
+                    echo ""
+                    echo "🎉 Release erfolgreich auf GitHub veröffentlicht!"
                     echo "=========================================="
                   displayName: "Deployment Summary"
 
