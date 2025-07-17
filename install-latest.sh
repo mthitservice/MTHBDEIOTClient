@@ -12,7 +12,7 @@ echo ""
 
 # Konfiguration
 GITHUB_REPO="mthitservice/MTHBDEIOTClient"
-RELEASES_URL="https://github.com/${GITHUB_REPO}/raw/main/releases/latest"
+RELEASES_URL="https://github.com/${GITHUB_REPO}/blob/main/releases/latest"
 TEMP_DIR="/tmp/mthbdeiot-install"
 
 # Überprüfe Systemvoraussetzungen
@@ -48,15 +48,6 @@ mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
 # Lade SHA256SUMS zur Dateinamenerkennung
-echo "🔍 Erkenne verfügbare DEB-Dateien..."
-if ! wget -q "$RELEASES_URL/SHA256SUMS" -O SHA256SUMS; then
-    echo "❌ Fehler: Kann SHA256SUMS nicht herunterladen."
-    echo "   URL: $RELEASES_URL/SHA256SUMS"
-    echo "   Prüfe Internetverbindung und Repository-Verfügbarkeit."
-    exit 1
-fi
-
-# Extrahiere DEB-Dateinamen mit Priorität für die korrekte Namenskonvention
 echo "🔍 Erkenne verfügbare DEB-Dateien..."
 if ! wget -q "$RELEASES_URL/SHA256SUMS" -O SHA256SUMS; then
     echo "❌ Fehler: Kann SHA256SUMS nicht herunterladen."
@@ -107,6 +98,17 @@ if [[ $FILE_SIZE -lt 1000000 ]]; then  # < 1MB
 fi
 
 echo "✅ DEB-Datei heruntergeladen ($(numfmt --to=iec $FILE_SIZE))"
+
+# Validiere DEB-Paket vor Installation
+echo "🔍 Validiere DEB-Paket..."
+if ! dpkg-deb --info "$DEB_FILENAME" >/dev/null 2>&1; then
+    echo "❌ Fehler: Heruntergeladene Datei ist kein gültiges DEB-Paket!"
+    echo "   Datei-Typ: $(file "$DEB_FILENAME")"
+    echo "   Datei-Header: $(head -c 100 "$DEB_FILENAME" | xxd -l 50)"
+    exit 1
+fi
+
+echo "✅ DEB-Paket erfolgreich validiert"
 
 # Überprüfe Prüfsumme
 echo "🔒 Überprüfe Integrität der Datei..."

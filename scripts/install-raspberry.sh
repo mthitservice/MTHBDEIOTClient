@@ -51,7 +51,33 @@ cd "$TEMP_DIR"
 echo "⬇️  Lade Version $LATEST_VERSION herunter..."
 curl -L "$DOWNLOAD_URL" -o "mthbdeiotclient.deb" --progress-bar
 
-echo "📦 Installiere Paket..."
+echo "� Validiere heruntergeladene Datei..."
+if [[ ! -f "mthbdeiotclient.deb" ]]; then
+    echo "❌ Download fehlgeschlagen - Datei nicht gefunden!"
+    exit 1
+fi
+
+# Dateigröße prüfen
+FILE_SIZE=$(stat -c%s "mthbdeiotclient.deb")
+if [[ $FILE_SIZE -lt 30000000 ]]; then  # Weniger als 30MB
+    echo "⚠️  Warnung: Datei ist ungewöhnlich klein ($FILE_SIZE Bytes)"
+fi
+
+echo "📋 Datei-Informationen:"
+echo "   Größe: $FILE_SIZE Bytes ($(echo "scale=2; $FILE_SIZE/1024/1024" | bc) MB)"
+echo "   Typ: $(file mthbdeiotclient.deb)"
+
+# DEB-Paket validieren
+echo "🔍 Validiere DEB-Paket..."
+if ! dpkg-deb --info "mthbdeiotclient.deb" >/dev/null 2>&1; then
+    echo "❌ Fehler: Heruntergeladene Datei ist kein gültiges DEB-Paket!"
+    echo "Datei-Header: $(head -c 100 mthbdeiotclient.deb | xxd -l 50)"
+    exit 1
+fi
+
+echo "✅ DEB-Paket erfolgreich validiert"
+
+echo "�📦 Installiere Paket..."
 sudo dpkg -i "mthbdeiotclient.deb" || true
 sudo apt-get install -f -y
 

@@ -265,6 +265,22 @@
         }
       ],
       "category": "Development",
+      "description": "MTH BDE IoT Client for Raspberry Pi",
+      "maintainer": "MTH IT Service <info@mth-it-service.com>",
+      "synopsis": "IoT Client Application for Raspberry Pi",
+      "compression": "xz",
+      "priority": "optional",
+      "depends": [
+        "libnss3",
+        "libatk-bridge2.0-0",
+        "libdrm2",
+        "libxkbcommon0",
+        "libxdamage1",
+        "libxrandr2",
+        "libgbm1",
+        "libxss1",
+        "libasound2"
+      ],
       "extraFiles": [
         {
           "from": "node_modules/better-sqlite3/build/Release",
