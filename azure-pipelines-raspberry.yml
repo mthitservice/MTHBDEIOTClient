@@ -3,6 +3,23 @@ trigger:
     include:
       - main
       - develop
+      - master
+  paths:
+    include:
+      - App/*
+      - scripts/*
+      - azure-pipelines-raspberry.yml
+      - '!README.md'
+      - '!*.md'
+  batch: true
+
+# Manuelle Trigger auch erlauben
+pr:
+  branches:
+    include:
+      - main
+      - develop
+      - master
   paths:
     include:
       - App/*

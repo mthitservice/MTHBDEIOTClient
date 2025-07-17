@@ -1,0 +1,161 @@
+name: Raspberry Pi Build and Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'App/**'
+      - 'scripts/**'
+      - '.github/workflows/raspberry-build.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'App/**'
+      - 'scripts/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: App/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd App
+        npm ci
+        
+    - name: Build application
+      run: |
+        cd App
+        npm run build
+        
+    - name: Package for Raspberry Pi
+      run: |
+        cd App
+        npm run package:raspberry-deb
+        
+    - name: Validate DEB Package
+      run: |
+        cd App
+        DEB_PATH="release/build"
+        
+        if [ ! -d "$DEB_PATH" ]; then
+          echo "❌ Build directory not found: $DEB_PATH"
+          exit 1
+        fi
+        
+        DEB_FILES=($(find "$DEB_PATH" -name "*.deb"))
+        
+        if [ ${#DEB_FILES[@]} -eq 0 ]; then
+          echo "❌ No DEB files found in build directory"
+          exit 1
+        fi
+        
+        for debfile in "${DEB_FILES[@]}"; do
+          echo "🔍 Validating DEB file: $(basename $debfile)"
+          
+          # Check file size
+          size=$(stat -c%s "$debfile")
+          echo "File size: $size bytes ($(echo "scale=2; $size/1024/1024" | bc) MB)"
+          
+          # Check file type
+          filetype=$(file "$debfile")
+          echo "File type: $filetype"
+          
+          if [[ "$filetype" != *"Debian"* ]]; then
+            echo "❌ File does not appear to be a valid Debian package"
+            exit 1
+          fi
+          
+          # Validate DEB package
+          if ! dpkg-deb --info "$debfile" >/dev/null 2>&1; then
+            echo "❌ Failed to validate DEB package"
+            exit 1
+          fi
+          
+          echo "✅ DEB package validation successful"
+        done
+        
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+        cp App/release/build/*.deb artifacts/
+        cp scripts/install-raspberry.sh artifacts/
+        cp scripts/install-latest.sh artifacts/
+        
+        # Update install scripts with correct URLs
+        sed -i 's|https://github.com/mthitservice/MTHBDEIOTClient/raw/main|https://github.com/mthitservice/MTHBDEIOTClient/blob/main|g' artifacts/install-raspberry.sh
+        sed -i 's|https://github.com/mthitservice/MTHBDEIOTClient/raw/main|https://github.com/mthitservice/MTHBDEIOTClient/blob/main|g' artifacts/install-latest.sh
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: raspberry-pi-build
+        path: artifacts/
+        retention-days: 30
+        
+    - name: Generate release notes
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "## Raspberry Pi Release ${{ github.run_number }}" > release_notes.md
+        echo "" >> release_notes.md
+        echo "### What's New" >> release_notes.md
+        echo "- Automated build and deployment for Raspberry Pi" >> release_notes.md
+        echo "- Validated DEB package for ARM architecture" >> release_notes.md
+        echo "- Updated installation script with proper GitHub URLs" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Installation" >> release_notes.md
+        echo "\`\`\`bash" >> release_notes.md
+        echo "# Download and run the installation script" >> release_notes.md
+        echo "wget https://github.com/mthitservice/MTHBDEIOTClient/blob/main/scripts/install-raspberry.sh" >> release_notes.md
+        echo "chmod +x install-raspberry.sh" >> release_notes.md
+        echo "sudo ./install-raspberry.sh" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Files in this release" >> release_notes.md
+        echo "- \`*.deb\` - Debian package for Raspberry Pi (ARM)" >> release_notes.md
+        echo "- \`install-raspberry.sh\` - Automated installation script" >> release_notes.md
+        echo "- \`install-latest.sh\` - Alternative installation script" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Requirements" >> release_notes.md
+        echo "- Raspberry Pi OS (32-bit or 64-bit)" >> release_notes.md
+        echo "- ARM architecture (ARMv7l)" >> release_notes.md
+        echo "- Minimum 1GB RAM" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Built with GitHub Actions"
+        
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: Raspberry Pi Release v${{ github.run_number }}
+        body_path: release_notes.md
+        files: |
+          artifacts/*.deb
+          artifacts/install-raspberry.sh
+          artifacts/install-latest.sh
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Deploy notification
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        echo "🎉 Release deployed successfully!"
+        echo "Release URL: https://github.com/mthitservice/MTHBDEIOTClient/releases/tag/v${{ github.run_number }}"
+        
+        # List released files
+        echo "Released files:"
+        ls -la artifacts/
