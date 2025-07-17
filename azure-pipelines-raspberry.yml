@@ -500,46 +500,82 @@ stages:
                     workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
                     temp_releases="$(Agent.TempDirectory)/releases"
                     
+                    echo "Workspace: $workspace"
+                    echo "Temp releases: $temp_releases"
+                    
                     # Erstelle releases Ordnerstruktur
                     mkdir -p "$temp_releases/latest"
                     mkdir -p "$temp_releases/v$(releaseVersion)"
                     
-                    # Kopiere DEB-Dateien
+                    # Debug: Zeige verfügbare Dateien
+                    echo "=== AVAILABLE FILES IN WORKSPACE ==="
+                    find "$workspace" -type f -name "*.deb" -exec ls -la {} \; || echo "No DEB files found"
+                    
+                    # Kopiere DEB-Dateien (alle möglichen Pfade prüfen)
+                    echo "=== COPYING DEB FILES ==="
+                    deb_copied=false
+                    
+                    # Prüfe packages Ordner
                     if [ -d "$workspace/packages" ]; then
-                      echo "Copying DEB packages..."
-                      
-                      # Kopiere in latest Ordner
-                      cp "$workspace/packages"/*.deb "$temp_releases/latest/" 2>/dev/null || echo "No DEB files to copy"
-                      
-                      # Kopiere in versionsspezifischen Ordner
-                      cp "$workspace/packages"/*.deb "$temp_releases/v$(releaseVersion)/" 2>/dev/null || echo "No DEB files to copy"
-                      
-                      # Erstelle SHA256 Checksums
-                      cd "$temp_releases/latest"
-                      if ls *.deb 1> /dev/null 2>&1; then
-                        sha256sum *.deb > SHA256SUMS
-                        echo "✅ SHA256SUMS created in latest/"
-                      fi
-                      
-                      cd "$temp_releases/v$(releaseVersion)"
-                      if ls *.deb 1> /dev/null 2>&1; then
-                        sha256sum *.deb > SHA256SUMS
-                        echo "✅ SHA256SUMS created in v$(releaseVersion)/"
+                      echo "Found packages directory"
+                      if find "$workspace/packages" -name "*.deb" | head -1 | grep -q .; then
+                        echo "Copying from packages directory..."
+                        cp "$workspace/packages"/*.deb "$temp_releases/latest/" 2>/dev/null && deb_copied=true
+                        cp "$workspace/packages"/*.deb "$temp_releases/v$(releaseVersion)/" 2>/dev/null
                       fi
                     fi
                     
-                    # Kopiere Installation Files
-                    if [ -d "$workspace/installation" ]; then
-                      echo "Copying installation documentation..."
-                      cp "$workspace/installation/RASPBERRY_INSTALLATION.md" "$temp_releases/latest/" 2>/dev/null || echo "No RASPBERRY_INSTALLATION.md found"
-                      cp "$workspace/installation/deploy.ps1" "$temp_releases/latest/" 2>/dev/null || echo "No deploy.ps1 found"
-                      cp "$workspace/installation/generate-inventory.sh" "$temp_releases/latest/" 2>/dev/null || echo "No generate-inventory.sh found"
+                    # Prüfe direkten workspace
+                    if [ "$deb_copied" = false ]; then
+                      echo "Trying workspace root..."
+                      if find "$workspace" -maxdepth 1 -name "*.deb" | head -1 | grep -q .; then
+                        echo "Copying from workspace root..."
+                        cp "$workspace"/*.deb "$temp_releases/latest/" 2>/dev/null && deb_copied=true
+                        cp "$workspace"/*.deb "$temp_releases/v$(releaseVersion)/" 2>/dev/null
+                      fi
                     fi
                     
-                    # Kopiere README
+                    # Prüfe alle Unterordner
+                    if [ "$deb_copied" = false ]; then
+                      echo "Searching all subdirectories..."
+                      deb_files=$(find "$workspace" -name "*.deb" | head -5)
+                      if [ -n "$deb_files" ]; then
+                        echo "Found DEB files:"
+                        echo "$deb_files"
+                        for deb_file in $deb_files; do
+                          echo "Copying: $deb_file"
+                          cp "$deb_file" "$temp_releases/latest/" && deb_copied=true
+                          cp "$deb_file" "$temp_releases/v$(releaseVersion)/"
+                        done
+                      fi
+                    fi
+                    
+                    if [ "$deb_copied" = false ]; then
+                      echo "❌ ERROR: No DEB files found to copy!"
+                      echo "Available files in workspace:"
+                      find "$workspace" -type f | head -20
+                      exit 1
+                    fi
+                    
+                    # Erstelle SHA256 Checksums nur für DEB-Dateien
+                    echo "=== CREATING CHECKSUMS ==="
+                    cd "$temp_releases/latest"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                      sha256sum *.deb > SHA256SUMS
+                      echo "✅ SHA256SUMS created in latest/"
+                    fi
+                    
+                    cd "$temp_releases/v$(releaseVersion)"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                      sha256sum *.deb > SHA256SUMS
+                      echo "✅ SHA256SUMS created in v$(releaseVersion)/"
+                    fi
+                    
+                    # Kopiere nur README (KEINE Dokumentationsdateien)
                     cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
                     
-                    echo "✅ Release files prepared:"
+                    echo "=== RELEASE FILES PREPARED ==="
+                    echo "✅ Only DEB files and checksums will be published"
                     find "$temp_releases" -type f -exec ls -la {} \;
                   displayName: "Prepare Release Files"
 
@@ -701,13 +737,14 @@ stages:
                     echo "✅ Status: SUCCESS"
                     echo "📦 Version: $(releaseVersion)"
                     echo "🔗 Repository: https://github.com/$(githubRepository)"
-                    echo "� Releases Folder: https://github.com/$(githubRepository)/tree/master/releases"
+                    echo "📁 Releases Folder: https://github.com/$(githubRepository)/tree/main/releases"
                     echo ""
-                    echo "📦 DEPLOYED FILES:"
+                    echo "📦 DEPLOYED FILES (ONLY DEB & CHECKSUMS):"
                     echo "- releases/latest/$(DEB_FILENAME)"
                     echo "- releases/v$(releaseVersion)/$(DEB_FILENAME)"
                     echo "- releases/README.md"
                     echo "- releases/latest/SHA256SUMS"
+                    echo "- releases/v$(releaseVersion)/SHA256SUMS"
                     echo ""
                     echo "🍓 RASPBERRY PI INSTALLATION:"
                     echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
