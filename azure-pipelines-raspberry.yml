@@ -4,13 +4,14 @@
 
 trigger:
   branches:
-    include:
-      - main
-      - master
-      - develop
+    exclude:
+      - "*"  # Keine Branch-Trigger
   tags:
     include:
-      - "v*"  # Auch bei Tags die mit "v" beginnen
+      - "v*"  # Nur bei Tags die mit "v" beginnen
+
+# Deaktiviere auch Pull Request Triggers  
+pr: none
 
 variables:
   # Build-Konfiguration
@@ -335,10 +336,22 @@ stages:
                       Write-Host "Workspace: $workspacePath"
                       Write-Host "Version: $version"
                       
-                      # Suche nach DEB-Dateien
+                      # Debug: Zeige komplette Ordnerstruktur
+                      Write-Host "=== WORKSPACE STRUCTURE ==="
+                      if (Test-Path $workspacePath) {
+                          Get-ChildItem -Path $workspacePath -Recurse | ForEach-Object {
+                              Write-Host "  $($_.FullName)"
+                          }
+                      } else {
+                          Write-Host "❌ Workspace path does not exist: $workspacePath"
+                      }
+                      
+                      # Erweiterte Suche nach DEB-Dateien
                       $searchPaths = @(
                           "$workspacePath/packages",
-                          "$workspacePath"
+                          "$workspacePath/installation", 
+                          "$workspacePath",
+                          "$(Pipeline.Workspace)"
                       )
                       
                       $foundDebFiles = @()
@@ -351,11 +364,17 @@ stages:
                                   $foundDebFiles += $file
                                   Write-Host "  Found: $($file.Name) (Size: $([math]::Round($file.Length/1MB, 2)) MB)"
                               }
+                          } else {
+                              Write-Host "Path does not exist: $searchPath"
                           }
                       }
                       
                       if ($foundDebFiles.Count -eq 0) {
                           Write-Host "❌ ERROR: No DEB files found!"
+                          Write-Host "Available artifacts:"
+                          Get-ChildItem -Path "$(Pipeline.Workspace)" -Recurse | Where-Object {$_.Name -like "*.deb" -or $_.Name -like "*.tar.gz"} | ForEach-Object {
+                              Write-Host "  $($_.FullName)"
+                          }
                           exit 1
                       }
                       
@@ -365,10 +384,12 @@ stages:
                       
                       Write-Host "=== SELECTED DEB FILE ==="
                       Write-Host "Filename: $debFileName"
+                      Write-Host "Full Path: $($selectedDebFile.FullName)"
                       Write-Host "Size: $([math]::Round($selectedDebFile.Length/1MB, 2)) MB"
                       
                       # Setze Pipeline-Variable
                       Write-Host "##vso[task.setvariable variable=ACTUAL_DEB_FILENAME]$debFileName"
+                      Write-Host "##vso[task.setvariable variable=ACTUAL_DEB_FULLPATH]$($selectedDebFile.FullName)"
                       Write-Host "✅ DEB filename detected: $debFileName"
 
                 - script: |
@@ -382,11 +403,13 @@ stages:
                     mkdir -p "$temp_releases/v$(releaseVersion)"
                     mkdir -p "$temp_releases/update"
                     
-                    # Finde und kopiere DEB-Dateien
-                    actual_deb_file=$(find "$workspace" -name "*.deb" -type f | head -1)
-                    if [ -n "$actual_deb_file" ]; then
+                    # Verwende den vollständigen Pfad zur DEB-Datei
+                    actual_deb_file="$(ACTUAL_DEB_FULLPATH)"
+                    
+                    if [ -n "$actual_deb_file" ] && [ -f "$actual_deb_file" ]; then
                       actual_deb_filename=$(basename "$actual_deb_file")
                       echo "=== COPYING DEB FILE: $actual_deb_filename ==="
+                      echo "Source: $actual_deb_file"
                       
                       # Kopiere zu allen Zielordnern
                       cp "$actual_deb_file" "$temp_releases/latest/"
@@ -421,7 +444,10 @@ stages:
                       
                       echo "✅ Release files prepared successfully"
                     else
-                      echo "❌ ERROR: No DEB file found!"
+                      echo "❌ ERROR: DEB file not found at expected location!"
+                      echo "Expected: $actual_deb_file"
+                      echo "Fallback search in workspace:"
+                      find "$workspace" -name "*.deb" -type f | head -5
                       exit 1
                     fi
                   displayName: "Prepare Release Files"
