@@ -539,7 +539,7 @@ sudo apt-get install -f`;
     execCommand(`git push origin ${newTag}`);
     coloredOutput('Pushed changes and tag to origin', 'green', emojis.success);
     
-    // 7. Summary
+    // 6. Summary
     console.log('');
     coloredOutput('==========================================', 'cyan');
     coloredOutput('VERSION RELEASE COMPLETED', 'cyan', emojis.success);
@@ -548,8 +548,21 @@ sudo apt-get install -f`;
     coloredOutput('Summary:', 'green', emojis.info);
     console.log(`  • Version: ${newVersion}`);
     console.log(`  • Tag: ${newTag}`);
-    console.log(`  • Commit: ${execCommand('git rev-parse --short HEAD', { silent: true })}`);
-    console.log(`  • Branch: ${execCommand('git branch --show-current', { silent: true })}`);
+    
+    try {
+        const commitHash = execCommand('git rev-parse --short HEAD', { silent: true });
+        const branch = execCommand('git branch --show-current', { silent: true });
+        
+        if (commitHash && commitHash.trim()) {
+            console.log(`  • Commit: ${commitHash.trim()}`);
+        }
+        if (branch && branch.trim()) {
+            console.log(`  • Branch: ${branch.trim()}`);
+        }
+    } catch (error) {
+        // Ignore errors when getting git info
+    }
+    
     console.log('');
     coloredOutput('Next steps:', 'green', emojis.rocket);
     console.log('  1. Azure DevOps Pipeline will start automatically');
