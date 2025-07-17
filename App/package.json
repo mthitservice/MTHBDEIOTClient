@@ -41,6 +41,7 @@
     "package:github": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --win --linux --mac --publish always",
     "package:raspberry": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env --  electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false",
     "package:raspberry-deb": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false",
+    "package:raspberry-updater": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux deb --armv7l --publish always --config.nodeGypRebuild=false",
     "install:raspberry": "npm install --target_arch=armv7l --target_platform=linux --cache=/tmp/.npm",
     "version:set": "node scripts/set-version.js",
     "release:prepare": "npm run version:set && npm run build && npm run package:all",
@@ -281,8 +282,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "electron-react-boilerplate",
-      "repo": "electron-react-boilerplate"
+      "owner": "mthitservice",
+      "repo": "MTHBDEIOTClient"
     }
   },
   "collective": {

@@ -2,7 +2,13 @@
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-export type Channels = 'ipc-example';
+export type Channels =
+  | 'ipc-example'
+  | 'update-available'
+  | 'download-progress'
+  | 'update-downloaded'
+  | 'update-not-available'
+  | 'update-error';
 
 const electronHandler = {
   app: {
@@ -20,6 +26,13 @@ const electronHandler = {
   },
   dbQuery: (query: string) => ipcRenderer.invoke('db-query', query),
   getEnv: () => ipcRenderer.invoke('get-env'),
+  autoUpdater: {
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    getUpdateInfo: () => ipcRenderer.invoke('get-update-info'),
+  },
   ipcRenderer: {
     sendMessage(channel: Channels, ...args: unknown[]) {
       ipcRenderer.send(channel, ...args);
@@ -35,6 +48,12 @@ const electronHandler = {
     },
     once(channel: Channels, func: (...args: unknown[]) => void) {
       ipcRenderer.once(channel, (_event, ...args) => func(...args));
+    },
+    removeAllListeners(channel: Channels) {
+      ipcRenderer.removeAllListeners(channel);
+    },
+    invoke(channel: string, ...args: unknown[]) {
+      return ipcRenderer.invoke(channel, ...args);
     },
   },
 };

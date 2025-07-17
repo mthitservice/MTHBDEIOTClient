@@ -10,16 +10,18 @@
  */
 import path from 'path';
 
-import { app, BrowserWindow, shell, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
+
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-const NOTIFICATION_TITLE = 'Basic Notification'
-const NOTIFICATION_BODY = 'Notification from the Main process'
 
 const configDB = require('../../public/database/DBConfig');
+
 let globalConfig: any = 0;
+let mainWindow: BrowserWindow | null = null;
+
 require('dotenv').config();
 
 console.log('APP Name:', process.env.APP_NAME);
@@ -29,17 +31,93 @@ class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
     autoUpdater.logger = log;
-    autoUpdater.checkForUpdatesAndNotify();
+
+    // Konfiguriere AutoUpdater für GitHub
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'mthitservice',
+      repo: 'MTHBDEIOTClient',
+      private: false,
+    });
+
+    // AutoUpdater Events
+    autoUpdater.on('checking-for-update', () => {
+      console.log('Checking for update...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+      console.log('Update available:', info);
+      if (mainWindow) {
+        mainWindow.webContents.send('update-available', info);
+      }
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('Update not available:', info);
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('Error in auto-updater:', err);
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+      console.log('Download progress:', progressObj);
+      if (mainWindow) {
+        mainWindow.webContents.send('download-progress', progressObj);
+      }
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('Update downloaded:', info);
+      if (mainWindow) {
+        mainWindow.webContents.send('update-downloaded', info);
+      }
+    });
+
+    // Prüfe nur in Production auf Updates
+    if (process.env.NODE_ENV === 'production') {
+      autoUpdater.checkForUpdatesAndNotify();
+    }
   }
 }
-
-let mainWindow: BrowserWindow | null = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
   console.log(msgTemplate(arg));
   event.reply('ipc-example', msgTemplate('pong'));
+});
 
+// AutoUpdater IPC Handlers
+ipcMain.handle('check-for-updates', async () => {
+  if (process.env.NODE_ENV === 'production') {
+    return autoUpdater.checkForUpdates();
+  }
+  return { updateInfo: null };
+});
+
+ipcMain.handle('download-update', async () => {
+  if (process.env.NODE_ENV === 'production') {
+    return autoUpdater.downloadUpdate();
+  }
+  return false;
+});
+
+ipcMain.handle('install-update', async () => {
+  if (process.env.NODE_ENV === 'production') {
+    autoUpdater.quitAndInstall();
+  }
+});
+
+ipcMain.handle('get-app-version', async () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('get-update-info', async () => {
+  return {
+    currentVersion: app.getVersion(),
+    updateCheckEnabled: process.env.NODE_ENV === 'production',
+    githubRepo: 'https://github.com/mthitservice/MTHBDEIOTClient',
+  };
 });
 
 if (process.env.NODE_ENV === 'production') {

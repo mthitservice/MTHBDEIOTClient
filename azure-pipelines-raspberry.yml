@@ -574,8 +574,42 @@ stages:
                     # Kopiere nur README (KEINE Dokumentationsdateien)
                     cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
                     
+                    # Erstelle Update-Ordner für Electron AutoUpdater
+                    echo "=== CREATING UPDATE FOLDER FOR ELECTRON AUTOUPDATER ==="
+                    mkdir -p "$temp_releases/update"
+                    
+                    # Kopiere DEB-Dateien auch in update Ordner
+                    if [ -d "$temp_releases/latest" ]; then
+                      cp "$temp_releases/latest"/*.deb "$temp_releases/update/" 2>/dev/null || echo "No DEB files for update folder"
+                      
+                      # Erstelle latest.yml für AutoUpdater
+                      cd "$temp_releases/update"
+                      if ls *.deb 1> /dev/null 2>&1; then
+                        deb_file=$(ls *.deb | head -1)
+                        file_size=$(stat -c%s "$deb_file")
+                        deb_sha512=$(sha512sum "$deb_file" | cut -d' ' -f1)
+                        
+                        # Erstelle latest.yml für Electron AutoUpdater
+                        echo "version: $(releaseVersion)" > latest.yml
+                        echo "files:" >> latest.yml
+                        echo "  - url: $deb_file" >> latest.yml
+                        echo "    sha512: $deb_sha512" >> latest.yml
+                        echo "    size: $file_size" >> latest.yml
+                        echo "path: $deb_file" >> latest.yml
+                        echo "sha512: $deb_sha512" >> latest.yml
+                        echo "releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")" >> latest.yml
+                        
+                        echo "✅ latest.yml created for AutoUpdater"
+                        cat latest.yml
+                        
+                        # Erstelle auch SHA512SUMS für Konsistenz
+                        sha512sum *.deb > SHA512SUMS
+                        echo "✅ SHA512SUMS created in update/"
+                      fi
+                    fi
+                    
                     echo "=== RELEASE FILES PREPARED ==="
-                    echo "✅ Only DEB files and checksums will be published"
+                    echo "✅ DEB files, checksums, and AutoUpdater files ready"
                     find "$temp_releases" -type f -exec ls -la {} \;
                   displayName: "Prepare Release Files"
 
@@ -739,12 +773,15 @@ stages:
                     echo "🔗 Repository: https://github.com/$(githubRepository)"
                     echo "📁 Releases Folder: https://github.com/$(githubRepository)/tree/main/releases"
                     echo ""
-                    echo "📦 DEPLOYED FILES (ONLY DEB & CHECKSUMS):"
+                    echo "📦 DEPLOYED FILES (DEB, CHECKSUMS & AUTOUPDATER):"
                     echo "- releases/latest/$(DEB_FILENAME)"
                     echo "- releases/v$(releaseVersion)/$(DEB_FILENAME)"
                     echo "- releases/README.md"
                     echo "- releases/latest/SHA256SUMS"
                     echo "- releases/v$(releaseVersion)/SHA256SUMS"
+                    echo "- releases/update/$(DEB_FILENAME) (for AutoUpdater)"
+                    echo "- releases/update/latest.yml (AutoUpdater config)"
+                    echo "- releases/update/SHA512SUMS"
                     echo ""
                     echo "🍓 RASPBERRY PI INSTALLATION:"
                     echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
@@ -753,6 +790,8 @@ stages:
                     echo "🔗 ÖFFENTLICHE LINKS:"
                     echo "Latest DEB: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
                     echo "Latest SHA256: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/SHA256SUMS"
+                    echo "AutoUpdater DEB: https://raw.githubusercontent.com/$(githubRepository)/main/releases/update/$(DEB_FILENAME)"
+                    echo "AutoUpdater Config: https://raw.githubusercontent.com/$(githubRepository)/main/releases/update/latest.yml"
                     echo "Installation Guide: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/RASPBERRY_INSTALLATION.md"
                     echo ""
                     echo "🎉 Release ist jetzt öffentlich verfügbar!"

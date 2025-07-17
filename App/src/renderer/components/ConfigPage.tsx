@@ -5,6 +5,7 @@ import Form from 'react-bootstrap/Form';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../App.css';
 import './ConfigPage.css';
+import AutoUpdater from './AutoUpdater';
 
 type Env = {
   APP_NAME: string;
@@ -126,6 +127,8 @@ export function ConfigPage() {
         <p>
           {name?.APP_NAME} {name?.APP_VERSION}
         </p>
+
+        <AutoUpdater />
       </div>
     </div>
   );
