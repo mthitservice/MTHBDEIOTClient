@@ -433,7 +433,7 @@ stages:
                       file_size=$(stat -c%s "$deb_file")
                       deb_sha512=$(sha512sum "$deb_file" | cut -d' ' -f1)
                       
-                      cat > latest.yml << EOF
+                      cat > latest.yml << 'ENDOFFILE'
                       version: $(releaseVersion)
                       files:
                         - url: $deb_file
@@ -442,7 +442,7 @@ stages:
                       path: $deb_file
                       sha512: $deb_sha512
                       releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
-                      EOF
+                      ENDOFFILE
                       
                       echo "✅ Release files prepared successfully"
                     else
