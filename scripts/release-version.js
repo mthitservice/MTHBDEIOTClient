@@ -497,25 +497,31 @@ async function main() {
     
     // 4. Commit changes
     coloredOutput('Committing changes...', 'blue', emojis.gear);
-    execCommand(`git add "${packageJsonPath}" "${envFilePath}"`);
-    if (fs.existsSync(releasePackageJsonPath)) {
-        execCommand(`git add "${releasePackageJsonPath}"`);
-    }
-    
-    const commitMessage = `Release ${newVersion}
+    try {
+        execCommand(`git add "${packageJsonPath}" "${envFilePath}"`);
+        if (fs.existsSync(releasePackageJsonPath)) {
+            execCommand(`git add "${releasePackageJsonPath}"`);
+        }
+        
+        const commitMessage = `Release ${newVersion}
 
 - Updated package.json version to ${newVersion}
 - Updated .env file with new version
 - Prepared for release build
 
 [skip ci]`;
-    
-    execCommand(`git commit -m "${commitMessage}"`);
-    coloredOutput('Committed changes', 'green', emojis.success);
+        
+        execCommand(`git commit -m "${commitMessage}"`);
+        coloredOutput('Committed changes', 'green', emojis.success);
+    } catch (error) {
+        coloredOutput(`Error committing changes: ${error.message}`, 'red', emojis.error);
+        // Don't exit, continue with tagging
+    }
     
     // 5. Create Git tag
     coloredOutput('Creating Git tag...', 'blue', emojis.gear);
-    const tagMessage = `Release ${newVersion}
+    try {
+        const tagMessage = `Release ${newVersion}
 
 MthBdeIotClient Raspberry Pi Release v${newVersion}
 
@@ -529,15 +535,26 @@ Installation:
 wget https://github.com/mthitservice/MTHBDEIOTClient/releases/latest/download/mthbdeiotclient_${newVersion}_armhf.deb
 sudo dpkg -i mthbdeiotclient_${newVersion}_armhf.deb
 sudo apt-get install -f`;
-    
-    execCommand(`git tag -a "${newTag}" -m "${tagMessage}"`);
-    coloredOutput(`Created tag ${newTag}`, 'green', emojis.success);
+        
+        execCommand(`git tag -a "${newTag}" -m "${tagMessage}"`);
+        coloredOutput(`Created tag ${newTag}`, 'green', emojis.success);
+    } catch (error) {
+        coloredOutput(`Error creating tag: ${error.message}`, 'red', emojis.error);
+        process.exit(1);
+    }
     
     // 6. Push to origin
     coloredOutput('Pushing changes and tag to origin...', 'blue', emojis.gear);
-    execCommand('git push origin HEAD');
-    execCommand(`git push origin ${newTag}`);
-    coloredOutput('Pushed changes and tag to origin', 'green', emojis.success);
+    try {
+        execCommand('git push origin HEAD');
+        execCommand(`git push origin ${newTag}`);
+        coloredOutput('Pushed changes and tag to origin', 'green', emojis.success);
+    } catch (error) {
+        coloredOutput(`Error pushing to origin: ${error.message}`, 'red', emojis.error);
+        coloredOutput('You may need to push manually:', 'yellow', emojis.info);
+        console.log(`  git push origin HEAD`);
+        console.log(`  git push origin ${newTag}`);
+    }
     
     // 6. Summary
     console.log('');
