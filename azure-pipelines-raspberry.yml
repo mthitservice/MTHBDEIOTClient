@@ -396,6 +396,10 @@ stages:
           runOnce:
             deploy:
               steps:
+                - checkout: self
+                  fetchDepth: 1
+                  displayName: "Checkout Repository"
+                  
                 - download: current
                   displayName: "Download Build Artifacts"
 
@@ -423,8 +427,56 @@ stages:
                 - task: PowerShell@2
                   displayName: "Detect Actual DEB Filename"
                   inputs:
-                    filePath: "detect-deb-filename.ps1"
-                    arguments: "-WorkspacePath '$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi' -Version '$(releaseVersion)'"
+                    targetType: "inline"
+                    script: |
+                      # DEB-Dateiname-Erkennung für MTH BDE IoT Client Pipeline
+                      $workspacePath = "$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                      $version = "$(releaseVersion)"
+                      
+                      Write-Host "=== DEB FILENAME DETECTION ==="
+                      Write-Host "Workspace: $workspacePath"
+                      Write-Host "Version: $version"
+                      
+                      # Suche nach DEB-Dateien in allen möglichen Pfaden
+                      $searchPaths = @(
+                          "$workspacePath/packages",
+                          "$workspacePath/release/build",
+                          "$workspacePath/dist",
+                          "$workspacePath"
+                      )
+                      
+                      $foundDebFiles = @()
+                      
+                      foreach ($searchPath in $searchPaths) {
+                          if (Test-Path $searchPath) {
+                              Write-Host "Searching in: $searchPath"
+                              $debFiles = Get-ChildItem -Path $searchPath -Filter "*.deb" -Recurse -ErrorAction SilentlyContinue
+                              foreach ($file in $debFiles) {
+                                  $foundDebFiles += $file
+                                  Write-Host "  Found: $($file.Name) (Size: $([math]::Round($file.Length/1MB, 2)) MB)"
+                              }
+                          }
+                      }
+                      
+                      if ($foundDebFiles.Count -eq 0) {
+                          Write-Host "❌ ERROR: No DEB files found in any search path!"
+                          Write-Host "Available files in workspace:"
+                          Get-ChildItem -Path $workspacePath -Recurse -File | Select-Object Name, Length, DirectoryName | Format-Table -AutoSize
+                          exit 1
+                      }
+                      
+                      # Wähle das erste/größte DEB-File
+                      $selectedDebFile = $foundDebFiles | Sort-Object Length -Descending | Select-Object -First 1
+                      $debFileName = $selectedDebFile.Name
+                      
+                      Write-Host "=== SELECTED DEB FILE ==="
+                      Write-Host "Filename: $debFileName"
+                      Write-Host "Size: $([math]::Round($selectedDebFile.Length/1MB, 2)) MB"
+                      Write-Host "Path: $($selectedDebFile.FullName)"
+                      
+                      # Setze Pipeline-Variable für nachfolgende Tasks
+                      Write-Host "##vso[task.setvariable variable=ACTUAL_DEB_FILENAME]$debFileName"
+                      Write-Host "✅ DEB filename detected: $debFileName"
 
                 - task: PowerShell@2
                   displayName: "Prepare Release Files"
@@ -623,12 +675,14 @@ stages:
                       echo "✅ SHA256SUMS created in v$(releaseVersion)/"
                     fi
                     
-                      # Kopiere nur README und Installationsskript (KEINE Dokumentationsdateien)
-                      cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
-                      cp "install-latest.sh" "$temp_releases/install-latest.sh"
-                      
-                      # Mache Installationsskript ausführbar
-                      chmod +x "$temp_releases/install-latest.sh"                    # Erstelle Update-Ordner für Electron AutoUpdater
+                    # Kopiere nur README und Installationsskript (KEINE Dokumentationsdateien)
+                    cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
+                    cp "install-latest.sh" "$temp_releases/install-latest.sh"
+                    
+                    # Mache Installationsskript ausführbar
+                    chmod +x "$temp_releases/install-latest.sh"
+                    
+                    # Erstelle Update-Ordner für Electron AutoUpdater
                     echo "=== CREATING UPDATE FOLDER FOR ELECTRON AUTOUPDATER ==="
                     mkdir -p "$temp_releases/update"
                     

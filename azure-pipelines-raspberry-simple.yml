@@ -1,0 +1,269 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi (Vereinfacht)
+# Pipeline-Fix für Deployment-Probleme
+
+trigger:
+  tags:
+    include:
+      - "v*"
+  branches:
+    include:
+      - main
+      - master
+
+variables:
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  artifactName: "MthBdeIotClient-RaspberryPi"
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+
+stages:
+  - stage: Build
+    displayName: "Build Raspberry Pi Application"
+    jobs:
+      - job: BuildRaspberryPi
+        displayName: "Build Electron App für Raspberry Pi 3+"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd App
+              echo "=== PIPELINE VALIDATION ==="
+              echo "Build Reason: $(Build.Reason)"
+              echo "Source Branch: $(Build.SourceBranch)"
+              echo "Is Release: $(isRelease)"
+              echo "Release Version: $(releaseVersion)"
+              echo "Node: $(node --version)"
+              echo "NPM: $(npm --version)"
+            displayName: "Pipeline Validation"
+
+          - script: |
+              cd App
+              echo "=== INSTALLING DEPENDENCIES ==="
+              npm ci --ignore-scripts --no-audit --no-fund
+              echo "=== VERIFYING PACKAGES ==="
+              npm list electron electron-builder --depth=0
+            displayName: "Install Dependencies"
+            timeoutInMinutes: 10
+
+          - script: |
+              cd App
+              echo "=== SETTING VERSION ==="
+              if [ "$(isRelease)" = "True" ]; then
+                VERSION="$(releaseVersion)"
+              else
+                VERSION="1.0.0-dev.$(Build.BuildNumber)"
+              fi
+              echo "Version: $VERSION"
+              echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              
+              # Update package.json
+              node -e "
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                pkg.version = '$VERSION';
+                fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+                console.log('Updated package.json to version:', pkg.version);
+              "
+            displayName: "Set Version"
+
+          - script: |
+              cd App
+              echo "=== BUILDING APPLICATION ==="
+              export NODE_ENV=production
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              npm run build:main
+              npm run build:renderer
+              
+              if [ -d "dist" ]; then
+                echo "✅ Build successful"
+                find dist -name "*.js" | wc -l
+              else
+                echo "❌ Build failed"
+                exit 1
+              fi
+            displayName: "Build Application"
+
+          - script: |
+              cd App
+              echo "=== PACKAGING RASPBERRY PI DEB ==="
+              export NODE_ENV=production
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              npm run package:raspberry-deb
+              
+              echo "=== PACKAGE VERIFICATION ==="
+              find . -name "*.deb" -exec ls -lh {} \; || echo "No DEB files found"
+              
+              # Kopiere für Artifacts
+              if find . -name "*.deb" | grep -q .; then
+                mkdir -p "$(Build.ArtifactStagingDirectory)/packages"
+                find . -name "*.deb" -exec cp {} "$(Build.ArtifactStagingDirectory)/packages/" \;
+                echo "✅ DEB files copied to staging"
+              else
+                echo "❌ No DEB files to copy"
+              fi
+            displayName: "Package Application"
+
+          - script: |
+              echo "=== FINAL VERIFICATION ==="
+              echo "Staging directory:"
+              find "$(Build.ArtifactStagingDirectory)" -type f -exec ls -lh {} \;
+              
+              deb_count=$(find "$(Build.ArtifactStagingDirectory)" -name "*.deb" | wc -l)
+              echo "DEB packages: $deb_count"
+              
+              if [ $deb_count -gt 0 ]; then
+                echo "✅ Ready for deployment"
+              else
+                echo "❌ No packages for deployment"
+              fi
+            displayName: "Final Verification"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: $(artifactName)
+            condition: always()
+
+  - stage: Deploy
+    displayName: "Deploy to GitHub"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Build
+    jobs:
+      - deployment: GitHubDeploy
+        displayName: "Deploy to GitHub"
+        environment: "GitHub-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+                  
+                - download: current
+                  displayName: "Download Artifacts"
+
+                - script: |
+                    echo "=== GITHUB DEPLOYMENT PREPARATION ==="
+                    echo "Version: $(releaseVersion)"
+                    echo "Repository: $(githubRepository)"
+                    
+                    workspace="$(Pipeline.Workspace)/$(artifactName)"
+                    echo "Workspace: $workspace"
+                    
+                    # Finde DEB-Dateien
+                    echo "=== SEARCHING FOR DEB FILES ==="
+                    find "$workspace" -name "*.deb" -type f | while read file; do
+                      echo "Found: $file"
+                      echo "  Size: $(ls -lh "$file" | awk '{print $5}')"
+                      echo "  Basename: $(basename "$file")"
+                    done
+                    
+                    # Bestimme Dateiname
+                    actual_deb_file=$(find "$workspace" -name "*.deb" -type f | head -1)
+                    if [ -n "$actual_deb_file" ]; then
+                      actual_deb_filename=$(basename "$actual_deb_file")
+                      echo "=== DETECTED DEB FILENAME: $actual_deb_filename ==="
+                      echo "##vso[task.setvariable variable=DEB_FILENAME]$actual_deb_filename"
+                    else
+                      echo "❌ ERROR: No DEB file found!"
+                      exit 1
+                    fi
+                  displayName: "Detect DEB Filename"
+
+                - script: |
+                    echo "=== PREPARING RELEASE FILES ==="
+                    workspace="$(Pipeline.Workspace)/$(artifactName)"
+                    temp_releases="$(Agent.TempDirectory)/releases"
+                    
+                    # Erstelle Ordnerstruktur
+                    mkdir -p "$temp_releases/latest"
+                    mkdir -p "$temp_releases/v$(releaseVersion)"
+                    
+                    # Kopiere DEB-Dateien
+                    find "$workspace" -name "*.deb" -exec cp {} "$temp_releases/latest/" \;
+                    find "$workspace" -name "*.deb" -exec cp {} "$temp_releases/v$(releaseVersion)/" \;
+                    
+                    # Erstelle Checksums
+                    cd "$temp_releases/latest"
+                    sha256sum *.deb > SHA256SUMS
+                    
+                    cd "$temp_releases/v$(releaseVersion)"
+                    sha256sum *.deb > SHA256SUMS
+                    
+                    # Kopiere install script
+                    cp "$(Build.SourcesDirectory)/install-latest.sh" "$temp_releases/install-latest.sh"
+                    chmod +x "$temp_releases/install-latest.sh"
+                    
+                    echo "=== RELEASE FILES PREPARED ==="
+                    find "$temp_releases" -type f -exec ls -la {} \;
+                  displayName: "Prepare Release Files"
+
+                - task: PowerShell@2
+                  displayName: "Deploy to GitHub Repository"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      # GitHub Token prüfen
+                      $githubToken = "$(GITHUB_TOKEN)"
+                      if ([string]::IsNullOrEmpty($githubToken)) {
+                        Write-Host "❌ ERROR: GITHUB_TOKEN nicht gesetzt!"
+                        exit 1
+                      }
+                      
+                      # Git konfigurieren
+                      git config --global user.email "azure-devops@mth-it-service.com"
+                      git config --global user.name "Azure DevOps Pipeline"
+                      
+                      # Repository klonen
+                      $repoUrl = "https://$($githubToken)@github.com/$(githubRepository).git"
+                      git clone $repoUrl repo-clone --quiet
+                      
+                      cd repo-clone
+                      
+                      # Releases Ordner erstellen
+                      if (-not (Test-Path "releases")) {
+                        New-Item -ItemType Directory -Path "releases"
+                      }
+                      
+                      # Release-Dateien kopieren
+                      $tempReleases = "$(Agent.TempDirectory)/releases"
+                      Copy-Item -Path "$tempReleases/*" -Destination "releases/" -Recurse -Force
+                      
+                      # Git add, commit, push
+                      git add releases/
+                      git commit -m "Release v$(releaseVersion) - Raspberry Pi DEB package"
+                      git push origin main
+                      
+                      Write-Host "✅ GitHub deployment completed"
+
+                - script: |
+                    echo "=========================================="
+                    echo "🚀 DEPLOYMENT COMPLETED"
+                    echo "=========================================="
+                    echo "✅ Version: $(releaseVersion)"
+                    echo "📦 DEB File: $(DEB_FILENAME)"
+                    echo "🔗 Repository: https://github.com/$(githubRepository)"
+                    echo "📁 Releases: https://github.com/$(githubRepository)/tree/main/releases"
+                    echo ""
+                    echo "🍓 INSTALLATION:"
+                    echo "wget https://github.com/$(githubRepository)/raw/main/releases/latest/$(DEB_FILENAME)"
+                    echo "sudo dpkg -i $(DEB_FILENAME) && sudo apt-get install -f"
+                    echo ""
+                    echo "🎉 Release deployed successfully!"
+                  displayName: "Deployment Summary"
