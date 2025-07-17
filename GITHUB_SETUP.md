@@ -58,8 +58,8 @@
 
 1. **Repository-Name korrigieren:**
    ```
-   Aktuelle Pipelines verwenden: mthitservice/MTHBDEIOTClient
-   GitHub Repository sollte existieren: https://github.com/mthitservice/MTHBDEIOTClient
+   Aktuelle Pipelines verwenden: MTHBDEIOTClient
+   GitHub Repository sollte existieren: https://github.com/MTHBDEIOTClient
    ```
 
 2. **Falls Repository nicht existiert:**
@@ -92,74 +92,74 @@ Stelle sicher, dass beide Pipelines die korrekten Variablen haben:
 
 ```yaml
 variables:
-  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubRepository: "MTHBDEIOTClient"
   githubConnection: "github-connection"
 ```
 
 ## 🚀 Automatischer GitHub Release Workflow
 
-### Build Pipeline (azure-pipelines-raspberry.yml)
+### Raspberry Pi Pipeline (azure-pipelines-raspberry.yml)
 
 **Trigger:** Git Tag `v*` (z.B. `v1.0.0`)
 
 **Stages:**
-1. **Build** - Erstellt .deb Paket
+1. **Build** - Erstellt .deb Paket für Raspberry Pi
 2. **Release** - Erstellt Release-Paket (nur bei Tags)
-3. **GitHubRelease** - Publiziert automatisch auf GitHub (nur bei Tags)
+3. **GitHubDeploy** - Kopiert .deb in GitHub releases/ Ordner (nur bei Tags)
+4. **Documentation** - Zeigt nützliche Links und nächste Schritte
 
-### Release Pipeline (azure-pipelines-release.yml)
-
-**Trigger:** Build Pipeline bei Tags
-
-**Stages:**
-1. **ValidateRelease** - Validiert Artifacts
-2. **CreateInternalRelease** - Erstellt strukturierte Release-Pakete
-3. **PublishGitHubRelease** - Publiziert auf GitHub
+**Besonderheit:** Erstellt einen `releases/` Ordner direkt im GitHub Repository mit öffentlich zugänglichen Links.
 
 ## 📋 Release-Prozess
 
 ### 1. Neuen Release erstellen
 
 ```bash
-# 1. Code committen
-git add .
-git commit -m "Release v1.0.0 - Neue Features und Bugfixes"
+# 1. Release-Skript verwenden (empfohlen)
+./release-version.sh
+# oder
+./release-version.ps1
 
-# 2. Tag erstellen
-git tag v1.0.0
-
-# 3. Tag pushen (triggert Pipeline)
-git push origin v1.0.0
+# Das Skript fragt nach der Version und erstellt automatisch:
+# - Tag v1.0.0
+# - Commit mit Version Updates
+# - Push zu GitHub
 ```
 
 ### 2. Pipeline läuft automatisch
 
-1. **Build Pipeline startet:**
-   - Baut .deb Paket
+1. **Raspberry Pi Pipeline startet:**
+   - Baut .deb Paket für Raspberry Pi ARMv7l
    - Erstellt Release-Artifacts
-   - Publiziert automatisch auf GitHub
+   - Kopiert .deb in GitHub releases/ Ordner
+   - Erstellt öffentliche Download-Links
 
-2. **GitHub Release wird erstellt:**
-   - Tag: `v1.0.0`
-   - Title: "MthBdeIotClient Raspberry Pi v1.0.0"
-   - Assets: .deb Datei, SHA256SUMS, Dokumentation
-   - Automatisch als "latest" markiert
+2. **GitHub releases/ Ordner wird erstellt:**
+   - `releases/latest/` - Neueste Version (für direkte Installation)
+   - `releases/v1.0.0/` - Spezifische Version (für Archivierung)
+   - Automatisch SHA256SUMS und Dokumentation
 
 ### 3. Raspberry Pi Installation
 
-**Direkt von GitHub:**
+**Direkt von GitHub (empfohlen):**
 ```bash
-# Download latest release
-wget https://github.com/mthitservice/MTHBDEIOTClient/releases/latest/download/mthbdeiotclient_1.0.0_armhf.deb
-
-# Installation
-sudo dpkg -i mthbdeiotclient_1.0.0_armhf.deb
-sudo apt-get install -f
+# Eine Zeile Installation - Latest Release
+wget https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_1.0.0_armhf.deb && sudo dpkg -i mthbdeiotclient_1.0.0_armhf.deb && sudo apt-get install -f
 ```
 
-**Eine Zeile Installation:**
+**Schritt-für-Schritt Installation:**
 ```bash
-wget https://github.com/mthitservice/MTHBDEIOTClient/releases/latest/download/mthbdeiotclient_1.0.0_armhf.deb && sudo dpkg -i mthbdeiotclient_1.0.0_armhf.deb && sudo apt-get install -f
+# 1. Download Latest Release
+wget https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_1.0.0_armhf.deb
+
+# 2. Installation
+sudo dpkg -i mthbdeiotclient_1.0.0_armhf.deb
+
+# 3. Abhängigkeiten installieren
+sudo apt-get install -f
+
+# 4. Anwendung starten
+mthbdeiotclient
 ```
 
 ## 🐛 Troubleshooting
@@ -167,7 +167,8 @@ wget https://github.com/mthitservice/MTHBDEIOTClient/releases/latest/download/mt
 ### Service Connection Fehler
 
 **Fehler:** "Could not authenticate to GitHub"
-```
+
+```text
 Lösung:
 1. GitHub Token prüfen und erneuern
 2. Token-Scopes prüfen (repo, write:packages erforderlich)
@@ -175,9 +176,10 @@ Lösung:
 ```
 
 **Fehler:** "Repository not found"
-```
+
+```text
 Lösung:
-1. Repository-Name prüfen: mthitservice/MTHBDEIOTClient
+1. Repository-Name prüfen: MTHBDEIOTClient
 2. Repository auf GitHub existiert?
 3. Token hat Zugriff auf Repository?
 ```
@@ -185,14 +187,16 @@ Lösung:
 ### Pipeline Fehler
 
 **Fehler:** "Environment 'GitHub-Production' not found"
-```
+
+```text
 Lösung:
 1. Environment in Azure DevOps erstellen
 2. Namen exakt verwenden: GitHub-Production
 ```
 
-**Fehler:** "GitHubRelease task failed"
-```
+**Fehler:** "GitHubDeploy task failed"
+
+```text
 Lösung:
 1. Service Connection prüfen
 2. GitHub Token erneuern
@@ -200,14 +204,24 @@ Lösung:
 4. Pipeline-Variablen prüfen
 ```
 
-### GitHub Release Fehler
+### GitHub Deploy Fehler
 
-**Fehler:** "Tag already exists"
-```
+**Fehler:** "Push rejected - permission denied"
+
+```text
 Lösung:
-1. Bestehendes Release löschen
-2. Tag löschen: git tag -d v1.0.0 && git push origin :refs/tags/v1.0.0
-3. Neuen Tag erstellen
+1. Token-Permissions prüfen (repo scope erforderlich)
+2. Service Connection erneuern
+3. GitHub Repository-Settings prüfen
+```
+
+**Fehler:** "releases/ folder not created"
+
+```text
+Lösung:
+1. Pipeline-Logs prüfen
+2. Git-Konfiguration in Pipeline prüfen
+3. Manueller Push-Test mit Token
 ```
 
 ## 🔒 Security Best Practices
@@ -230,19 +244,30 @@ Lösung:
 ## 📊 Monitoring
 
 ### Pipeline Monitoring
+
 - **Build Success Rate:** Überwachung in Azure DevOps
 - **Release Frequency:** Tracking von Releases
-- **Deployment Status:** GitHub Release Status
+- **Deployment Status:** GitHub releases/ Ordner Status
 
 ### GitHub Monitoring
-- **Release Downloads:** GitHub Insights
-- **Asset Downloads:** Tracking von .deb Downloads
+
+- **Release Downloads:** GitHub Raw File Downloads
+- **Asset Downloads:** Tracking von .deb Downloads via GitHub
 - **Issue Reports:** Feedback zu Releases
 
 ## 🎯 Next Steps
 
 1. **Service Connection einrichten** (siehe oben)
-2. **Test Release erstellen:** `git tag v0.1.0-test`
+2. **Test Release erstellen:** `./release-version.sh` verwenden
 3. **Pipeline testen:** Vollständigen Workflow durchlaufen
-4. **Dokumentation aktualisieren:** README mit neuen Links
+4. **Dokumentation aktualisieren:** README mit neuen Raw GitHub Links
 5. **Monitoring einrichten:** Success/Failure Notifications
+
+## 🔗 Öffentliche Links
+
+Nach erfolgreichem Release sind folgende Links öffentlich verfügbar:
+
+- **Latest DEB:** `https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_{version}_armhf.deb`
+- **Latest SHA256:** `https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/SHA256SUMS`
+- **Installation Guide:** `https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/RASPBERRY_INSTALLATION.md`
+- **Releases Folder:** `https://github.com/MTHBDEIOTClient/MTHBDEIOTClient/tree/master/releases`

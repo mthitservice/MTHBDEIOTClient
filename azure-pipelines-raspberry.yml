@@ -24,7 +24,7 @@ variables:
   artifactName: "MthBdeIotClient-RaspberryPi"
   
   # GitHub Configuration
-  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubRepository: "MTHBDEIOTClient/MTHBDEIOTClient"
   githubConnection: "github-connection"
 
 stages:
@@ -293,7 +293,7 @@ stages:
                       #### Direkte Installation:
                       ``````bash
                       # Download des DEB Pakets
-                      wget https://your-release-url/mthbdeiotclient_$version_armhf.deb
+                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$version_armhf.deb
 
                       # Installation
                       sudo dpkg -i mthbdeiotclient_$version_armhf.deb
@@ -305,9 +305,7 @@ stages:
                       #### Automatische Installation:
                       ``````bash
                       # Schnell-Installation
-                      curl -L https://your-release-url/mthbdeiotclient_$version_armhf.deb -o mthbdeiotclient.deb
-                      sudo dpkg -i mthbdeiotclient.deb
-                      sudo apt-get install -f
+                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$version_armhf.deb && sudo dpkg -i mthbdeiotclient_$version_armhf.deb && sudo apt-get install -f
                       ``````
 
                       ### 🚀 Starten der Anwendung:
@@ -326,7 +324,7 @@ stages:
                       - Desktop-Umgebung (X11)
 
                       ### 📖 Detaillierte Anweisungen:
-                      Siehe [RASPBERRY_INSTALLATION.md](./RASPBERRY_INSTALLATION.md) für:
+                      Siehe [RASPBERRY_INSTALLATION.md](https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/RASPBERRY_INSTALLATION.md) für:
                       - Ansible Deployment
                       - Automatische Installation
                       - Konfiguration
@@ -370,13 +368,13 @@ stages:
                     fi
                   displayName: "Release Package Summary"
 
-  - stage: GitHubRelease
-    displayName: "GitHub Release"
+  - stage: GitHubDeploy
+    displayName: "Deploy to GitHub Repository"
     condition: and(succeeded(), eq(variables.isRelease, true))
     dependsOn: Release
     jobs:
-      - deployment: CreateGitHubRelease
-        displayName: "Create GitHub Release"
+      - deployment: DeployToGitHub
+        displayName: "Deploy DEB to GitHub releases folder"
         environment: "GitHub-Production"
         pool:
           vmImage: "ubuntu-latest"
@@ -388,7 +386,7 @@ stages:
                   displayName: "Download Build Artifacts"
 
                 - script: |
-                    echo "=== GITHUB RELEASE PREPARATION ==="
+                    echo "=== GITHUB DEPLOY PREPARATION ==="
                     echo "Version: $(releaseVersion)"
                     echo "Tag: v$(releaseVersion)"
                     echo "Repository: $(githubRepository)"
@@ -406,10 +404,10 @@ stages:
                       echo "❌ Artifacts not found"
                       exit 1
                     fi
-                  displayName: "Prepare GitHub Release"
+                  displayName: "Prepare GitHub Deploy"
 
                 - task: PowerShell@2
-                  displayName: "Generate Release Notes"
+                  displayName: "Prepare Release Files"
                   inputs:
                     targetType: "inline"
                     script: |
@@ -423,28 +421,28 @@ stages:
                       $debFiles = Get-ChildItem -Path "$workspace/packages" -Filter "*.deb" -ErrorAction SilentlyContinue
                       $debFileName = if ($debFiles) { $debFiles[0].Name } else { "mthbdeiotclient_$($version)_armhf.deb" }
                       
-                      $releaseNotes = @"
-                      # 🍓 MthBdeIotClient Raspberry Pi v$version
+                      # Erstelle README für releases Ordner
+                      $releaseReadme = @"
+                      # MthBdeIotClient Raspberry Pi Releases
                       
-                      ## Raspberry Pi 3+ Installation Package
+                      ## Latest Release: v$version
                       
-                      **Automatisch erstellt:** $today  
+                      **Erstellt:** $today  
                       **Build:** $buildNumber  
                       **Commit:** $commit
                       
-                      ### 📦 Download
-                      - **Raspberry Pi 3+ (ARMv7l):** [$debFileName]($debFileName)
+                      ### 📦 Download & Installation
                       
-                      ### ⚡ Schnell-Installation
+                      #### Direkte Installation (Empfohlen):
                       ``````bash
-                      # Eine Zeile Installation
-                      wget https://github.com/$(githubRepository)/releases/latest/download/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      # Eine Zeile Installation - Latest Release
+                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
                       ``````
                       
-                      ### 🔧 Schritt-für-Schritt Installation
+                      #### Manuelle Installation:
                       ``````bash
-                      # 1. Download
-                      wget https://github.com/$(githubRepository)/releases/latest/download/$debFileName
+                      # 1. Download Latest Release
+                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$debFileName
                       
                       # 2. Installation
                       sudo dpkg -i $debFileName
@@ -478,8 +476,8 @@ stages:
                       ``````
                       
                       ### 📖 Weitere Informationen
-                      - [📋 Raspberry Pi Installation Guide](https://github.com/$(githubRepository)/blob/master/App/RASPBERRY_INSTALLATION.md)
-                      - [🚀 Deployment Guide](https://github.com/$(githubRepository)/blob/master/DEPLOYMENT_GUIDE.md)
+                      - [📋 Raspberry Pi Installation Guide](../App/RASPBERRY_INSTALLATION.md)
+                      - [🚀 Deployment Guide](../DEPLOYMENT_GUIDE.md)
                       - [❓ Issues & Support](https://github.com/$(githubRepository)/issues)
                       
                       ---
@@ -487,96 +485,244 @@ stages:
                       Architektur: ARMv7l | Package: DEB | Build System: Azure DevOps
                       "@
                       
-                      $releaseNotes | Out-File -FilePath "$(Agent.TempDirectory)/release-notes.md" -Encoding UTF8
-                      Write-Host "Release notes generated for version $version"
+                      $releaseReadme | Out-File -FilePath "$(Agent.TempDirectory)/releases-README.md" -Encoding UTF8
+                      Write-Host "Release README generated for version $version"
                       
-                      # Setze Variablen für GitHub Release
-                      Write-Host "##vso[task.setvariable variable=TAG_NAME]v$version"
+                      # Setze Variablen
                       Write-Host "##vso[task.setvariable variable=DEB_FILENAME]$debFileName"
 
                 - script: |
-                    echo "=== PREPARING GITHUB ASSETS ==="
+                    echo "=== PREPARING RELEASE FILES ==="
                     
                     workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
-                    assets_path="$(Agent.TempDirectory)/github-assets"
+                    temp_releases="$(Agent.TempDirectory)/releases"
                     
-                    # Erstelle Assets-Ordner
-                    mkdir -p "$assets_path"
+                    # Erstelle releases Ordnerstruktur
+                    mkdir -p "$temp_releases/latest"
+                    mkdir -p "$temp_releases/v$(releaseVersion)"
                     
                     # Kopiere DEB-Dateien
                     if [ -d "$workspace/packages" ]; then
                       echo "Copying DEB packages..."
-                      cp "$workspace/packages"/*.deb "$assets_path/" 2>/dev/null || echo "No DEB files to copy"
+                      
+                      # Kopiere in latest Ordner
+                      cp "$workspace/packages"/*.deb "$temp_releases/latest/" 2>/dev/null || echo "No DEB files to copy"
+                      
+                      # Kopiere in versionsspezifischen Ordner
+                      cp "$workspace/packages"/*.deb "$temp_releases/v$(releaseVersion)/" 2>/dev/null || echo "No DEB files to copy"
                       
                       # Erstelle SHA256 Checksums
-                      cd "$assets_path"
+                      cd "$temp_releases/latest"
                       if ls *.deb 1> /dev/null 2>&1; then
                         sha256sum *.deb > SHA256SUMS
-                        echo "✅ SHA256SUMS created"
+                        echo "✅ SHA256SUMS created in latest/"
+                      fi
+                      
+                      cd "$temp_releases/v$(releaseVersion)"
+                      if ls *.deb 1> /dev/null 2>&1; then
+                        sha256sum *.deb > SHA256SUMS
+                        echo "✅ SHA256SUMS created in v$(releaseVersion)/"
                       fi
                     fi
                     
                     # Kopiere Installation Files
                     if [ -d "$workspace/installation" ]; then
                       echo "Copying installation documentation..."
-                      cp "$workspace/installation/RASPBERRY_INSTALLATION.md" "$assets_path/" 2>/dev/null || echo "No RASPBERRY_INSTALLATION.md found"
-                      cp "$workspace/installation/deploy.ps1" "$assets_path/" 2>/dev/null || echo "No deploy.ps1 found"
-                      cp "$workspace/installation/generate-inventory.sh" "$assets_path/" 2>/dev/null || echo "No generate-inventory.sh found"
+                      cp "$workspace/installation/RASPBERRY_INSTALLATION.md" "$temp_releases/latest/" 2>/dev/null || echo "No RASPBERRY_INSTALLATION.md found"
+                      cp "$workspace/installation/deploy.ps1" "$temp_releases/latest/" 2>/dev/null || echo "No deploy.ps1 found"
+                      cp "$workspace/installation/generate-inventory.sh" "$temp_releases/latest/" 2>/dev/null || echo "No generate-inventory.sh found"
                     fi
                     
-                    echo "✅ GitHub assets prepared:"
-                    ls -la "$assets_path"
-                  displayName: "Prepare GitHub Assets"
+                    # Kopiere README
+                    cp "$(Agent.TempDirectory)/releases-README.md" "$temp_releases/README.md"
+                    
+                    echo "✅ Release files prepared:"
+                    find "$temp_releases" -type f -exec ls -la {} \;
+                  displayName: "Prepare Release Files"
 
-                - task: GitHubRelease@1
-                  displayName: "Create GitHub Release"
+                - task: PowerShell@2
+                  displayName: "Clone Repository and Update Releases"
                   inputs:
-                    gitHubConnection: $(githubConnection)
-                    repositoryName: $(githubRepository)
-                    action: "create"
-                    target: "$(Build.SourceVersion)"
-                    tagSource: "userSpecifiedTag"
-                    tag: "$(TAG_NAME)"
-                    title: "MthBdeIotClient Raspberry Pi v$(releaseVersion)"
-                    releaseNotesSource: "filePath"
-                    releaseNotesFilePath: "$(Agent.TempDirectory)/release-notes.md"
-                    assets: "$(Agent.TempDirectory)/github-assets/*"
-                    isPreRelease: false
-                    isDraft: false
-                    changeLogCompareToRelease: "lastFullRelease"
-                    changeLogType: "commitBased"
+                    targetType: "inline"
+                    script: |
+                      # Aktiviere ausführliches Logging
+                      $VerbosePreference = "Continue"
+                      $DebugPreference = "Continue"
+                      
+                      Write-Host "=== DETAILED GITHUB DEPLOYMENT DEBUG ==="
+                      Write-Host "Release Version: $(releaseVersion)"
+                      Write-Host "DEB Filename: $(DEB_FILENAME)"
+                      Write-Host "GitHub Repository: $(githubRepository)"
+                      Write-Host "GitHub Connection: $(githubConnection)"
+                      Write-Host "System Access Token Length: $('$(System.AccessToken)'.Length)"
+                      
+                      # Git konfigurieren mit Debug
+                      Write-Host "=== CONFIGURING GIT ==="
+                      git config --global user.email "azure-devops@mth-it-service.com"
+                      git config --global user.name "Azure DevOps Pipeline"
+                      git config --global --list
+                      
+                      # Test Git-Konfiguration
+                      Write-Host "Git Version: $(git --version)"
+                      Write-Host "Git Config User: $(git config user.name)"
+                      Write-Host "Git Config Email: $(git config user.email)"
+                      
+                      # Repository klonen mit Debug
+                      Write-Host "=== CLONING REPOSITORY ==="
+                      $repoUrl = "https://$(githubConnection):$(System.AccessToken)@github.com/$(githubRepository).git"
+                      $repoUrlMasked = "https://$(githubConnection):***@github.com/$(githubRepository).git"
+                      Write-Host "Repository URL (masked): $repoUrlMasked"
+                      
+                      try {
+                        Write-Host "Starting git clone..."
+                        git clone $repoUrl repo-clone --verbose
+                        Write-Host "✅ Git clone completed successfully"
+                      } catch {
+                        Write-Host "❌ Git clone failed: $($_.Exception.Message)"
+                        Write-Host "Git clone exit code: $LASTEXITCODE"
+                        exit 1
+                      }
+                      
+                      # Verzeichnis wechseln und Status prüfen
+                      Write-Host "=== REPOSITORY STATUS ==="
+                      cd repo-clone
+                      Write-Host "Current directory: $(Get-Location)"
+                      Write-Host "Repository contents:"
+                      Get-ChildItem -Force | Format-Table -AutoSize
+                      
+                      # Git Status prüfen
+                      Write-Host "Git remote origin: $(git remote get-url origin)"
+                      Write-Host "Git branch: $(git branch --show-current)"
+                      Write-Host "Git status:"
+                      git status --porcelain
+                      
+                      # Releases Ordner erstellen
+                      Write-Host "=== CREATING RELEASES DIRECTORY ==="
+                      if (-not (Test-Path "releases")) {
+                        New-Item -ItemType Directory -Path "releases"
+                        Write-Host "✅ Created releases directory"
+                      } else {
+                        Write-Host "ℹ️ releases directory already exists"
+                        Write-Host "Existing releases content:"
+                        Get-ChildItem "releases" -Recurse | Format-Table -AutoSize
+                      }
+                      
+                      # Kopiere neue Release-Dateien mit Debug
+                      Write-Host "=== COPYING RELEASE FILES ==="
+                      $tempReleases = "$(Agent.TempDirectory)/releases"
+                      Write-Host "Source: $tempReleases"
+                      Write-Host "Destination: releases/"
+                      
+                      if (Test-Path $tempReleases) {
+                        Write-Host "Source files to copy:"
+                        Get-ChildItem "$tempReleases" -Recurse | Format-Table -AutoSize
+                        
+                        Copy-Item -Path "$tempReleases/*" -Destination "releases/" -Recurse -Force -Verbose
+                        Write-Host "✅ Files copied successfully"
+                      } else {
+                        Write-Host "❌ Source directory not found: $tempReleases"
+                        exit 1
+                      }
+                      
+                      # Git add mit Debug
+                      Write-Host "=== ADDING FILES TO GIT ==="
+                      Write-Host "Files to add:"
+                      Get-ChildItem "releases" -Recurse | Format-Table -AutoSize
+                      
+                      git add releases/ --verbose
+                      Write-Host "Git add exit code: $LASTEXITCODE"
+                      
+                      # Git Status nach add
+                      Write-Host "Git status after add:"
+                      git status --porcelain
+                      git status
+                      
+                      # Git commit mit Debug
+                      Write-Host "=== COMMITTING CHANGES ==="
+                      $commitMessage = "Release v$(releaseVersion) - Add Raspberry Pi DEB package
+                      
+                      - Added $(DEB_FILENAME) to releases/latest/
+                      - Added versioned release in releases/v$(releaseVersion)/
+                      - Updated releases README
+                      - SHA256SUMS included
+                      
+                      Build: $(Build.BuildNumber)
+                      Commit: $(Build.SourceVersion)"
+                      
+                      Write-Host "Commit message:"
+                      Write-Host $commitMessage
+                      
+                      try {
+                        git commit -m $commitMessage --verbose
+                        Write-Host "✅ Git commit completed successfully"
+                        Write-Host "Git commit exit code: $LASTEXITCODE"
+                      } catch {
+                        Write-Host "❌ Git commit failed: $($_.Exception.Message)"
+                        Write-Host "Git commit exit code: $LASTEXITCODE"
+                        
+                        # Zusätzliche Debug-Informationen
+                        Write-Host "Git diff --staged:"
+                        git diff --staged
+                        Write-Host "Git diff:"
+                        git diff
+                        exit 1
+                      }
+                      
+                      # Push mit Debug
+                      Write-Host "=== PUSHING TO GITHUB ==="
+                      try {
+                        git push origin master --verbose
+                        Write-Host "✅ Git push completed successfully"
+                        Write-Host "Git push exit code: $LASTEXITCODE"
+                      } catch {
+                        Write-Host "❌ Git push failed: $($_.Exception.Message)"
+                        Write-Host "Git push exit code: $LASTEXITCODE"
+                        
+                        # Zusätzliche Debug-Informationen
+                        Write-Host "Git remote -v:"
+                        git remote -v
+                        Write-Host "Git log --oneline -5:"
+                        git log --oneline -5
+                        exit 1
+                      }
+                      
+                      Write-Host "✅ GitHub deployment completed successfully"
 
                 - script: |
                     echo "=========================================="
-                    echo "🚀 GITHUB RELEASE PUBLISHED"
+                    echo "🚀 GITHUB DEPLOY COMPLETED"
                     echo "=========================================="
                     echo ""
                     echo "✅ Status: SUCCESS"
-                    echo "🏷️ Tag: $(TAG_NAME)"
                     echo "📦 Version: $(releaseVersion)"
                     echo "🔗 Repository: https://github.com/$(githubRepository)"
-                    echo "📋 Release: https://github.com/$(githubRepository)/releases/tag/$(TAG_NAME)"
-                    echo "📥 Latest: https://github.com/$(githubRepository)/releases/latest"
+                    echo "� Releases Folder: https://github.com/$(githubRepository)/tree/master/releases"
                     echo ""
-                    echo "📦 PUBLISHED ASSETS:"
-                    echo "- $(DEB_FILENAME)"
-                    echo "- SHA256SUMS"
-                    echo "- RASPBERRY_INSTALLATION.md"
-                    echo "- deploy.ps1"
-                    echo "- generate-inventory.sh"
+                    echo "📦 DEPLOYED FILES:"
+                    echo "- releases/latest/$(DEB_FILENAME)"
+                    echo "- releases/v$(releaseVersion)/$(DEB_FILENAME)"
+                    echo "- releases/README.md"
+                    echo "- releases/latest/SHA256SUMS"
                     echo ""
                     echo "🍓 RASPBERRY PI INSTALLATION:"
-                    echo "wget https://github.com/$(githubRepository)/releases/latest/download/$(DEB_FILENAME)"
+                    echo "wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$(DEB_FILENAME)"
                     echo "sudo dpkg -i $(DEB_FILENAME) && sudo apt-get install -f"
                     echo ""
-                    echo "🎉 Release ist jetzt als 'latest' verfügbar!"
+                    echo "🔗 ÖFFENTLICHE LINKS:"
+                    echo "Latest DEB: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$(DEB_FILENAME)"
+                    echo "Latest SHA256: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/SHA256SUMS"
+                    echo "Installation Guide: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/RASPBERRY_INSTALLATION.md"
+                    echo ""
+                    echo "🎉 Release ist jetzt öffentlich verfügbar!"
                     echo "=========================================="
-                  displayName: "GitHub Release Summary"
+                  displayName: "GitHub Deploy Summary"
 
   - stage: Documentation
     displayName: "Documentation & Next Steps"
     condition: succeeded()
-    dependsOn: Build
+    dependsOn: 
+      - Build
+      - GitHubDeploy
     jobs:
       - job: DocumentationSummary
         displayName: "Show Next Steps"
@@ -593,10 +739,20 @@ stages:
               echo "🎯 Target: Raspberry Pi 3+ (ARMv7l)"
               echo "📋 Package: .deb (Debian Package)"
               echo ""
-              echo "📖 NEXT STEPS:"
+              if [ "$(isRelease)" = "True" ]; then
+                echo "🚀 GITHUB RELEASE DEPLOYED:"
+                echo "📁 Latest Release: https://github.com/$(githubRepository)/tree/master/releases/latest"
+                echo "� Direct Download: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo ""
+                echo "📦 INSTALLATION COMMANDS:"
+                echo "wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo "sudo dpkg -i mthbdeiotclient_$(releaseVersion)_armhf.deb && sudo apt-get install -f"
+                echo ""
+              fi
+              echo "�📖 NEXT STEPS:"
               echo "1. Download the artifacts from this build"
               echo "2. Test installation on Raspberry Pi 3+"
-              echo "3. Update GitHub releases (manual step)"
+              echo "3. Use public GitHub links for distribution"
               echo "4. Deploy using Ansible (see RASPBERRY_INSTALLATION.md)"
               echo ""
               echo "🔧 MANUAL TESTING:"

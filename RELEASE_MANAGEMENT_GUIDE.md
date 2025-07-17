@@ -45,11 +45,11 @@ bash scripts/release-version.sh
 
 ### NPM Scripts
 
-| Kommando | Beschreibung |
-|----------|-------------|
-| `npm run release` | Interaktive Versionswahl mit Menü |
-| `npm run release:patch` | Patch-Version erhöhen (Bugfixes) |
-| `npm run release:minor` | Minor-Version erhöhen (neue Features) |
+| Kommando                | Beschreibung                             |
+| ----------------------- | ---------------------------------------- |
+| `npm run release`       | Interaktive Versionswahl mit Menü        |
+| `npm run release:patch` | Patch-Version erhöhen (Bugfixes)         |
+| `npm run release:minor` | Minor-Version erhöhen (neue Features)    |
 | `npm run release:major` | Major-Version erhöhen (Breaking Changes) |
 
 ### Kommandozeilen-Parameter
@@ -239,9 +239,9 @@ GIT_TRACE=1 npm run release
 
 ### Nützliche Links
 
-- **Azure DevOps Builds**: https://dev.azure.com/your-org/MthBdeIotClient/_build
-- **GitHub Releases**: https://github.com/mthitservice/MTHBDEIOTClient/releases
-- **Latest Release**: https://github.com/mthitservice/MTHBDEIOTClient/releases/latest
+- **Azure DevOps Builds**: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build
+- **GitHub Repository**: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient
+- **Latest Release**: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient/tree/master/releases/latest
 
 ### Status Checking
 
@@ -250,10 +250,10 @@ GIT_TRACE=1 npm run release
 git tag -l --sort=-version:refname "v*" | head -5
 
 # Pipeline Status prüfen
-az pipelines show --name "MthBdeIotClient-Raspberry-CI" --organization https://dev.azure.com/your-org
+az pipelines show --name "MthBdeIotClient-Raspberry-CI" --organization https://dev.azure.com/mth-it-service
 
 # GitHub Release Status
-curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest
+curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/MTHBDEIOTClient/MTHBDEIOTClient/releases/latest
 ```
 
 ## 🎉 Best Practices

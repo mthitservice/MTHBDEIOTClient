@@ -262,7 +262,7 @@ Features:
 - GitHub Release Integration
 
 Installation:
-wget https://github.com/mthitservice/MTHBDEIOTClient/releases/latest/download/mthbdeiotclient_${NEW_VERSION}_armhf.deb
+wget https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb
 sudo dpkg -i mthbdeiotclient_${NEW_VERSION}_armhf.deb
 sudo apt-get install -f
 "
@@ -270,11 +270,10 @@ sudo apt-get install -f
 git tag -a "$NEW_TAG" -m "$TAG_MESSAGE"
 echo -e "${SUCCESS} ${GREEN}Created tag $NEW_TAG${NC}"
 
-# 6. Push zu origin
+# 6. Push zu origin (Commit und Tag zusammen)
 echo -e "${GEAR} ${BLUE}Pushing changes and tag to origin...${NC}"
-git push origin HEAD
-git push origin "$NEW_TAG"
-echo -e "${SUCCESS} ${GREEN}Pushed changes and tag to origin${NC}"
+git push origin HEAD "$NEW_TAG"
+echo -e "${SUCCESS} ${GREEN}Pushed changes and tag to origin (triggers pipeline)${NC}"
 
 # 7. Zusammenfassung
 echo ""
@@ -289,14 +288,15 @@ echo -e "  • Commit: $(git rev-parse --short HEAD)"
 echo -e "  • Branch: $(git branch --show-current)"
 echo ""
 echo -e "${ROCKET} ${GREEN}Next steps:${NC}"
-echo "  1. Azure DevOps Pipeline will start automatically"
+echo "  1. Azure DevOps Pipeline is starting automatically"
 echo "  2. .deb package will be built for Raspberry Pi"
-echo "  3. GitHub Release will be created automatically"
+echo "  3. GitHub releases/ folder will be updated automatically"
 echo "  4. Package will be available as 'latest' release"
 echo ""
 echo -e "${INFO} ${BLUE}Useful links:${NC}"
-echo "  • Azure DevOps: https://dev.azure.com/your-org/MthBdeIotClient/_build"
-echo "  • GitHub Releases: https://github.com/mthitservice/MTHBDEIOTClient/releases"
-echo "  • Latest Release: https://github.com/mthitservice/MTHBDEIOTClient/releases/latest"
+echo "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
+echo "  • GitHub Repository: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient"
+echo "  • Latest Release: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient/tree/master/releases/latest"
+echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"
 echo ""
 echo -e "${SUCCESS} ${GREEN}Version $NEW_VERSION released successfully!${NC}"

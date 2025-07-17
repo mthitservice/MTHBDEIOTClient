@@ -74,7 +74,7 @@ Gehen Sie zu: **Pipelines → Ihre Pipeline → Edit → Variables**
 | Variable Name        | Beispiel Wert                    | Secret |
 | -------------------- | -------------------------------- | ------ |
 | `GITHUB_TOKEN`       | `ghp_xxxxxxxxxxxx`               | ✅      |
-| `GITHUB_REPOSITORY`  | `mthitservice/MthBdeIotClient`   | ❌      |
+| `GITHUB_REPOSITORY`  | `MTHBDEIOTClient/MTHBDEIOTClient`   | ❌      |
 | `API_ENDPOINT_URL`   | `https://api.mth-it-service.com` | ❌      |
 | `API_KEY_PRODUCTION` | `prod_api_key_123`               | ✅      |
 
