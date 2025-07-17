@@ -1,11 +1,11 @@
 {
   "name": "MthBdeIotClient",
   "version": "1.0.15",
-  "description": "A foundation for scalable desktop apps",
+  "description": "BDE App",
   "license": "MIT",
   "author": {
     "name": "MTH-IT-SERVICE",
-    "email": "info@mth-it-service",
+    "email": "info@mth-it-service.com",
     "url": "hhttps://mth-it-service.com"
   },
   "main": "./dist/main/main.js",
@@ -15,6 +15,7 @@
     "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0"
+    "better-sqlite3": "^11.10.0",
+    "bootstrap-icons": "^1.13.1"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "mthbdeiotclient",
+  "name": "MthBdeIotClient",
   "description": "Anwendung zum Erfassen von Betriebsdaten",
   "keywords": [
     "electron",
@@ -13,18 +13,11 @@
     "reload"
   ],
   "homepage": "https://mth-it-service.com",
-  "bugs": {
-    "url": "https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/electron-react-boilerplate/electron-react-boilerplate.git"
-  },
   "license": "MIT",
   "author": {
-    "name": "Electron React Boilerplate Maintainers",
-    "email": "electronreactboilerplate@gmail.com",
-    "url": "https://electron-react-boilerplate.js.org"
+    "name": "Michael Lindner",
+    "email": "info@mth-it-service.com",
+    "url": "https://github.com/mthitservice"
   },
   "contributors": [
     {
@@ -45,8 +38,8 @@
     "package": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --publish never && npm run build:dll",
     "package:all": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --win --linux --mac --publish never",
     "package:github": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --win --linux --mac --publish always",
-    "package:raspberry": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false",
-    "package:raspberry-deb": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false",
+    "package:raspberry": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env --  electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false",
+    "package:raspberry-deb": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false",
     "install:raspberry": "npm install --target_arch=armv7l --target_platform=linux --cache=/tmp/.npm",
     "version:set": "node scripts/set-version.js",
     "release:prepare": "npm run version:set && npm run build && npm run package:all",
@@ -112,7 +105,7 @@
     "bootstrap": "^5.3.7",
     "bootstrap-icons": "^1.13.1",
     "chalk": "^4.1.2",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "electron-debug": "^4.1.0",
     "electron-log": "^5.3.2",
     "electron-updater": "^6.3.9",
@@ -139,12 +132,14 @@
     "@typescript-eslint/eslint-plugin": "^8.26.1",
     "@typescript-eslint/parser": "^8.26.1",
     "browserslist-config-erb": "^0.0.3",
+    "chalk": "^4.1.2",
     "concurrently": "^9.1.2",
     "core-js": "^3.41.0",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
     "css-minimizer-webpack-plugin": "^7.0.2",
     "detect-port": "^2.1.0",
+    "dotenv-cli": "^8.0.0",
     "electron": "^35.0.2",
     "electron-builder": "^25.1.8",
     "electron-devtools-installer": "^4.0.0",
