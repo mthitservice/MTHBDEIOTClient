@@ -24,7 +24,7 @@ variables:
   artifactName: "MthBdeIotClient-RaspberryPi"
   
   # GitHub Configuration
-  githubRepository: "MTHBDEIOTClient/MTHBDEIOTClient"
+  githubRepository: "mth-it-service/MTHBDEIOTClient"
   githubConnection: "github-connection"
 
 stages:

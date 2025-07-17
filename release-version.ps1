@@ -398,8 +398,8 @@ Write-Host "  4. Package will be available as 'latest' release"
 Write-Host ""
 Write-ColoredOutput "Useful links:" $Colors.Blue $Emojis.Info
 Write-Host "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
-Write-Host "  • GitHub Repository: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient"
-Write-Host "  • Latest Release: https://github.com/MTHBDEIOTClient/MTHBDEIOTClient/tree/master/releases/latest"
-Write-Host "  • Install on Raspberry Pi: https://raw.githubusercontent.com/MTHBDEIOTClient/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_$($newVersion)_armhf.deb"
+Write-Host "  • GitHub Repository: https://github.com/mth-it-service/MTHBDEIOTClient"
+Write-Host "  • Latest Release: https://github.com/mth-it-service/MTHBDEIOTClient/tree/master/releases/latest"
+Write-Host "  • Install on Raspberry Pi: https://raw.githubusercontent.com/mth-it-service/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_$($newVersion)_armhf.deb"
 Write-Host ""
 Write-ColoredOutput "Version $newVersion released successfully!" $Colors.Green $Emojis.Success
