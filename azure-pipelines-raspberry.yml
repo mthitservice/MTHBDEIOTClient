@@ -296,7 +296,7 @@ stages:
                       #### Direkte Installation:
                       ``````bash
                       # Download des DEB Pakets
-                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$version_armhf.deb
+                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$version_armhf.deb
 
                       # Installation
                       sudo dpkg -i mthbdeiotclient_$version_armhf.deb
@@ -308,7 +308,7 @@ stages:
                       #### Automatische Installation:
                       ``````bash
                       # Schnell-Installation
-                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$version_armhf.deb && sudo dpkg -i mthbdeiotclient_$version_armhf.deb && sudo apt-get install -f
+                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$version_armhf.deb && sudo dpkg -i mthbdeiotclient_$version_armhf.deb && sudo apt-get install -f
                       ``````
 
                       ### 🚀 Starten der Anwendung:
@@ -327,7 +327,7 @@ stages:
                       - Desktop-Umgebung (X11)
 
                       ### 📖 Detaillierte Anweisungen:
-                      Siehe [RASPBERRY_INSTALLATION.md](https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/RASPBERRY_INSTALLATION.md) für:
+                      Siehe [RASPBERRY_INSTALLATION.md](https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/RASPBERRY_INSTALLATION.md) für:
                       - Ansible Deployment
                       - Automatische Installation
                       - Konfiguration
@@ -439,13 +439,13 @@ stages:
                       #### Direkte Installation (Empfohlen):
                       ``````bash
                       # Eine Zeile Installation - Latest Release
-                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
+                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$debFileName && sudo dpkg -i $debFileName && sudo apt-get install -f
                       ``````
                       
                       #### Manuelle Installation:
                       ``````bash
                       # 1. Download Latest Release
-                      wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$debFileName
+                      wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$debFileName
                       
                       # 2. Installation
                       sudo dpkg -i $debFileName
@@ -676,7 +676,7 @@ stages:
                       # Push mit Debug
                       Write-Host "=== PUSHING TO GITHUB ==="
                       try {
-                        git push origin master --verbose
+                        git push origin main --verbose
                         Write-Host "✅ Git push completed successfully"
                         Write-Host "Git push exit code: $LASTEXITCODE"
                       } catch {
@@ -710,13 +710,13 @@ stages:
                     echo "- releases/latest/SHA256SUMS"
                     echo ""
                     echo "🍓 RASPBERRY PI INSTALLATION:"
-                    echo "wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$(DEB_FILENAME)"
+                    echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
                     echo "sudo dpkg -i $(DEB_FILENAME) && sudo apt-get install -f"
                     echo ""
                     echo "🔗 ÖFFENTLICHE LINKS:"
-                    echo "Latest DEB: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/$(DEB_FILENAME)"
-                    echo "Latest SHA256: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/SHA256SUMS"
-                    echo "Installation Guide: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/RASPBERRY_INSTALLATION.md"
+                    echo "Latest DEB: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/$(DEB_FILENAME)"
+                    echo "Latest SHA256: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/SHA256SUMS"
+                    echo "Installation Guide: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/RASPBERRY_INSTALLATION.md"
                     echo ""
                     echo "🎉 Release ist jetzt öffentlich verfügbar!"
                     echo "=========================================="
@@ -746,11 +746,11 @@ stages:
               echo ""
               if [ "$(isRelease)" = "True" ]; then
                 echo "🚀 GITHUB RELEASE DEPLOYED:"
-                echo "📁 Latest Release: https://github.com/$(githubRepository)/tree/master/releases/latest"
-                echo "� Direct Download: https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo "📁 Latest Release: https://github.com/$(githubRepository)/tree/main/releases/latest"
+                echo "� Direct Download: https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
                 echo ""
                 echo "📦 INSTALLATION COMMANDS:"
-                echo "wget https://raw.githubusercontent.com/$(githubRepository)/master/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
+                echo "wget https://raw.githubusercontent.com/$(githubRepository)/main/releases/latest/mthbdeiotclient_$(releaseVersion)_armhf.deb"
                 echo "sudo dpkg -i mthbdeiotclient_$(releaseVersion)_armhf.deb && sudo apt-get install -f"
                 echo ""
               fi
