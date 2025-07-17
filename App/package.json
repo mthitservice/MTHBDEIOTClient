@@ -268,7 +268,7 @@
       "description": "MTH BDE IoT Client for Raspberry Pi",
       "maintainer": "MTH IT Service <info@mth-it-service.com>",
       "synopsis": "IoT Client Application for Raspberry Pi",
-      "compression": "xz",
+      "compression": "normal",
       "priority": "optional",
       "packageCategory": "devel",
       "fpm": [
