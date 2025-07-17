@@ -1,15 +1,14 @@
 # Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi 3+ Build
 # Optimierte Pipeline für Raspberry Pi ARMv7l .deb Pakete
+# Wird nur bei Git-Tags ausgeführt (nicht bei Master-Commits)
 
 trigger:
   branches:
-    include:
-      - master
-      - release/*
-      - develop
+    exclude:
+      - "*"  # Keine Branch-Trigger
   tags:
     include:
-      - "v*"
+      - "v*"  # Nur bei Tags die mit "v" beginnen (z.B. v1.0.0)
 
 variables:
   # Build-Konfiguration
