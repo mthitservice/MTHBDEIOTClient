@@ -269,6 +269,27 @@ stages:
               path: App/node_modules
 
           - script: |
+              echo "=== INSTALLING 32-BIT DEVELOPMENT TOOLS ==="
+              
+              # Enable 32-bit architecture
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              
+              # Install 32-bit development packages
+              sudo apt-get install -y \
+                gcc-multilib \
+                g++-multilib \
+                libc6-dev:i386 \
+                libstdc++6:i386 \
+                libgcc-s1:i386 \
+                build-essential \
+                python3-dev \
+                make
+              
+              echo "=== VERIFYING 32-BIT COMPILATION CAPABILITY ==="
+              echo "32-bit libc available: $(find /usr/lib -name "*libc*" | grep i386 | head -5)"
+              echo "GCC multilib: $(gcc -m32 --version | head -1)"
+              
               cd App
               echo "=== SYSTEM INFORMATION ==="
               echo "Node version: $(node --version)"
@@ -287,15 +308,32 @@ stages:
               npm config set audit false
               npm config set progress false
               npm config list
-            displayName: "System Information & NPM Setup"
+            displayName: "Install 32-bit Development Tools & System Setup"
 
           - script: |
               cd App
-              echo "=== INSTALLING DEPENDENCIES ==="
+              echo "=== INSTALLING DEPENDENCIES FOR 32-BIT COMPILATION ==="
               echo "Starting npm install at $(date)"
               
-              # Clean install
+              # Set 32-bit compilation environment
+              export CC="gcc -m32"
+              export CXX="g++ -m32"
+              export npm_config_target_arch=ia32
+              export npm_config_target_platform=linux
+              export npm_config_arch=ia32
+              export npm_config_node_gyp_force_rebuild=true
+              
+              echo "=== COMPILATION ENVIRONMENT ==="
+              echo "CC: $CC"
+              echo "CXX: $CXX"
+              echo "Target architecture: $npm_config_target_arch"
+              echo "Target platform: $npm_config_target_platform"
+              
+              # Clean install with 32-bit compilation flags
               npm ci --ignore-scripts --no-audit --no-fund
+              
+              echo "=== REBUILDING NATIVE MODULES FOR 32-BIT ==="
+              npm rebuild --arch=ia32 --target_arch=ia32
               
               echo "=== VERIFYING CRITICAL PACKAGES ==="
               echo "dotenv-cli: $(npx dotenv-cli --version || echo 'NOT INSTALLED')"
@@ -303,8 +341,8 @@ stages:
               echo "electron-builder: $(npx electron-builder --version || echo 'NOT INSTALLED')"
               
               echo "Dependencies installed successfully at $(date)"
-            displayName: "Install Dependencies"
-            timeoutInMinutes: 10
+            displayName: "Install Dependencies (32-bit)"
+            timeoutInMinutes: 15
 
           - script: |
               cd App
