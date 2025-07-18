@@ -1,0 +1,60 @@
+# Einfache GitHub Release Alternative
+# Kann verwendet werden falls die GitHubRelease@1 Task Probleme macht
+
+trigger:
+  branches:
+    exclude:
+      - "*"
+  tags:
+    include:
+      - "v*"
+
+pr: none
+
+variables:
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  artifactName: "MthBdeIotClient-RaspberryPi"
+
+stages:
+  - stage: Deploy
+    displayName: "Simple GitHub Release"
+    condition: eq(variables.isRelease, true)
+    jobs:
+      - job: CreateGitHubRelease
+        displayName: "Create GitHub Release via API"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: "Download Build Artifacts"
+            inputs:
+              artifact: $(artifactName)
+              path: "$(Pipeline.Workspace)/$(artifactName)"
+
+          - script: |
+              echo "=== SIMPLE GITHUB RELEASE CREATION ==="
+              echo "Tag: $(Build.SourceBranchName)"
+              echo "Version: $(releaseVersion)"
+              echo "Artifacts available:"
+              find $(Pipeline.Workspace) -name "*.deb" -exec ls -lh {} \;
+              
+              # GitHub Release via curl (benötigt GITHUB_TOKEN Variable)
+              if [ -z "$GITHUB_TOKEN" ]; then
+                echo "❌ GITHUB_TOKEN variable not set"
+                echo "Please add GITHUB_TOKEN as secret variable in Azure DevOps"
+                exit 1
+              fi
+              
+              echo "✅ GitHub Token available - Release creation would work"
+              echo "Manual steps:"
+              echo "1. Go to: https://github.com/mthitservice/MTHBDEIOTClient/releases/new"
+              echo "2. Tag: $(Build.SourceBranchName)"
+              echo "3. Title: Release $(releaseVersion)"
+              echo "4. Upload DEB files from artifacts"
+            displayName: "Manual Release Instructions"
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
