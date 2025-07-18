@@ -23,7 +23,43 @@ variables:
   releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
   
   # Artifact Names
-  artifactName: "MthBdeIotClient-RaspberryPi"
+  artifactName: "MthBdeIotClie                      ### 📦 Schnell-Install                      ### � Anwendung starten
+                      
+                      ``````bash
+                      # Normale Ausführung
+                      mthbdeiotclient
+                      
+                      # Im Vollbild-Modus starten
+                      mthbdeiotclient --fullscreen
+                      
+                      # Mit Debug-Ausgabe
+                      mthbdeiotclient --verbose
+                      
+                      # Vollbild mit Debug
+                      mthbdeiotclient --fullscreen --verbose
+                      
+                      # Im Hintergrund starten
+                      nohup mthbdeiotclient --fullscreen &
+                      ``````                      ### 📦 Alternative: Automatische Installation
+                      
+                      ```bash
+                      # Abhängigkeiten vorinstallieren
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0
+                      
+                      # Automatisches Download der neuesten Version
+                      wget -qO- https://api.github.com/repos/$repo/releases/latest | grep "browser_download_url.*\.deb" | cut -d '"' -f 4 | wget -i -
+                      sudo dpkg -i *.deb && sudo apt-get install -f
+                      ```          
+                      ```bash
+                      # Abhängigkeiten vorinstallieren
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0
+                      
+                      # Download und Installation
+                      wget -O $debFileName https://github.com/$repo/releases/download/$tagName/$debFileName
+                      sudo dpkg -i $debFileName && sudo apt-get install -f
+                      ```berryPi"
   
   # GitHub Configuration
   githubRepository: "mthitservice/MTHBDEIOTClient"
@@ -483,17 +519,65 @@ stages:
                       ### 📦 Manuelle Installation
                       
                       ```bash
-                      # 1. Download (korrekter Dateiname)
+                      # 1. Abhängigkeiten vorinstallieren (inkl. libgbm für Electron)
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
+                      
+                      # 2. Download (korrekter Dateiname)
                       wget https://github.com/$githubRepo/raw/main/releases/latest/$debFileName
                       
-                      # 2. Installation
+                      # 3. Installation
                       sudo dpkg -i $debFileName
                       
-                      # 3. Abhängigkeiten reparieren
+                      # 4. Abhängigkeiten reparieren (falls nötig)
                       sudo apt-get install -f
                       
-                      # 4. Anwendung starten
+                      # 5. Anwendung starten
                       mthbdeiotclient
+                      ```
+                      
+                      ### 🚀 Anwendung starten
+                      
+                      ```bash
+                      # Normale Ausführung
+                      mthbdeiotclient
+                      
+                      # Im Vollbild-Modus starten
+                      mthbdeiotclient --fullscreen
+                      
+                      # Mit Debug-Ausgabe
+                      mthbdeiotclient --verbose
+                      
+                      # Vollbild mit Debug
+                      mthbdeiotclient --fullscreen --verbose
+                      
+                      # Im Hintergrund starten
+                      nohup mthbdeiotclient --fullscreen &
+                      ```
+                      
+                      ### 🖥️ Kiosk-Modus für Raspberry Pi
+                      
+                      ```bash
+                      # 1. Autostart einrichten mit Vollbild
+                      sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
+                      
+                      # Folgende Zeilen hinzufügen:
+                      @xset s off
+                      @xset -dpms
+                      @xset s noblank
+                      @mthbdeiotclient --fullscreen
+                      
+                      # 2. Bildschirmschoner deaktivieren
+                      sudo nano /etc/lightdm/lightdm.conf
+                      # Unter [Seat:*] hinzufügen:
+                      xserver-command=X -s 0 -dpms
+                      
+                      # 3. Vollbild-Kiosk mit Chromium (Alternative)
+                      # Falls die App einen Web-Server hat:
+                      chromium-browser --kiosk --disable-restore-session-state http://localhost:3000
+                      
+                      # 4. Reboot für Autostart
+                      sudo reboot
                       ```
                       
                       ### 📋 Systemanforderungen
@@ -504,11 +588,18 @@ stages:
                       
                       ### 🔧 Troubleshooting
                       ```bash
+                      # Abhängigkeiten manuell installieren (inkl. libgbm für Electron)
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
+                      
+                      # Spezifische Electron-Abhängigkeiten
+                      sudo apt-get install -y libasound2 libxrandr2 libatk1.0-0 libdrm2 libxcomposite1 libxdamage1 libxfixes3
+                      
                       # Berechtigungen reparieren
                       sudo chmod +x /usr/bin/mthbdeiotclient
                       
-                      # Abhängigkeiten installieren
-                      sudo apt-get update && sudo apt-get install -f
+                      # Abhängigkeiten reparieren nach dpkg-Fehlern
+                      sudo apt-get install -f
                       
                       # Deinstallation
                       sudo dpkg -r mthbdeiotclient
@@ -577,11 +668,55 @@ stages:
                       
                       ## 📦 Installation
                       
-                      ### Schnell-Installation (Empfohlen)
+                      ### 📦 Schnell-Installation (Empfohlen)
                       ``````bash
+                      # Abhängigkeiten vorinstallieren (inkl. libgbm für Electron)
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
+                      
                       # Download und Installation in einem Schritt
                       wget -O $debFileName https://github.com/$repo/releases/download/$tagName/$debFileName
                       sudo dpkg -i $debFileName && sudo apt-get install -f
+                      ``````
+                      
+                      ## 🚀 Anwendung starten
+                      
+                      ``````bash
+                      # Normale Ausführung
+                      mthbdeiotclient
+                      
+                      # Im Vollbild-Modus starten
+                      mthbdeiotclient --fullscreen
+                      
+                      # Mit Debug-Ausgabe
+                      mthbdeiotclient --verbose
+                      
+                      # Vollbild mit Debug
+                      mthbdeiotclient --fullscreen --verbose
+                      
+                      # Im Hintergrund starten
+                      nohup mthbdeiotclient --fullscreen &
+                      ``````
+                      
+                      ## 🖥️ Kiosk-Modus einrichten
+                      
+                      ``````bash
+                      # 1. Autostart konfigurieren mit Vollbild
+                      sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
+                      
+                      # Diese Zeilen hinzufügen:
+                      @xset s off
+                      @xset -dpms
+                      @xset s noblank
+                      @mthbdeiotclient --fullscreen
+                      
+                      # 2. Bildschirmschoner deaktivieren
+                      sudo nano /etc/lightdm/lightdm.conf
+                      # Unter [Seat:*] hinzufügen:
+                      xserver-command=X -s 0 -dpms
+                      
+                      # 3. Neustart für Autostart
+                      sudo reboot
                       ``````
                       
                       ### Systemanforderungen
@@ -659,7 +794,45 @@ stages:
                       sudo dpkg -i $debFileName && sudo apt-get install -f
                       ``````
                       
-                      ### 📦 Alternative: Automatische Installation
+                      ### � Anwendung starten
+                      
+                      ``````bash
+                      # Normale Ausführung
+                      mthbdeiotclient
+                      
+                      # Mit Debug-Ausgabe
+                      mthbdeiotclient --verbose
+                      
+                      # Im Hintergrund starten
+                      nohup mthbdeiotclient &
+                      ``````
+                      
+                      ### 🖥️ Kiosk-Modus für Raspberry Pi
+                      
+                      ``````bash
+                      # 1. Autostart einrichten
+                      sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
+                      
+                      # Folgende Zeilen hinzufügen:
+                      @xset s off
+                      @xset -dpms
+                      @xset s noblank
+                      @mthbdeiotclient
+                      
+                      # 2. Bildschirmschoner deaktivieren
+                      sudo nano /etc/lightdm/lightdm.conf
+                      # Unter [Seat:*] hinzufügen:
+                      xserver-command=X -s 0 -dpms
+                      
+                      # 3. Vollbild-Kiosk mit Chromium (Alternative)
+                      # Falls gewünscht, App über Browser im Kiosk-Modus:
+                      chromium-browser --kiosk --disable-restore-session-state http://localhost:3000
+                      
+                      # 4. Reboot für Autostart
+                      sudo reboot
+                      ``````
+                      
+                      ### �📦 Alternative: Automatische Installation
                       
                       ``````bash
                       # Automatisches Download der neuesten Version
@@ -717,6 +890,10 @@ stages:
                     echo "Latest Release: https://github.com/$(githubRepository)/releases/latest"
                     echo ""
                     echo "🍓 INSTALLATION COMMANDS:"
+                    echo "# Abhängigkeiten vorinstallieren (inkl. libgbm für Electron):"
+                    echo "sudo apt-get update"
+                    echo "sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1"
+                    echo ""
                     echo "# Direct Download:"
                     echo "wget -O $(ACTUAL_DEB_FILENAME) https://github.com/$(githubRepository)/releases/download/v$(releaseVersion)/$(ACTUAL_DEB_FILENAME)"
                     echo "sudo dpkg -i $(ACTUAL_DEB_FILENAME) && sudo apt-get install -f"
