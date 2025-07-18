@@ -4,18 +4,22 @@
 
 Eine moderne Electron-basierte Anwendung für die Verwaltung von MTH BDE IoT-Geräten mit fokussierter Raspberry Pi-Unterstützung.
 
-## 🎯 ### Direkter Image-Zugriff
+## 🎯 Features
 
-```bash
-# Einzelne Images direkt verwenden
-c### Direkter Image-Zugriff
+Eine moderne Electron-basierte Anwendung für die Verwaltung von MTH BDE IoT-Geräten mit fokussierter Raspberry Pi-Unterstützung.
+
+- ✅ **Native Electron Desktop App** für Windows, macOS und Linux
+- ✅ **Raspberry Pi optimiert** (ARM64 & ARMv7l Architektur)
+- ✅ **AutoUpdater** mit GitHub-Integration
+- ✅ **SQLite-Datenbank** für lokale Datenverwaltung
+- ✅ **Cross-Platform** Build-System
+- ✅ **Azure DevOps CI/CD** Pipeline
+
+### Direkter Image-Zugriff
 
 ```bash
 # Einzelne Images direkt verwenden
 curl -L https://github.com/mthitservice/MTHBDEIOTClient/raw/master/App/assets/images/mthitservicelogo.png -o logo.png
-```
-
-## 🔗 Linksttps://github.com/mthitservice/MTHBDEIOTClient/blob/master/App/assets/images/mthitservicelogo.png -o logo.png
 ```
 
 ### App-Icons (verschiedene Größen)
@@ -61,16 +65,7 @@ wget -P ~/mth-bde-client/icons/ \
   https://github.com/mthitservice/MTHBDEIOTClient/raw/master/App/assets/icons/16x16.png
 ```
 
-## 🔗 Links
-
-- ✅ **Native Electron Desktop App** für Windows, macOS und Linux
-- ✅ **Raspberry Pi optimiert** (ARMv7l Architektur)
-- ✅ **AutoUpdater** mit GitHub-Integration
-- ✅ **SQLite-Datenbank** für lokale Datenverwaltung
-- ✅ **Cross-Platform** Build-System
-- ✅ **Azure DevOps CI/CD** Pipeline
-
-## 🔧 Installation
+##  Installation
 
 ### Raspberry Pi (Ein-Kommando-Installation)
 
