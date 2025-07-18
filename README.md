@@ -70,7 +70,7 @@ wget -P ~/mth-bde-client/icons/ \
 ### Raspberry Pi (Ein-Kommando-Installation)
 
 ```bash
-wget -O /tmp/install-latest.sh https://github.com/mthitservice/MTHBDEIOTClient/raw/master/install-latest.sh && chmod +x /tmp/install-latest.sh && /tmp/install-latest.sh
+wget -O /tmp/install-latest.sh https://github.com/mthitservice/MTHBDEIOTClient/raw/master/scripts/install-raspberry.sh && chmod +x /tmp/install-latest.sh && /tmp/install-latest.sh
 ```
 
 ### Manuelle Installation (.deb Pakete)

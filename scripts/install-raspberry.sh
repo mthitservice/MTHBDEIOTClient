@@ -1,30 +1,204 @@
 #!/bin/bash
 
-# MthBdeIotClient Raspberry Pi Installation Script
-# Automatische Installation der neuesten Version von GitHub
+# MTH BDE IoT Client - Raspberry Pi Installation Script
+# Automatische Installation mit Problemlösungen für SQLite und Display
 
 set -e
 
-echo "🚀 MthBdeIotClient Raspberry Pi Installation"
-echo "============================================="
+# Farben für Output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# System prüfen
-if [[ ! -f /proc/device-tree/model ]] || ! grep -q "Raspberry Pi" /proc/device-tree/model; then
-    echo "❌ Dieses Script ist nur für Raspberry Pi gedacht!"
-    exit 1
+echo -e "${BLUE}============================================${NC}"
+echo -e "${BLUE}  MTH BDE IoT Client - Raspberry Pi Setup  ${NC}"
+echo -e "${BLUE}============================================${NC}"
+
+# Funktion für farbigen Output
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# System-Check
+log_info "Prüfe System-Kompatibilität..."
+
+# Raspberry Pi Check
+if ! grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
+    log_warning "Dieses System scheint kein Raspberry Pi zu sein. Installation wird fortgesetzt..."
 fi
 
 # Root-Rechte prüfen
 if [[ $EUID -eq 0 ]]; then
-    echo "⚠️  Bitte nicht als Root ausführen!"
+    log_error "Bitte nicht als Root ausführen!"
     exit 1
 fi
 
-echo "📋 System-Informationen:"
-echo "   OS: $(lsb_release -d | cut -f2)"
-echo "   Architektur: $(uname -m)"
-echo "   Modell: $(cat /proc/device-tree/model | tr -d '\0')"
-echo ""
+# Architektur ermitteln
+ARCH=$(uname -m)
+log_info "Erkannte Architektur: $ARCH"
+
+case $ARCH in
+    aarch64|arm64)
+        DEB_ARCH="arm64"
+        log_info "ARM64 Architektur erkannt (Raspberry Pi 4/400/5)"
+        ;;
+    armv7l)
+        DEB_ARCH="armv7l"
+        log_info "ARMv7l Architektur erkannt (Raspberry Pi 3/Zero 2 W)"
+        ;;
+    *)
+        log_error "Nicht unterstützte Architektur: $ARCH"
+        exit 1
+        ;;
+esac
+
+# Prüfe Internetverbindung
+log_info "Prüfe Internetverbindung..."
+if ! ping -c 1 github.com &> /dev/null; then
+    log_error "Keine Internetverbindung verfügbar!"
+    exit 1
+fi
+log_success "Internetverbindung verfügbar"
+
+# System aktualisieren
+log_info "Aktualisiere System-Pakete..."
+sudo apt update -qq
+sudo apt upgrade -y -qq
+
+# Abhängigkeiten installieren
+log_info "Installiere notwendige Abhängigkeiten..."
+sudo apt install -y curl wget gdebi-core xorg openbox lightdm
+
+# X11 Server sicherstellen
+log_info "Konfiguriere X11 Server..."
+if ! systemctl is-active --quiet lightdm; then
+    sudo systemctl enable lightdm
+    sudo systemctl start lightdm
+    log_success "X11 Display Manager gestartet"
+fi
+
+# Neueste Version ermitteln
+log_info "Ermittle neueste Version..."
+LATEST_VERSION=$(curl -s https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest | grep tag_name | cut -d '"' -f 4)
+if [ -z "$LATEST_VERSION" ]; then
+    log_error "Konnte neueste Version nicht ermitteln"
+    exit 1
+fi
+log_success "Neueste Version: $LATEST_VERSION"
+
+# Download URL konstruieren
+PACKAGE_NAME="MthBdeIotClient_${LATEST_VERSION#v}_${DEB_ARCH}.deb"
+DOWNLOAD_URL="https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${LATEST_VERSION}/${PACKAGE_NAME}"
+
+log_info "Download URL: $DOWNLOAD_URL"
+
+# Temporäres Verzeichnis erstellen
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR"
+
+# Paket herunterladen
+log_info "Lade Paket herunter: $PACKAGE_NAME"
+if ! wget -q --show-progress "$DOWNLOAD_URL"; then
+    log_error "Download fehlgeschlagen!"
+    exit 1
+fi
+log_success "Download abgeschlossen"
+
+# Alte Installation entfernen (falls vorhanden)
+if dpkg -l | grep -q mthbdeiotclient; then
+    log_info "Entferne alte Installation..."
+    sudo apt remove -y mthbdeiotclient || true
+fi
+
+# Paket installieren
+log_info "Installiere MTH BDE IoT Client..."
+sudo gdebi -n "$PACKAGE_NAME"
+
+# Abhängigkeiten reparieren
+sudo apt install -f -y
+
+log_success "Installation abgeschlossen"
+
+# User Data Directory vorbereiten
+log_info "Bereite Benutzer-Verzeichnisse vor..."
+mkdir -p ~/.local/share/MthBdeIotClient/database
+mkdir -p ~/.config/MthBdeIotClient
+
+# Desktop-Verknüpfung erstellen
+log_info "Erstelle Desktop-Verknüpfung..."
+cat > ~/Desktop/MTH-BDE-IoT-Client.desktop << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MTH BDE IoT Client
+Comment=MTH BDE IoT Management Application
+Exec=/opt/MthBdeIotClient/mthbdeiotclient --no-sandbox --disable-gpu
+Icon=/opt/MthBdeIotClient/resources/app/assets/icon.png
+Terminal=false
+StartupWMClass=MTH BDE IoT Client
+Categories=Utility;Development;
+EOF
+
+chmod +x ~/Desktop/MTH-BDE-IoT-Client.desktop
+
+# Applications Menu Eintrag erstellen
+sudo mkdir -p /usr/share/applications
+sudo cat > /usr/share/applications/mth-bde-iot-client.desktop << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MTH BDE IoT Client
+Comment=MTH BDE IoT Management Application
+Exec=/opt/MthBdeIotClient/mthbdeiotclient --no-sandbox --disable-gpu
+Icon=/opt/MthBdeIotClient/resources/app/assets/icon.png
+Terminal=false
+StartupWMClass=MTH BDE IoT Client
+Categories=Utility;Development;
+EOF
+
+# Cleanup
+cd ~
+rm -rf "$TEMP_DIR"
+
+log_success "Installation erfolgreich abgeschlossen!"
+
+echo
+echo -e "${GREEN}============================================${NC}"
+echo -e "${GREEN}           Installation abgeschlossen!     ${NC}"
+echo -e "${GREEN}============================================${NC}"
+echo
+echo -e "${BLUE}Starten der Anwendung:${NC}"
+echo "1. Desktop-Verknüpfung: Doppelklick auf 'MTH BDE IoT Client'"
+echo "2. Terminal: /opt/MthBdeIotClient/mthbdeiotclient --no-sandbox"
+echo
+echo -e "${BLUE}Wichtige Hinweise:${NC}"
+echo "• Datenbank wird in ~/.local/share/MthBdeIotClient/ gespeichert"
+echo "• Bei Display-Problemen: export DISPLAY=:0"
+echo "• Für Troubleshooting siehe: RASPBERRY_PI_TROUBLESHOOTING.md"
+echo
+echo -e "${BLUE}Support:${NC} https://github.com/mthitservice/MTHBDEIOTClient/issues"
+
+# Frage nach Neustart
+read -p "Jetzt neustarten? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    log_info "System wird neu gestartet..."
+    sudo reboot
+fi
 
 # GitHub Repository
 GITHUB_REPO="mthitservice/MTHBDEIOTClient"
