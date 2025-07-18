@@ -255,12 +255,12 @@ echo "✅ Alle Images erfolgreich heruntergeladen!"
 
 ### Verfügbare Images
 
-| Image | Beschreibung | Größe | Verwendung |
-|-------|-------------|-------|------------|
-| `mthitservicelogo.png` | MTH IT Service Haupt-Logo | ~KB | Branding, About-Dialog |
-| `mthitservicelogo2.png` | MTH IT Service Logo Variante | ~KB | Alternative Darstellung |
-| `mthuabdedslogo.png` | MTH UAE BDE DS Logo | ~KB | Anwendungs-Branding |
-| `mthuabdedsbarcodescanner.png` | Barcode Scanner Icon | ~KB | UI-Element, Scanner-Funktion |
+| Image                          | Beschreibung                 | Größe | Verwendung                   |
+| ------------------------------ | ---------------------------- | ----- | ---------------------------- |
+| `mthitservicelogo.png`         | MTH IT Service Haupt-Logo    | ~KB   | Branding, About-Dialog       |
+| `mthitservicelogo2.png`        | MTH IT Service Logo Variante | ~KB   | Alternative Darstellung      |
+| `mthuabdedslogo.png`           | MTH UAE BDE DS Logo          | ~KB   | Anwendungs-Branding          |
+| `mthuabdedsbarcodescanner.png` | Barcode Scanner Icon         | ~KB   | UI-Element, Scanner-Funktion |
 
 ### Direkter Image-Zugriff
 
