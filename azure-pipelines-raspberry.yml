@@ -26,7 +26,7 @@ variables:
   
   # GitHub Configuration
   githubRepository: "mthitservice/MTHBDEIOTClient"
-  githubConnection: "mth-github-connection"
+  githubConnection: "github-connection"
 
 stages:
   - stage: Build
