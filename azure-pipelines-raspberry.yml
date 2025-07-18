@@ -1,5 +1,5 @@
-# Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi 3+ Build
-# Optimierte Pipeline für Raspberry Pi ARMv7l .deb Pakete - Basierend auf v1.0.49
+# Azure DevOps Pipeline für MthBdeIotClient - Multi-Architecture Build
+# Optimierte Pipeline für Raspberry Pi ARMv7l und Linux 32-bit .deb Pakete
 # Korrigierte GitHub-Links und Groß-/Kleinschreibung
 
 trigger:
@@ -23,7 +23,7 @@ variables:
   releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
   
   # Artifact Names
-  artifactName: "MthBdeIotClient-RaspberryPi"
+  artifactName: "MthBdeIotClient-MultiArch"
   
   # GitHub Configuration
   githubRepository: "mthitservice/MTHBDEIOTClient"
@@ -31,10 +31,10 @@ variables:
 
 stages:
   - stage: Build
-    displayName: "Build Raspberry Pi Application"
+    displayName: "Build Multi-Architecture Applications"
     jobs:
       - job: BuildRaspberryPi
-        displayName: "Build Electron App für Raspberry Pi 3+"
+        displayName: "Build Raspberry Pi (ARMv7l)"
         pool:
           vmImage: "ubuntu-latest"
         
@@ -65,6 +65,7 @@ stages:
               echo "Working directory: $(pwd)"
               echo "Available memory: $(free -h)"
               echo "Disk space: $(df -h)"
+              echo "Target: Raspberry Pi (ARMv7l)"
               
               echo "=== PROJECT VERIFICATION ==="
               echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
@@ -179,10 +180,10 @@ stages:
               echo "Running Raspberry Pi DEB packaging..."
               npm run package:raspberry-deb
               
-              echo "=== ENHANCED DEB PACKAGE VALIDATION ==="
+              echo "=== RASPBERRY PI DEB VALIDATION ==="
               # Detaillierte Validierung aller .deb Dateien
-              for debfile in $(find . -name "*.deb"); do
-                echo "Validating: $debfile"
+              for debfile in $(find . -name "*armv7l*.deb"); do
+                echo "Validating Raspberry Pi package: $debfile"
                 
                 # Dateigröße prüfen
                 size=$(stat -c%s "$debfile")
@@ -238,14 +239,245 @@ stages:
             displayName: "Copy Raspberry Pi Packages"
             inputs:
               sourceFolder: "App/release"
+              contents: "**/*armv7l*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/raspberry-pi"
+              flattenFolders: false
+
+      - job: BuildLinux32
+        displayName: "Build Linux 32-bit (ia32)"
+        dependsOn: BuildRaspberryPi
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - task: Cache@2
+            displayName: "Cache node modules"
+            inputs:
+              key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: App/node_modules
+
+          - script: |
+              cd App
+              echo "=== SYSTEM INFORMATION ==="
+              echo "Node version: $(node --version)"
+              echo "NPM version: $(npm --version)"
+              echo "Working directory: $(pwd)"
+              echo "Available memory: $(free -h)"
+              echo "Disk space: $(df -h)"
+              echo "Target: Linux 32-bit (ia32)"
+              
+              echo "=== PROJECT VERIFICATION ==="
+              echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+              echo "Package-lock.json exists: $(test -f package-lock.json && echo 'YES' || echo 'NO')"
+              
+              echo "=== NPM CONFIGURATION ==="
+              npm config set fund false
+              npm config set audit false
+              npm config set progress false
+              npm config list
+            displayName: "System Information & NPM Setup"
+
+          - script: |
+              cd App
+              echo "=== INSTALLING DEPENDENCIES ==="
+              echo "Starting npm install at $(date)"
+              
+              # Clean install
+              npm ci --ignore-scripts --no-audit --no-fund
+              
+              echo "=== VERIFYING CRITICAL PACKAGES ==="
+              echo "dotenv-cli: $(npx dotenv-cli --version || echo 'NOT INSTALLED')"
+              echo "cross-env: $(npx cross-env --version || echo 'NOT INSTALLED')"
+              echo "electron-builder: $(npx electron-builder --version || echo 'NOT INSTALLED')"
+              
+              echo "Dependencies installed successfully at $(date)"
+            displayName: "Install Dependencies"
+            timeoutInMinutes: 10
+
+          - script: |
+              cd App
+              echo "=== SETTING VERSION ==="
+              
+              # Version aus Tag oder automatisch generieren
+              if [ "$ISRELEASE" = "True" ]; then
+                VERSION="$RELEASEVERSION"
+                echo "Release Version: $VERSION"
+              else
+                BUILD_NUMBER="$BUILD_BUILDNUMBER"
+                SHORT_COMMIT=$(echo "$BUILD_SOURCEVERSION" | cut -c1-7)
+                VERSION="1.0.0-dev.$BUILD_NUMBER+$SHORT_COMMIT"
+                echo "Development Version: $VERSION"
+              fi
+
+              # Environment Variables setzen
+              echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=NODE_ENV]production"
+              echo "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+              # Package.json Version aktualisieren
+              node -e "
+                const fs = require('fs');
+                const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                packageJson.version = '$VERSION';
+                fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+                console.log('Updated package.json version to: $VERSION');
+              "
+              
+              echo "Version set to: $VERSION"
+            displayName: "Set Application Version"
+
+          - script: |
+              cd App
+              echo "=== BUILDING APPLICATION ==="
+              
+              # Environment Variables für Build
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              echo "Building main process..."
+              npm run build:main
+              
+              echo "Building renderer process..."
+              npm run build:renderer
+              
+              echo "=== BUILD VERIFICATION ==="
+              if [ -d "dist" ]; then
+                echo "✅ Dist folder created"
+                echo "Main files: $(find dist -name "*.js" | wc -l) JS files"
+                echo "Total files: $(find dist -type f | wc -l) files"
+              else
+                echo "❌ No dist folder found"
+                exit 1
+              fi
+              
+              echo "Application build completed successfully"
+            displayName: "Build Application"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - script: |
+              cd App
+              echo "=== PACKAGING LINUX 32-BIT DEB ==="
+              
+              # Environment Variables
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              export ELECTRON_BUILDER_CACHE_DIR=/tmp/.electron-builder-cache
+              
+              # Erstelle .env file wenn nicht vorhanden
+              if [ ! -f ".env" ]; then
+                echo "Creating .env file..."
+                echo "NODE_ENV=production" > .env
+                echo "APP_VERSION=$(APP_VERSION)" >> .env
+                echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
+              fi
+              
+              echo "Running Linux 32-bit DEB packaging..."
+              npm run package:linux32
+              
+              echo "=== LINUX 32-BIT DEB VALIDATION ==="
+              # Detaillierte Validierung aller .deb Dateien
+              for debfile in $(find . -name "*ia32*.deb"); do
+                echo "Validating Linux 32-bit package: $debfile"
+                
+                # Dateigröße prüfen
+                size=$(stat -c%s "$debfile")
+                echo "  File size: $size bytes ($(echo "scale=2; $size/1024/1024" | bc) MB)"
+                
+                # Mindestgröße für Electron App (sollte > 30MB sein)
+                if [ $size -lt 30000000 ]; then
+                  echo "  ⚠️  WARNING: File is unusually small for Electron app"
+                fi
+                
+                # Dateityp prüfen
+                filetype=$(file "$debfile")
+                echo "  File type: $filetype"
+                
+                # Prüfe ob es ein Debian-Archiv ist
+                if [[ "$filetype" == *"Debian"* ]]; then
+                  echo "  ✅ File is recognized as Debian package"
+                else
+                  echo "  ❌ File is NOT recognized as Debian package"
+                fi
+                
+                # Versuche dpkg-deb validation
+                if dpkg-deb --info "$debfile" > /dev/null 2>&1; then
+                  echo "  ✅ dpkg-deb validation successful"
+                  echo "  Package info:"
+                  dpkg-deb --info "$debfile" | head -20
+                else
+                  echo "  ❌ dpkg-deb validation FAILED"
+                  echo "  This will cause 'not a Debian format archive' error"
+                fi
+                
+                # Versuche ar-archiv test
+                if ar t "$debfile" > /dev/null 2>&1; then
+                  echo "  ✅ ar archive validation successful"
+                  echo "  Archive contents:"
+                  ar t "$debfile"
+                else
+                  echo "  ❌ ar archive validation FAILED"
+                fi
+                
+                echo "  ----------------------------------------"
+              done
+              
+              echo "Linux 32-bit packaging completed"
+            displayName: "Package Linux 32-bit DEB"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+              ELECTRON_BUILDER_CACHE_DIR: /tmp/.electron-builder-cache
+
+          - task: CopyFiles@2
+            displayName: "Copy Linux 32-bit Packages"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*ia32*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/linux-32bit"
+              flattenFolders: false
+
+      - job: CombineArtifacts
+        displayName: "Combine All Packages"
+        dependsOn: 
+          - BuildRaspberryPi
+          - BuildLinux32
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - download: current
+            displayName: "Download Build Artifacts"
+
+          - task: CopyFiles@2
+            displayName: "Copy All Packages to Combined Folder"
+            inputs:
+              sourceFolder: "$(Pipeline.Workspace)"
               contents: "**/*.deb"
               targetFolder: "$(Build.ArtifactStagingDirectory)/packages"
-              flattenFolders: false
+              flattenFolders: true
 
           - task: CopyFiles@2
             displayName: "Copy Installation Files"
             inputs:
-              sourceFolder: "App"
+              sourceFolder: "$(Build.SourcesDirectory)/App"
               contents: |
                 RASPBERRY_INSTALLATION.md
                 deploy.ps1
@@ -264,17 +496,27 @@ stages:
               echo "DEB packages found: $deb_count"
               
               if [ $deb_count -gt 0 ]; then
-                echo "✅ Raspberry Pi DEB package created successfully"
-                find $(Build.ArtifactStagingDirectory) -name "*.deb" -exec basename {} \;
+                echo "✅ Multi-architecture packages created successfully"
+                
+                # Raspberry Pi Packages
+                raspberry_count=$(find $(Build.ArtifactStagingDirectory) -name "*armv7l*.deb" | wc -l)
+                echo "🍓 Raspberry Pi packages: $raspberry_count"
+                find $(Build.ArtifactStagingDirectory) -name "*armv7l*.deb" -exec basename {} \;
+                
+                # Linux 32-bit Packages
+                linux32_count=$(find $(Build.ArtifactStagingDirectory) -name "*ia32*.deb" | wc -l)
+                echo "🐧 Linux 32-bit packages: $linux32_count"
+                find $(Build.ArtifactStagingDirectory) -name "*ia32*.deb" -exec basename {} \;
+                
               else
                 echo "❌ No DEB packages found"
                 echo "Available files:"
                 find $(Build.ArtifactStagingDirectory) -type f
               fi
-            displayName: "Verify Packages"
+            displayName: "Verify Combined Packages"
 
           - task: PublishBuildArtifacts@1
-            displayName: "Publish Raspberry Pi Artifacts"
+            displayName: "Publish Multi-Architecture Artifacts"
             inputs:
               pathToPublish: "$(Build.ArtifactStagingDirectory)"
               artifactName: $(artifactName)
@@ -282,13 +524,13 @@ stages:
             condition: always()
 
   - stage: Release
-    displayName: "Release Raspberry Pi Package"
+    displayName: "Release Multi-Architecture Packages"
     condition: and(succeeded(), eq(variables.isRelease, true))
     dependsOn: Build
     jobs:
-      - deployment: RaspberryPiRelease
-        displayName: "Create Raspberry Pi Release"
-        environment: "RaspberryPi-Production"
+      - deployment: MultiArchRelease
+        displayName: "Create Multi-Architecture Release"
+        environment: "MultiArch-Production"
         pool:
           vmImage: "ubuntu-latest"
         strategy:
@@ -299,14 +541,23 @@ stages:
                   displayName: "Download Build Artifacts"
 
                 - script: |
-                    echo "=== RELEASE INFORMATION ==="
+                    echo "=== MULTI-ARCHITECTURE RELEASE INFORMATION ==="
                     echo "Version: $(releaseVersion)"
                     echo "Build Number: $(Build.BuildNumber)"
                     echo "Commit: $(Build.SourceVersion)"
                     echo "Branch: $(Build.SourceBranch)"
+                    echo "Targets: Raspberry Pi (ARMv7l) + Linux 32-bit (ia32)"
                     
                     echo "=== AVAILABLE ARTIFACTS ==="
                     find $(Pipeline.Workspace) -name "*.deb" -exec ls -lh {} \;
+                    
+                    echo "=== PACKAGE BREAKDOWN ==="
+                    raspberry_count=$(find $(Pipeline.Workspace) -name "*armv7l*.deb" | wc -l)
+                    linux32_count=$(find $(Pipeline.Workspace) -name "*ia32*.deb" | wc -l)
+                    
+                    echo "🍓 Raspberry Pi packages: $raspberry_count"
+                    echo "🐧 Linux 32-bit packages: $linux32_count"
+                    echo "📦 Total packages: $((raspberry_count + linux32_count))"
                   displayName: "Release Information"
 
   - stage: GitHubDeploy
@@ -327,14 +578,14 @@ stages:
                   displayName: "Download Build Artifacts"
 
                 - task: PowerShell@2
-                  displayName: "Detect Actual DEB Filename"
+                  displayName: "Detect All DEB Filenames"
                   inputs:
                     targetType: "inline"
                     script: |
-                      $workspacePath = "$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                      $workspacePath = "$(Pipeline.Workspace)/MthBdeIotClient-MultiArch"
                       $version = "$(releaseVersion)"
                       
-                      Write-Host "=== DEB FILENAME DETECTION ==="
+                      Write-Host "=== MULTI-ARCHITECTURE DEB DETECTION ==="
                       Write-Host "Workspace: $workspacePath"
                       Write-Host "Version: $version"
                       
@@ -351,12 +602,15 @@ stages:
                       # Erweiterte Suche nach DEB-Dateien
                       $searchPaths = @(
                           "$workspacePath/packages",
-                          "$workspacePath/installation", 
+                          "$workspacePath/raspberry-pi", 
+                          "$workspacePath/linux-32bit",
                           "$workspacePath",
                           "$(Pipeline.Workspace)"
                       )
                       
                       $foundDebFiles = @()
+                      $raspberryFiles = @()
+                      $linux32Files = @()
                       
                       foreach ($searchPath in $searchPaths) {
                           if (Test-Path $searchPath) {
@@ -365,6 +619,15 @@ stages:
                               foreach ($file in $debFiles) {
                                   $foundDebFiles += $file
                                   Write-Host "  Found: $($file.Name) (Size: $([math]::Round($file.Length/1MB, 2)) MB)"
+                                  
+                                  # Kategorisiere nach Architektur
+                                  if ($file.Name -like "*armv7l*") {
+                                      $raspberryFiles += $file
+                                      Write-Host "    → Raspberry Pi (ARMv7l)"
+                                  } elseif ($file.Name -like "*ia32*") {
+                                      $linux32Files += $file
+                                      Write-Host "    → Linux 32-bit (ia32)"
+                                  }
                               }
                           } else {
                               Write-Host "Path does not exist: $searchPath"
@@ -380,24 +643,36 @@ stages:
                           exit 1
                       }
                       
-                      # Wähle das erste/größte DEB-File
+                      Write-Host "=== PACKAGE SUMMARY ==="
+                      Write-Host "Total packages: $($foundDebFiles.Count)"
+                      Write-Host "Raspberry Pi packages: $($raspberryFiles.Count)"
+                      Write-Host "Linux 32-bit packages: $($linux32Files.Count)"
+                      
+                      # Setze Pipeline-Variablen für alle gefundenen Dateien
+                      if ($raspberryFiles.Count -gt 0) {
+                          $selectedRaspberryFile = $raspberryFiles | Sort-Object Length -Descending | Select-Object -First 1
+                          Write-Host "##vso[task.setvariable variable=RASPBERRY_DEB_FILENAME]$($selectedRaspberryFile.Name)"
+                          Write-Host "##vso[task.setvariable variable=RASPBERRY_DEB_FULLPATH]$($selectedRaspberryFile.FullName)"
+                          Write-Host "✅ Raspberry Pi DEB: $($selectedRaspberryFile.Name)"
+                      }
+                      
+                      if ($linux32Files.Count -gt 0) {
+                          $selectedLinux32File = $linux32Files | Sort-Object Length -Descending | Select-Object -First 1
+                          Write-Host "##vso[task.setvariable variable=LINUX32_DEB_FILENAME]$($selectedLinux32File.Name)"
+                          Write-Host "##vso[task.setvariable variable=LINUX32_DEB_FULLPATH]$($selectedLinux32File.FullPath)"
+                          Write-Host "✅ Linux 32-bit DEB: $($selectedLinux32File.Name)"
+                      }
+                      
+                      # Wähle das erste/größte DEB-File als Haupt-DEB
                       $selectedDebFile = $foundDebFiles | Sort-Object Length -Descending | Select-Object -First 1
-                      $debFileName = $selectedDebFile.Name
-                      
-                      Write-Host "=== SELECTED DEB FILE ==="
-                      Write-Host "Filename: $debFileName"
-                      Write-Host "Full Path: $($selectedDebFile.FullName)"
-                      Write-Host "Size: $([math]::Round($selectedDebFile.Length/1MB, 2)) MB"
-                      
-                      # Setze Pipeline-Variable
-                      Write-Host "##vso[task.setvariable variable=ACTUAL_DEB_FILENAME]$debFileName"
+                      Write-Host "##vso[task.setvariable variable=ACTUAL_DEB_FILENAME]$($selectedDebFile.Name)"
                       Write-Host "##vso[task.setvariable variable=ACTUAL_DEB_FULLPATH]$($selectedDebFile.FullName)"
-                      Write-Host "✅ DEB filename detected: $debFileName"
+                      Write-Host "✅ Main DEB file detected: $($selectedDebFile.Name)"
 
                 - script: |
-                    echo "=== PREPARING RELEASE FILES ==="
+                    echo "=== PREPARING MULTI-ARCHITECTURE RELEASE FILES ==="
                     
-                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi"
+                    workspace="$(Pipeline.Workspace)/MthBdeIotClient-MultiArch"
                     temp_releases="$(Agent.TempDirectory)/releases"
                     
                     # Erstelle releases Ordnerstruktur
@@ -405,181 +680,211 @@ stages:
                     mkdir -p "$temp_releases/v$(releaseVersion)"
                     mkdir -p "$temp_releases/update"
                     
-                    # Verwende den vollständigen Pfad zur DEB-Datei
-                    actual_deb_file="$(ACTUAL_DEB_FULLPATH)"
+                    # Kopiere alle DEB-Dateien
+                    echo "=== COPYING ALL DEB FILES ==="
                     
-                    if [ -n "$actual_deb_file" ] && [ -f "$actual_deb_file" ]; then
-                      actual_deb_filename=$(basename "$actual_deb_file")
-                      echo "=== COPYING DEB FILE: $actual_deb_filename ==="
-                      echo "Source: $actual_deb_file"
-                      
-                      # Kopiere zu allen Zielordnern
-                      cp "$actual_deb_file" "$temp_releases/latest/"
-                      cp "$actual_deb_file" "$temp_releases/v$(releaseVersion)/"
-                      cp "$actual_deb_file" "$temp_releases/update/"
-                      
-                      # Erstelle Checksums
-                      cd "$temp_releases/latest"
-                      sha256sum *.deb > SHA256SUMS
-                      
-                      cd "$temp_releases/v$(releaseVersion)"
-                      sha256sum *.deb > SHA256SUMS
-                      
-                      cd "$temp_releases/update"
-                      sha512sum *.deb > SHA512SUMS
-                      
-                      # Erstelle latest.yml für AutoUpdater
-                      deb_file=$(ls *.deb | head -1)
-                      file_size=$(stat -c%s "$deb_file")
-                      deb_sha512=$(sha512sum "$deb_file" | cut -d' ' -f1)
-                      
-                      # Erstelle latest.yml mit echo-Befehlen
-                      echo "version: $(releaseVersion)" > latest.yml
-                      echo "files:" >> latest.yml
-                      echo "  - url: $deb_file" >> latest.yml
-                      echo "    sha512: $deb_sha512" >> latest.yml
-                      echo "    size: $file_size" >> latest.yml
-                      echo "path: $deb_file" >> latest.yml
-                      echo "sha512: $deb_sha512" >> latest.yml
-                      echo "releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")" >> latest.yml
-                      
-                      echo "✅ Release files prepared successfully"
-                    else
-                      echo "❌ ERROR: DEB file not found at expected location!"
-                      echo "Expected: $actual_deb_file"
-                      echo "Fallback search in workspace:"
-                      find "$workspace" -name "*.deb" -type f | head -5
-                      exit 1
+                    # Finde alle DEB-Dateien
+                    find "$(Pipeline.Workspace)" -name "*.deb" -type f | while read debfile; do
+                        echo "Processing: $debfile"
+                        filename=$(basename "$debfile")
+                        
+                        # Kopiere zu allen Zielordnern
+                        cp "$debfile" "$temp_releases/latest/"
+                        cp "$debfile" "$temp_releases/v$(releaseVersion)/"
+                        cp "$debfile" "$temp_releases/update/"
+                        
+                        echo "  ✅ Copied: $filename"
+                    done
+                    
+                    # Erstelle Checksums
+                    cd "$temp_releases/latest"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                        sha256sum *.deb > SHA256SUMS
+                        echo "✅ SHA256 checksums created"
                     fi
-                  displayName: "Prepare Release Files"
+                    
+                    cd "$temp_releases/v$(releaseVersion)"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                        sha256sum *.deb > SHA256SUMS
+                        echo "✅ Version-specific checksums created"
+                    fi
+                    
+                    cd "$temp_releases/update"
+                    if ls *.deb 1> /dev/null 2>&1; then
+                        sha512sum *.deb > SHA512SUMS
+                        
+                        # Erstelle latest.yml für AutoUpdater (Multi-Architecture Support)
+                        deb_files=(*.deb)
+                        if [ ${#deb_files[@]} -gt 0 ]; then
+                            echo "version: $(releaseVersion)" > latest.yml
+                            echo "files:" >> latest.yml
+                            
+                            for deb_file in "${deb_files[@]}"; do
+                                file_size=$(stat -c%s "$deb_file")
+                                deb_sha512=$(sha512sum "$deb_file" | cut -d' ' -f1)
+                                
+                                # Architektur aus Dateiname extrahieren
+                                if [[ "$deb_file" == *"armv7l"* ]]; then
+                                    arch="armv7l"
+                                elif [[ "$deb_file" == *"ia32"* ]]; then
+                                    arch="ia32"
+                                else
+                                    arch="unknown"
+                                fi
+                                
+                                echo "  - url: $deb_file" >> latest.yml
+                                echo "    sha512: $deb_sha512" >> latest.yml
+                                echo "    size: $file_size" >> latest.yml
+                                echo "    blockMapSize: 0" >> latest.yml
+                                echo "    arch: $arch" >> latest.yml
+                            done
+                            
+                            # Verwende erste DEB-Datei als primäre
+                            primary_deb="${deb_files[0]}"
+                            primary_sha512=$(sha512sum "$primary_deb" | cut -d' ' -f1)
+                            
+                            echo "path: $primary_deb" >> latest.yml
+                            echo "sha512: $primary_sha512" >> latest.yml
+                            echo "releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")" >> latest.yml
+                            echo "✅ Multi-Architecture AutoUpdater config created"
+                        fi
+                    fi
+                    
+                    echo "=== RELEASE FILES SUMMARY ==="
+                    echo "Files prepared in $temp_releases:"
+                    find "$temp_releases" -type f -exec ls -lh {} \;
+                    
+                    echo "✅ Multi-architecture release files prepared successfully"
+                  displayName: "Prepare Multi-Architecture Release Files"
 
                 - task: PowerShell@2
-                  displayName: "Create Release README"
+                  displayName: "Create Multi-Architecture Release README"
                   inputs:
                     targetType: "inline"
                     script: |
                       $version = "$(releaseVersion)"
-                      $debFileName = "$(ACTUAL_DEB_FILENAME)"
+                      $raspberryDeb = "$(RASPBERRY_DEB_FILENAME)"
+                      $linux32Deb = "$(LINUX32_DEB_FILENAME)"
                       $today = Get-Date -Format "dd.MM.yyyy HH:mm"
                       
                       # Korrigierte GitHub-URLs (beachte Groß-/Kleinschreibung)
                       $githubRepo = "$(githubRepository)"
                       
                       $releaseReadme = @"
-                      # MthBdeIotClient Raspberry Pi Releases
+                      # MthBdeIotClient Multi-Architecture Releases
                       
                       ## Latest Release: v$version
                       
                       **Erstellt:** $today  
-                      **DEB-Datei:** $debFileName
+                      **Raspberry Pi DEB:** $raspberryDeb  
+                      **Linux 32-bit DEB:** $linux32Deb
                       
-                      ### 📦 Schnell-Installation
+                      ## 📦 Verfügbare Pakete
                       
-                      ```bash
-                      # Eine Zeile Installation (automatische Dateinamen-Erkennung)
-                      wget -qO- https://raw.githubusercontent.com/$githubRepo/main/install-latest.sh | bash
-                      ```
+                      ### 🍓 Raspberry Pi (ARMv7l)
+                      - **Für:** Raspberry Pi 3, 3+, 4, Zero 2 W
+                      - **Datei:** $raspberryDeb
+                      - **Installation:** ``sudo dpkg -i $raspberryDeb && sudo apt-get install -f``
                       
-                      ### 📦 Manuelle Installation
+                      ### 🐧 Linux 32-bit (ia32)
+                      - **Für:** Linux x86 32-bit Systeme
+                      - **Datei:** $linux32Deb
+                      - **Installation:** ``sudo dpkg -i $linux32Deb && sudo apt-get install -f``
                       
-                      ```bash
-                      # 1. Abhängigkeiten vorinstallieren (inkl. libgbm für Electron)
+                      ## � Schnellinstallation
+                      
+                      ### Raspberry Pi
+                      ``````bash
+                      # Abhängigkeiten vorinstallieren (inkl. libgbm für Electron)
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1 libasound2 libxrandr2 libatk1.0-0 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libgconf-2-4 mesa-utils libgl1-mesa-glx libgl1-mesa-dev
+                      
+                      # Download und Installation
+                      wget https://github.com/$githubRepo/releases/download/v$version/$raspberryDeb
+                      sudo dpkg -i $raspberryDeb && sudo apt-get install -f
+                      
+                      # Anwendung starten
+                      mthbdeiotclient --fullscreen
+                      ``````
+                      
+                      ### Linux 32-bit
+                      ``````bash
+                      # Abhängigkeiten vorinstallieren
                       sudo apt-get update
                       sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
                       
-                      # 2. Download (korrekter Dateiname)
-                      wget https://github.com/$githubRepo/raw/main/releases/latest/$debFileName
+                      # Download und Installation
+                      wget https://github.com/$githubRepo/releases/download/v$version/$linux32Deb
+                      sudo dpkg -i $linux32Deb && sudo apt-get install -f
                       
-                      # 3. Installation
-                      sudo dpkg -i $debFileName
-                      
-                      # 4. Abhängigkeiten reparieren (falls nötig)
-                      sudo apt-get install -f
-                      
-                      # 5. Anwendung starten
-                      mthbdeiotclient
-                      ```
-                      
-                      ### 🚀 Anwendung starten
-                      
-                      ```bash
-                      # Normale Ausführung
-                      mthbdeiotclient
-                      
-                      # Im Vollbild-Modus starten
+                      # Anwendung starten
                       mthbdeiotclient --fullscreen
+                      ``````
                       
-                      # Mit Debug-Ausgabe
-                      mthbdeiotclient --verbose
+                      ## 🖥️ Kiosk-Modus
                       
-                      # Vollbild mit Debug
-                      mthbdeiotclient --fullscreen --verbose
-                      
-                      # Im Hintergrund starten
-                      nohup mthbdeiotclient --fullscreen &
-                      ```
-                      
-                      ### 🖥️ Kiosk-Modus für Raspberry Pi
-                      
-                      ```bash
-                      # 1. Autostart einrichten mit Vollbild
+                      ``````bash
+                      # Autostart einrichten
                       sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
                       
-                      # Folgende Zeilen hinzufügen:
+                      # Diese Zeilen hinzufügen:
                       @xset s off
                       @xset -dpms
                       @xset s noblank
                       @mthbdeiotclient --fullscreen
                       
-                      # 2. Bildschirmschoner deaktivieren
+                      # Bildschirmschoner deaktivieren
                       sudo nano /etc/lightdm/lightdm.conf
                       # Unter [Seat:*] hinzufügen:
                       xserver-command=X -s 0 -dpms
                       
-                      # 3. Vollbild-Kiosk mit Chromium (Alternative)
-                      # Falls die App einen Web-Server hat:
-                      chromium-browser --kiosk --disable-restore-session-state http://localhost:3000
-                      
-                      # 4. Reboot für Autostart
+                      # Neustart für Autostart
                       sudo reboot
-                      ```
+                      ``````
                       
-                      ### 📋 Systemanforderungen
+                      ## 📋 Systemanforderungen
+                      
+                      ### Raspberry Pi
                       - ✅ Raspberry Pi 3, 3+, 4 oder Zero 2 W
                       - ✅ Raspberry Pi OS (32-bit, ARMv7l)
                       - ✅ Mindestens 1GB RAM
                       - ✅ Desktop-Umgebung (X11)
                       
-                      ### 🔧 Troubleshooting
-                      ```bash
-                      # Abhängigkeiten manuell installieren (inkl. libgbm für Electron)
-                      sudo apt-get update
-                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
+                      ### Linux 32-bit
+                      - ✅ Linux x86 32-bit Distribution
+                      - ✅ Debian-basierte Systeme (Ubuntu, Mint, etc.)
+                      - ✅ Mindestens 1GB RAM
+                      - ✅ Desktop-Umgebung (X11)
                       
-                      # Spezifische Electron-Abhängigkeiten
-                      sudo apt-get install -y libasound2 libxrandr2 libatk1.0-0 libdrm2 libxcomposite1 libxdamage1 libxfixes3
+                      ## 🔧 Troubleshooting
+                      ``````bash
+                      # Abhängigkeiten manuell installieren
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1 libasound2 libxrandr2 libatk1.0-0 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libgconf-2-4 mesa-utils libgl1-mesa-glx libgl1-mesa-dev
                       
                       # Berechtigungen reparieren
                       sudo chmod +x /usr/bin/mthbdeiotclient
                       
-                      # Abhängigkeiten reparieren nach dpkg-Fehlern
+                      # Abhängigkeiten reparieren
                       sudo apt-get install -f
                       
-                      # Deinstallation
-                      sudo dpkg -r mthbdeiotclient
-                      ```
+                      # Alternative: Software-Rendering
+                      LIBGL_ALWAYS_SOFTWARE=1 mthbdeiotclient --no-sandbox --fullscreen
+                      ``````
                       
-                      ### 🔗 Direkte Links
-                      - [📦 Latest DEB](https://github.com/$githubRepo/raw/main/releases/latest/$debFileName)
-                      - [📋 SHA256SUMS](https://github.com/$githubRepo/raw/main/releases/latest/SHA256SUMS)
-                      - [🔄 AutoUpdater Config](https://github.com/$githubRepo/raw/main/releases/update/latest.yml)
+                      ## 🔗 Direkte Links
+                      - [📦 Raspberry Pi DEB](https://github.com/$githubRepo/releases/download/v$version/$raspberryDeb)
+                      - [📦 Linux 32-bit DEB](https://github.com/$githubRepo/releases/download/v$version/$linux32Deb)
+                      - [📋 SHA256SUMS](https://github.com/$githubRepo/releases/download/v$version/SHA256SUMS)
+                      - [🔄 AutoUpdater Config](https://github.com/$githubRepo/releases/download/v$version/latest.yml)
                       
                       ---
-                      **Architektur:** ARMv7l | **Format:** DEB | **Build:** Azure DevOps
+                      **Architekturen:** ARMv7l, ia32 | **Format:** DEB | **Build:** Azure DevOps  
+                      **Automatisch erstellt am:** $today UTC
                       "@
                       
                       $releaseReadme | Out-File -FilePath "$(Agent.TempDirectory)/releases/README.md" -Encoding UTF8
-                      Write-Host "✅ Release README created"
+                      Write-Host "✅ Multi-Architecture Release README created"
 
                 - task: PowerShell@2
                   displayName: "Deploy to GitHub Releases"
