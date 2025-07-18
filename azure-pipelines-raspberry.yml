@@ -476,7 +476,7 @@ stages:
                 **Build Information:**
                 - Build: $(Build.BuildNumber)
                 - Commit: $(Build.SourceVersion)
-                - Datum: $(Build.BuildDateTime)
+                - Datum: $[format('{0:yyyy-MM-dd HH:mm:ss} UTC', pipeline.startTime)]
               assets: |
                 $(Pipeline.Workspace)/$(artifactName)/packages/*.deb
               assetUploadMode: "replace"
