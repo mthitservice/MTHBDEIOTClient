@@ -1,0 +1,340 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Linux 32-bit Build
+# Optimierte Pipeline für Linux x86 (32-bit) .deb Pakete
+
+trigger:
+  branches:
+    exclude:
+      - "*"  # Keine Branch-Trigger
+  tags:
+    include:
+      - "v*"  # Nur bei Tags die mit "v" beginnen
+
+# Deaktiviere auch Pull Request Triggers  
+pr: none
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  
+  # Artifact Names
+  artifactName: "MthBdeIotClient-Linux32"
+  
+  # GitHub Configuration
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubConnection: "github-connection"
+
+stages:
+  - stage: Build
+    displayName: "Build Linux 32-bit Application"
+    jobs:
+      - job: BuildLinux32
+        displayName: "Build Electron App für Linux 32-bit"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - task: Cache@2
+            displayName: "Cache node modules"
+            inputs:
+              key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: App/node_modules
+
+          - script: |
+              cd App
+              echo "=== SYSTEM INFORMATION ==="
+              echo "Node version: $(node --version)"
+              echo "NPM version: $(npm --version)"
+              echo "Working directory: $(pwd)"
+              echo "Available memory: $(free -h)"
+              echo "Disk space: $(df -h)"
+              echo "Target Architecture: Linux 32-bit (ia32)"
+              
+              echo "=== PROJECT VERIFICATION ==="
+              echo "Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+              echo "Package-lock.json exists: $(test -f package-lock.json && echo 'YES' || echo 'NO')"
+              
+              echo "=== NPM CONFIGURATION ==="
+              npm config set fund false
+              npm config set audit false
+              npm config set progress false
+              npm config list
+            displayName: "System Information & NPM Setup"
+
+          - script: |
+              cd App
+              echo "=== INSTALLING DEPENDENCIES ==="
+              echo "Starting npm install at $(date)"
+              
+              # Clean install
+              npm ci --ignore-scripts --no-audit --no-fund
+              
+              echo "=== VERIFYING CRITICAL PACKAGES ==="
+              echo "dotenv-cli: $(npx dotenv-cli --version || echo 'NOT INSTALLED')"
+              echo "cross-env: $(npx cross-env --version || echo 'NOT INSTALLED')"
+              echo "electron-builder: $(npx electron-builder --version || echo 'NOT INSTALLED')"
+              
+              echo "Dependencies installed successfully at $(date)"
+            displayName: "Install Dependencies"
+            timeoutInMinutes: 10
+
+          - script: |
+              cd App
+              echo "=== SETTING VERSION ==="
+              
+              # Version aus Tag oder automatisch generieren
+              if [ "$ISRELEASE" = "True" ]; then
+                VERSION="$RELEASEVERSION"
+                echo "Release Version: $VERSION"
+              else
+                BUILD_NUMBER="$BUILD_BUILDNUMBER"
+                SHORT_COMMIT=$(echo "$BUILD_SOURCEVERSION" | cut -c1-7)
+                VERSION="1.0.0-dev.$BUILD_NUMBER+$SHORT_COMMIT"
+                echo "Development Version: $VERSION"
+              fi
+
+              # Environment Variables setzen
+              echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=NODE_ENV]production"
+              echo "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+              # Package.json Version aktualisieren
+              node -e "
+                const fs = require('fs');
+                const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                packageJson.version = '$VERSION';
+                fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+                console.log('Updated package.json version to: $VERSION');
+              "
+              
+              echo "Version set to: $VERSION"
+            displayName: "Set Application Version"
+
+          - script: |
+              cd App
+              echo "=== BUILDING APPLICATION ==="
+              
+              # Environment Variables für Build
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              
+              echo "Building main process..."
+              npm run build:main
+              
+              echo "Building renderer process..."
+              npm run build:renderer
+              
+              echo "=== BUILD VERIFICATION ==="
+              if [ -d "dist" ]; then
+                echo "✅ Dist folder created"
+                echo "Main files: $(find dist -name "*.js" | wc -l) JS files"
+                echo "Total files: $(find dist -type f | wc -l) files"
+              else
+                echo "❌ No dist folder found"
+                exit 1
+              fi
+              
+              echo "Application build completed successfully"
+            displayName: "Build Application"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - script: |
+              cd App
+              echo "=== PACKAGING LINUX 32-BIT DEB ==="
+              
+              # Environment Variables
+              export NODE_ENV=production
+              export APP_VERSION=$(APP_VERSION)
+              export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
+              export ELECTRON_BUILDER_CACHE_DIR=/tmp/.electron-builder-cache
+              
+              # Erstelle .env file wenn nicht vorhanden
+              if [ ! -f ".env" ]; then
+                echo "Creating .env file..."
+                echo "NODE_ENV=production" > .env
+                echo "APP_VERSION=$(APP_VERSION)" >> .env
+                echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
+              fi
+              
+              echo "Running Linux 32-bit DEB packaging..."
+              npm run package:linux32
+              
+              echo "=== DEB PACKAGE VALIDATION ==="
+              # Detaillierte Validierung aller .deb Dateien
+              for debfile in $(find . -name "*.deb"); do
+                echo "Validating: $debfile"
+                
+                # Dateigröße prüfen
+                size=$(stat -c%s "$debfile")
+                echo "  File size: $size bytes ($(echo "scale=2; $size/1024/1024" | bc) MB)"
+                
+                # Mindestgröße für Electron App (sollte > 30MB sein)
+                if [ $size -lt 30000000 ]; then
+                  echo "  ⚠️  WARNING: File is unusually small for Electron app"
+                fi
+                
+                # Dateityp prüfen
+                filetype=$(file "$debfile")
+                echo "  File type: $filetype"
+                
+                # Prüfe ob es ein Debian-Archiv ist
+                if [[ "$filetype" == *"Debian"* ]]; then
+                  echo "  ✅ File is recognized as Debian package"
+                else
+                  echo "  ❌ File is NOT recognized as Debian package"
+                fi
+                
+                # Versuche dpkg-deb validation
+                if dpkg-deb --info "$debfile" > /dev/null 2>&1; then
+                  echo "  ✅ dpkg-deb validation successful"
+                  echo "  Package info:"
+                  dpkg-deb --info "$debfile" | head -20
+                else
+                  echo "  ❌ dpkg-deb validation FAILED"
+                  echo "  This will cause 'not a Debian format archive' error"
+                fi
+                
+                echo "  ----------------------------------------"
+              done
+              
+              echo "Linux 32-bit packaging completed"
+            displayName: "Package Linux 32-bit DEB"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+              ELECTRON_BUILDER_CACHE_DIR: /tmp/.electron-builder-cache
+
+          - task: CopyFiles@2
+            displayName: "Copy Linux 32-bit Packages"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/packages"
+              flattenFolders: false
+
+          - task: CopyFiles@2
+            displayName: "Copy Installation Files"
+            inputs:
+              sourceFolder: "App"
+              contents: |
+                *.md
+                deploy.ps1
+                *.sh
+                Dockerfile.*
+              targetFolder: "$(Build.ArtifactStagingDirectory)/installation"
+
+          - script: |
+              echo "=== FINAL PACKAGE VERIFICATION ==="
+              echo "Staging directory contents:"
+              find $(Build.ArtifactStagingDirectory) -type f -exec ls -lh {} \;
+              
+              echo "=== PACKAGE SUMMARY ==="
+              deb_count=$(find $(Build.ArtifactStagingDirectory) -name "*.deb" | wc -l)
+              echo "DEB packages found: $deb_count"
+              
+              if [ $deb_count -gt 0 ]; then
+                echo "✅ Linux 32-bit DEB package created successfully"
+                find $(Build.ArtifactStagingDirectory) -name "*.deb" -exec basename {} \;
+              else
+                echo "❌ No DEB packages found"
+                echo "Available files:"
+                find $(Build.ArtifactStagingDirectory) -type f
+              fi
+            displayName: "Verify Packages"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Linux 32-bit Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: $(artifactName)
+              publishLocation: "Container"
+            condition: always()
+
+  - stage: Release
+    displayName: "Release Linux 32-bit Package"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Build
+    jobs:
+      - deployment: Linux32Release
+        displayName: "Create Linux 32-bit Release"
+        environment: "Linux32-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download Build Artifacts"
+
+                - script: |
+                    echo "=== RELEASE INFORMATION ==="
+                    echo "Version: $(releaseVersion)"
+                    echo "Build Number: $(Build.BuildNumber)"
+                    echo "Commit: $(Build.SourceVersion)"
+                    echo "Branch: $(Build.SourceBranch)"
+                    echo "Target: Linux 32-bit (ia32)"
+                    
+                    echo "=== AVAILABLE ARTIFACTS ==="
+                    find $(Pipeline.Workspace) -name "*.deb" -exec ls -lh {} \;
+                  displayName: "Release Information"
+
+  - stage: Documentation
+    displayName: "Build Summary"
+    condition: succeeded()
+    dependsOn: 
+      - Build
+    jobs:
+      - job: BuildSummary
+        displayName: "Show Build Results"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "=========================================="
+              echo "🖥️ LINUX 32-BIT BUILD COMPLETED"
+              echo "=========================================="
+              echo ""
+              echo "✅ Build Status: SUCCESS"
+              echo "📦 Artifact: $(artifactName)"
+              echo "🎯 Target: Linux 32-bit (ia32)"
+              echo "📋 Format: .deb (Debian Package)"
+              echo ""
+              if [ "$(isRelease)" = "True" ]; then
+                echo "🚀 RELEASE INFORMATION:"
+                echo "📁 Version: $(releaseVersion)"
+                echo "🔗 GitHub: https://github.com/$(githubRepository)"
+                echo ""
+              fi
+              echo "📖 INSTALLATION COMMANDS:"
+              echo "# Download und Installation:"
+              echo "wget [DEB-FILE-URL]"
+              echo "sudo dpkg -i [DEB-FILENAME]"
+              echo "sudo apt-get install -f"
+              echo ""
+              echo "# Anwendung starten:"
+              echo "mthbdeiotclient --fullscreen"
+              echo ""
+              echo "=========================================="
+            displayName: "Build Summary"

@@ -42,7 +42,12 @@
     "package:raspberry": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env --  electron-builder build --linux tar.gz --armv7l --publish never --config.nodeGypRebuild=false",
     "package:raspberry-deb": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux deb --armv7l --publish never --config.nodeGypRebuild=false",
     "package:raspberry-updater": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux deb --armv7l --publish always --config.nodeGypRebuild=false",
+    "package:linux32": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux deb --ia32 --publish never --config.nodeGypRebuild=false",
+    "package:linux32-tar": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --linux tar.gz --ia32 --publish never --config.nodeGypRebuild=false",
+    "package:windows32": "dotenv -e .env -- cross-env NODE_ENV=production npm run build && dotenv -e .env -- electron-builder build --win --ia32 --publish never --config.nodeGypRebuild=false",
     "install:raspberry": "npm install --target_arch=armv7l --target_platform=linux --cache=/tmp/.npm",
+    "install:linux32": "npm install --target_arch=ia32 --target_platform=linux --cache=/tmp/.npm",
+    "install:windows32": "npm install --target_arch=ia32 --target_platform=win32 --cache=/tmp/.npm",
     "version:set": "node scripts/set-version.js",
     "release:prepare": "npm run version:set && npm run build && npm run package:all",
     "rebuild": "electron-rebuild --parallel --types prod,dev,optional --module-dir release/app -f -w better-sqlite3",
@@ -245,7 +250,13 @@
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
       ]
     },
     "linux": {
@@ -254,25 +265,29 @@
         {
           "target": "deb",
           "arch": [
-            "armv7l"
+            "armv7l",
+            "ia32",
+            "x64"
           ]
         },
         {
           "target": "tar.gz",
           "arch": [
-            "armv7l"
+            "armv7l",
+            "ia32",
+            "x64"
           ]
         }
       ],
       "category": "Development",
-      "description": "MTH BDE IoT Client for Raspberry Pi",
+      "description": "MTH BDE IoT Client for Raspberry Pi and Linux",
       "maintainer": "MTH IT Service <info@mth-it-service.com>",
-      "synopsis": "IoT Client Application for Raspberry Pi",
+      "synopsis": "IoT Client Application for Raspberry Pi and Linux",
       "compression": "normal",
       "packageCategory": "devel",
       "desktop": {
         "Name": "MTH BDE IoT Client",
-        "Comment": "IoT Client Application for Raspberry Pi",
+        "Comment": "IoT Client Application for Raspberry Pi and Linux",
         "Keywords": "IoT;Raspberry;Client;BDE;MTH;",
         "Categories": "Development;Utility;System;",
         "Terminal": "false",

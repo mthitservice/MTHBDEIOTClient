@@ -1,0 +1,373 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Multi-Architecture Build
+# Pipeline für Windows 32-bit, Linux 32-bit und Raspberry Pi (ARMv7l)
+
+trigger:
+  branches:
+    exclude:
+      - "*"  # Keine Branch-Trigger
+  tags:
+    include:
+      - "v*"  # Nur bei Tags die mit "v" beginnen
+
+# Deaktiviere auch Pull Request Triggers  
+pr: none
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  
+  # GitHub Configuration
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubConnection: "github-connection"
+
+stages:
+  - stage: BuildRaspberryPi
+    displayName: "Build Raspberry Pi (ARMv7l)"
+    jobs:
+      - job: BuildRaspberryPi
+        displayName: "Build Electron App für Raspberry Pi"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd App
+              npm ci --ignore-scripts --no-audit --no-fund
+              npm run build
+              npm run package:raspberry-deb
+            displayName: "Build Raspberry Pi Package"
+            env:
+              NODE_ENV: production
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Raspberry Pi Package"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/raspberry-pi"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Raspberry Pi Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)/raspberry-pi"
+              artifactName: "MthBdeIotClient-RaspberryPi-ARMv7l"
+
+  - stage: BuildLinux32
+    displayName: "Build Linux 32-bit (ia32)"
+    jobs:
+      - job: BuildLinux32
+        displayName: "Build Electron App für Linux 32-bit"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd App
+              npm ci --ignore-scripts --no-audit --no-fund
+              npm run build
+              npm run package:linux32
+            displayName: "Build Linux 32-bit Package"
+            env:
+              NODE_ENV: production
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Linux 32-bit Package"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.deb"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/linux-32bit"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Linux 32-bit Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)/linux-32bit"
+              artifactName: "MthBdeIotClient-Linux-ia32"
+
+  - stage: BuildWindows32
+    displayName: "Build Windows 32-bit (ia32)"
+    jobs:
+      - job: BuildWindows32
+        displayName: "Build Electron App für Windows 32-bit"
+        pool:
+          vmImage: "windows-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - powershell: |
+              cd App
+              npm ci --ignore-scripts --no-audit --no-fund
+              npm run build
+              npm run package:windows32
+            displayName: "Build Windows 32-bit Package"
+            env:
+              NODE_ENV: production
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Windows 32-bit Package"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.exe"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/windows-32bit"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Windows 32-bit Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)/windows-32bit"
+              artifactName: "MthBdeIotClient-Windows-ia32"
+
+  - stage: Release
+    displayName: "Create GitHub Release"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: 
+      - BuildRaspberryPi
+      - BuildLinux32
+      - BuildWindows32
+    jobs:
+      - deployment: MultiArchRelease
+        displayName: "Create Multi-Architecture Release"
+        environment: "Multi-Arch-Production"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download All Artifacts"
+
+                - task: PowerShell@2
+                  displayName: "Create GitHub Release with All Packages"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      $githubToken = "$(GITHUB_TOKEN)"
+                      $version = "$(releaseVersion)"
+                      $repo = "$(githubRepository)"
+                      $tagName = "v$version"
+                      
+                      Write-Host "=== MULTI-ARCHITECTURE RELEASE ==="
+                      Write-Host "Repository: $repo"
+                      Write-Host "Tag: $tagName"
+                      Write-Host "Workspace: $(Pipeline.Workspace)"
+                      
+                      # GitHub API Headers
+                      $headers = @{
+                          "Authorization" = "token $githubToken"
+                          "Accept" = "application/vnd.github+json"
+                          "X-GitHub-Api-Version" = "2022-11-28"
+                      }
+                      
+                      # Find all packages
+                      $packages = @()
+                      $packagePaths = @(
+                          "$(Pipeline.Workspace)/MthBdeIotClient-RaspberryPi-ARMv7l",
+                          "$(Pipeline.Workspace)/MthBdeIotClient-Linux-ia32", 
+                          "$(Pipeline.Workspace)/MthBdeIotClient-Windows-ia32"
+                      )
+                      
+                      foreach ($path in $packagePaths) {
+                          if (Test-Path $path) {
+                              $files = Get-ChildItem -Path $path -Recurse -File | Where-Object { $_.Extension -in @(".deb", ".exe") }
+                              foreach ($file in $files) {
+                                  $packages += @{
+                                      Name = $file.Name
+                                      Path = $file.FullName
+                                      Size = $file.Length
+                                      Type = $file.Extension
+                                  }
+                              }
+                          }
+                      }
+                      
+                      Write-Host "Found $($packages.Count) packages:"
+                      foreach ($pkg in $packages) {
+                          $sizeMB = [Math]::Round($pkg.Size / 1MB, 2)
+                          Write-Host "  - $($pkg.Name) ($sizeMB MB)"
+                      }
+                      
+                      # Create release
+                      $releaseData = @{
+                          tag_name = $tagName
+                          name = "MthBdeIotClient v$version - Multi-Architecture"
+                          body = @"
+                      # MthBdeIotClient v$version - Multi-Architecture Release
+                      
+                      ## 📦 Verfügbare Pakete
+                      
+                      ### 🍓 Raspberry Pi (ARMv7l)
+                      - **Für:** Raspberry Pi 3, 3+, 4, Zero 2 W
+                      - **Format:** .deb (Debian Package)
+                      - **Installation:** ``sudo dpkg -i [raspberry-deb-file] && sudo apt-get install -f``
+                      
+                      ### 🐧 Linux 32-bit (ia32)
+                      - **Für:** Linux x86 32-bit Systeme
+                      - **Format:** .deb (Debian Package)
+                      - **Installation:** ``sudo dpkg -i [linux32-deb-file] && sudo apt-get install -f``
+                      
+                      ### 🪟 Windows 32-bit (ia32)
+                      - **Für:** Windows x86 32-bit Systeme
+                      - **Format:** .exe (Windows Installer)
+                      - **Installation:** Als Administrator ausführen
+                      
+                      ## 🚀 Schnellinstallation
+                      
+                      ### Raspberry Pi
+                      ``````bash
+                      # Abhängigkeiten installieren
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1 libasound2 libxrandr2 libatk1.0-0 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libgconf-2-4 mesa-utils libgl1-mesa-glx libgl1-mesa-dev
+                      
+                      # Download und Installation
+                      wget [RASPBERRY-DEB-URL]
+                      sudo dpkg -i [raspberry-deb-file]
+                      sudo apt-get install -f
+                      
+                      # Anwendung starten
+                      mthbdeiotclient --fullscreen
+                      ``````
+                      
+                      ### Linux 32-bit
+                      ``````bash
+                      # Abhängigkeiten installieren
+                      sudo apt-get update
+                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
+                      
+                      # Download und Installation
+                      wget [LINUX32-DEB-URL]
+                      sudo dpkg -i [linux32-deb-file]
+                      sudo apt-get install -f
+                      
+                      # Anwendung starten
+                      mthbdeiotclient --fullscreen
+                      ``````
+                      
+                      ### Windows 32-bit
+                      1. [Windows EXE-Datei] herunterladen
+                      2. Als Administrator ausführen
+                      3. Installationsassistent befolgen
+                      4. Anwendung aus Startmenü starten
+                      
+                      ## 🖥️ Kiosk-Modus (Linux/Raspberry Pi)
+                      
+                      ``````bash
+                      # Autostart konfigurieren
+                      sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
+                      
+                      # Diese Zeilen hinzufügen:
+                      @xset s off
+                      @xset -dpms
+                      @xset s noblank
+                      @mthbdeiotclient --fullscreen
+                      
+                      # Neustart für Autostart
+                      sudo reboot
+                      ``````
+                      
+                      ---
+                      **Erstellt am:** $(Get-Date -Format "dd.MM.yyyy HH:mm") UTC  
+                      **Build System:** Azure DevOps  
+                      **Architekturen:** ARMv7l, ia32
+                      "@
+                          draft = $false
+                          prerelease = $false
+                      }
+                      
+                      # Create release
+                      $createReleaseUrl = "https://api.github.com/repos/$repo/releases"
+                      try {
+                          $release = Invoke-RestMethod -Uri $createReleaseUrl -Headers $headers -Method Post -Body ($releaseData | ConvertTo-Json) -ContentType "application/json"
+                          Write-Host "✅ Created release: $tagName"
+                          $uploadUrl = $release.upload_url -replace '\{\?name,label\}', ''
+                          
+                          # Upload all packages
+                          foreach ($pkg in $packages) {
+                              Write-Host "Uploading: $($pkg.Name)"
+                              $uploadHeaders = @{
+                                  "Authorization" = "token $githubToken"
+                                  "Content-Type" = "application/octet-stream"
+                              }
+                              
+                              $uploadUrlWithParams = "$uploadUrl" + "?name=$($pkg.Name)"
+                              $uploadResult = Invoke-RestMethod -Uri $uploadUrlWithParams -Headers $uploadHeaders -Method Post -InFile $pkg.Path
+                              Write-Host "  ✅ Uploaded successfully"
+                          }
+                          
+                          Write-Host "🎉 Multi-Architecture Release completed successfully!"
+                          Write-Host "🔗 Release URL: https://github.com/$repo/releases/tag/$tagName"
+                          
+                      } catch {
+                          Write-Host "❌ Release creation failed: $($_.Exception.Message)"
+                          exit 1
+                      }
+
+  - stage: Summary
+    displayName: "Build Summary"
+    condition: succeeded()
+    dependsOn: 
+      - BuildRaspberryPi
+      - BuildLinux32
+      - BuildWindows32
+    jobs:
+      - job: BuildSummary
+        displayName: "Show Build Results"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "=========================================="
+              echo "🏗️ MULTI-ARCHITECTURE BUILD COMPLETED"
+              echo "=========================================="
+              echo ""
+              echo "✅ Build Status: SUCCESS"
+              echo "🎯 Targets Built:"
+              echo "  - 🍓 Raspberry Pi (ARMv7l) - .deb"
+              echo "  - 🐧 Linux 32-bit (ia32) - .deb"
+              echo "  - 🪟 Windows 32-bit (ia32) - .exe"
+              echo ""
+              if [ "$(isRelease)" = "True" ]; then
+                echo "🚀 RELEASE INFORMATION:"
+                echo "📁 Version: $(releaseVersion)"
+                echo "🔗 GitHub: https://github.com/$(githubRepository)/releases/tag/v$(releaseVersion)"
+                echo ""
+              fi
+              echo "📖 NEXT STEPS:"
+              echo "1. Test packages on target systems"
+              echo "2. Verify all installations work correctly"
+              echo "3. Update documentation if needed"
+              echo ""
+              echo "=========================================="
+            displayName: "Multi-Architecture Build Summary"

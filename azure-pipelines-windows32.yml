@@ -1,0 +1,337 @@
+# Azure DevOps Pipeline für MthBdeIotClient - Windows 32-bit Build
+# Optimierte Pipeline für Windows x86 (32-bit) .exe Pakete
+
+trigger:
+  branches:
+    exclude:
+      - "*"  # Keine Branch-Trigger
+  tags:
+    include:
+      - "v*"  # Nur bei Tags die mit "v" beginnen
+
+# Deaktiviere auch Pull Request Triggers  
+pr: none
+
+variables:
+  # Build-Konfiguration
+  buildConfiguration: "Release"
+  nodeVersion: "22.x"
+  
+  # Versioning
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  
+  # Artifact Names
+  artifactName: "MthBdeIotClient-Windows32"
+  
+  # GitHub Configuration
+  githubRepository: "mthitservice/MTHBDEIOTClient"
+  githubConnection: "github-connection"
+
+stages:
+  - stage: Build
+    displayName: "Build Windows 32-bit Application"
+    jobs:
+      - job: BuildWindows32
+        displayName: "Build Electron App für Windows 32-bit"
+        pool:
+          vmImage: "windows-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - task: Cache@2
+            displayName: "Cache node modules"
+            inputs:
+              key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: App/node_modules
+
+          - powershell: |
+              cd App
+              Write-Host "=== SYSTEM INFORMATION ==="
+              Write-Host "Node version: $(node --version)"
+              Write-Host "NPM version: $(npm --version)"
+              Write-Host "Working directory: $(Get-Location)"
+              Write-Host "Available memory: $((Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1gb) GB"
+              Write-Host "Target Architecture: Windows 32-bit (ia32)"
+              
+              Write-Host "=== PROJECT VERIFICATION ==="
+              Write-Host "Package.json exists: $(Test-Path 'package.json')"
+              Write-Host "Package-lock.json exists: $(Test-Path 'package-lock.json')"
+              
+              Write-Host "=== NPM CONFIGURATION ==="
+              npm config set fund false
+              npm config set audit false
+              npm config set progress false
+              npm config list
+            displayName: "System Information & NPM Setup"
+
+          - powershell: |
+              cd App
+              Write-Host "=== INSTALLING DEPENDENCIES ==="
+              Write-Host "Starting npm install at $(Get-Date)"
+              
+              # Clean install
+              npm ci --ignore-scripts --no-audit --no-fund
+              
+              Write-Host "=== VERIFYING CRITICAL PACKAGES ==="
+              try { $dotenvVersion = npx dotenv-cli --version } catch { $dotenvVersion = "NOT INSTALLED" }
+              try { $crossEnvVersion = npx cross-env --version } catch { $crossEnvVersion = "NOT INSTALLED" }
+              try { $electronBuilderVersion = npx electron-builder --version } catch { $electronBuilderVersion = "NOT INSTALLED" }
+              
+              Write-Host "dotenv-cli: $dotenvVersion"
+              Write-Host "cross-env: $crossEnvVersion"
+              Write-Host "electron-builder: $electronBuilderVersion"
+              
+              Write-Host "Dependencies installed successfully at $(Get-Date)"
+            displayName: "Install Dependencies"
+            timeoutInMinutes: 10
+
+          - powershell: |
+              cd App
+              Write-Host "=== SETTING VERSION ==="
+              
+              # Version aus Tag oder automatisch generieren
+              if ($env:ISRELEASE -eq "True") {
+                $VERSION = $env:RELEASEVERSION
+                Write-Host "Release Version: $VERSION"
+              } else {
+                $BUILD_NUMBER = $env:BUILD_BUILDNUMBER
+                $SHORT_COMMIT = $env:BUILD_SOURCEVERSION.Substring(0, 7)
+                $VERSION = "1.0.0-dev.$BUILD_NUMBER+$SHORT_COMMIT"
+                Write-Host "Development Version: $VERSION"
+              }
+
+              # Environment Variables setzen
+              Write-Host "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              Write-Host "##vso[task.setvariable variable=NODE_ENV]production"
+              Write-Host "##vso[task.setvariable variable=ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES]true"
+
+              # Package.json Version aktualisieren
+              $packageJsonPath = "package.json"
+              $packageJson = Get-Content $packageJsonPath | ConvertFrom-Json
+              $packageJson.version = $VERSION
+              $packageJson | ConvertTo-Json -Depth 10 | Set-Content $packageJsonPath
+              
+              Write-Host "Version set to: $VERSION"
+            displayName: "Set Application Version"
+
+          - powershell: |
+              cd App
+              Write-Host "=== BUILDING APPLICATION ==="
+              
+              # Environment Variables für Build
+              $env:NODE_ENV = "production"
+              $env:APP_VERSION = $env:APP_VERSION
+              $env:ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES = "true"
+              
+              Write-Host "Building main process..."
+              npm run build:main
+              
+              Write-Host "Building renderer process..."
+              npm run build:renderer
+              
+              Write-Host "=== BUILD VERIFICATION ==="
+              if (Test-Path "dist") {
+                Write-Host "✅ Dist folder created"
+                $jsFiles = (Get-ChildItem -Path "dist" -Filter "*.js" -Recurse).Count
+                $totalFiles = (Get-ChildItem -Path "dist" -Recurse -File).Count
+                Write-Host "Main files: $jsFiles JS files"
+                Write-Host "Total files: $totalFiles files"
+              } else {
+                Write-Host "❌ No dist folder found"
+                exit 1
+              }
+              
+              Write-Host "Application build completed successfully"
+            displayName: "Build Application"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - powershell: |
+              cd App
+              Write-Host "=== PACKAGING WINDOWS 32-BIT EXE ==="
+              
+              # Environment Variables
+              $env:NODE_ENV = "production"
+              $env:APP_VERSION = $env:APP_VERSION
+              $env:ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES = "true"
+              $env:ELECTRON_BUILDER_CACHE_DIR = "$env:TEMP\.electron-builder-cache"
+              
+              # Erstelle .env file wenn nicht vorhanden
+              if (!(Test-Path ".env")) {
+                Write-Host "Creating .env file..."
+                "NODE_ENV=production" | Out-File -FilePath ".env" -Encoding UTF8
+                "APP_VERSION=$env:APP_VERSION" | Out-File -FilePath ".env" -Encoding UTF8 -Append
+                "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" | Out-File -FilePath ".env" -Encoding UTF8 -Append
+              }
+              
+              Write-Host "Running Windows 32-bit EXE packaging..."
+              npm run package:windows32
+              
+              Write-Host "=== EXE PACKAGE VALIDATION ==="
+              # Detaillierte Validierung aller .exe Dateien
+              Get-ChildItem -Path "." -Filter "*.exe" -Recurse | ForEach-Object {
+                $exeFile = $_.FullName
+                Write-Host "Validating: $exeFile"
+                
+                # Dateigröße prüfen
+                $size = $_.Length
+                $sizeMB = [Math]::Round($size / 1MB, 2)
+                Write-Host "  File size: $size bytes ($sizeMB MB)"
+                
+                # Mindestgröße für Electron App (sollte > 30MB sein)
+                if ($size -lt 30000000) {
+                  Write-Host "  WARNING: File is unusually small for Electron app"
+                }
+                
+                # Prüfe ob es eine Windows-Executable ist
+                try {
+                  $fileInfo = Get-ItemProperty $exeFile
+                  Write-Host "  File is recognized as Windows executable"
+                  Write-Host "  Version: $($fileInfo.VersionInfo.FileVersion)"
+                  Write-Host "  Product: $($fileInfo.VersionInfo.ProductName)"
+                } catch {
+                  Write-Host "  File is NOT recognized as Windows executable"
+                }
+                
+                Write-Host "  ----------------------------------------"
+              }
+              
+              Write-Host "Windows 32-bit packaging completed"
+            displayName: "Package Windows 32-bit EXE"
+            env:
+              NODE_ENV: production
+              APP_VERSION: $(APP_VERSION)
+              ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+
+          - task: CopyFiles@2
+            displayName: "Copy Windows 32-bit Packages"
+            inputs:
+              sourceFolder: "App/release"
+              contents: "**/*.exe"
+              targetFolder: "$(Build.ArtifactStagingDirectory)/packages"
+              flattenFolders: false
+
+          - task: CopyFiles@2
+            displayName: "Copy Installation Files"
+            inputs:
+              sourceFolder: "App"
+              contents: |
+                *.md
+                deploy.ps1
+                *.bat
+              targetFolder: "$(Build.ArtifactStagingDirectory)/installation"
+
+          - powershell: |
+              Write-Host "=== FINAL PACKAGE VERIFICATION ==="
+              Write-Host "Staging directory contents:"
+              Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Recurse -File | ForEach-Object {
+                $sizeMB = [Math]::Round($_.Length / 1MB, 2)
+                Write-Host "  $($_.FullName) ($sizeMB MB)"
+              }
+              
+              Write-Host "=== PACKAGE SUMMARY ==="
+              $exeFiles = Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Filter "*.exe" -Recurse
+              $exeCount = $exeFiles.Count
+              Write-Host "EXE packages found: $exeCount"
+              
+              if ($exeCount -gt 0) {
+                Write-Host "✅ Windows 32-bit EXE package created successfully"
+                $exeFiles | ForEach-Object { Write-Host "  $($_.Name)" }
+              } else {
+                Write-Host "❌ No EXE packages found"
+                Write-Host "Available files:"
+                Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" -Recurse -File | ForEach-Object {
+                  Write-Host "  $($_.Name)"
+                }
+              }
+            displayName: "Verify Packages"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Windows 32-bit Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)"
+              artifactName: $(artifactName)
+              publishLocation: "Container"
+            condition: always()
+
+  - stage: Release
+    displayName: "Release Windows 32-bit Package"
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    dependsOn: Build
+    jobs:
+      - deployment: Windows32Release
+        displayName: "Create Windows 32-bit Release"
+        environment: "Windows32-Production"
+        pool:
+          vmImage: "windows-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  displayName: "Download Build Artifacts"
+
+                - powershell: |
+                    Write-Host "=== RELEASE INFORMATION ==="
+                    Write-Host "Version: $(releaseVersion)"
+                    Write-Host "Build Number: $(Build.BuildNumber)"
+                    Write-Host "Commit: $(Build.SourceVersion)"
+                    Write-Host "Branch: $(Build.SourceBranch)"
+                    Write-Host "Target: Windows 32-bit (ia32)"
+                    
+                    Write-Host "=== AVAILABLE ARTIFACTS ==="
+                    Get-ChildItem -Path "$(Pipeline.Workspace)" -Filter "*.exe" -Recurse | ForEach-Object {
+                      $sizeMB = [Math]::Round($_.Length / 1MB, 2)
+                      Write-Host "  $($_.FullName) ($sizeMB MB)"
+                    }
+                  displayName: "Release Information"
+
+  - stage: Documentation
+    displayName: "Build Summary"
+    condition: succeeded()
+    dependsOn: 
+      - Build
+    jobs:
+      - job: BuildSummary
+        displayName: "Show Build Results"
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - powershell: |
+              Write-Host "=========================================="
+              Write-Host "🖥️ WINDOWS 32-BIT BUILD COMPLETED"
+              Write-Host "=========================================="
+              Write-Host ""
+              Write-Host "✅ Build Status: SUCCESS"
+              Write-Host "📦 Artifact: $(artifactName)"
+              Write-Host "🎯 Target: Windows 32-bit (ia32)"
+              Write-Host "📋 Format: .exe (Windows Installer)"
+              Write-Host ""
+              if ($env:ISRELEASE -eq "True") {
+                Write-Host "🚀 RELEASE INFORMATION:"
+                Write-Host "📁 Version: $(releaseVersion)"
+                Write-Host "🔗 GitHub: https://github.com/$(githubRepository)"
+                Write-Host ""
+              }
+              Write-Host "📖 INSTALLATION:"
+              Write-Host "1. Download .exe file"
+              Write-Host "2. Run installer as Administrator"
+              Write-Host "3. Follow installation wizard"
+              Write-Host "4. Start application from Start Menu"
+              Write-Host ""
+              Write-Host "=========================================="
+            displayName: "Build Summary"
