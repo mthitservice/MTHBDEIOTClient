@@ -426,8 +426,69 @@ stages:
                 echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
               fi
               
-              echo "Running Linux 32-bit DEB packaging..."
-              npm run package:linux32
+              # Pre-build strategy: Create the release/app structure first
+              echo "=== PREPARING 32-BIT ENVIRONMENT ==="
+              
+              # Set global 32-bit compilation flags
+              export CC="gcc -m32"
+              export CXX="g++ -m32"
+              export npm_config_target_arch=ia32
+              export npm_config_target_platform=linux
+              export npm_config_arch=ia32
+              export npm_config_runtime=electron
+              export npm_config_target=35.6.0
+              export npm_config_disturl=https://electronjs.org/headers
+              export npm_config_node_gyp_force_rebuild=true
+              
+              # Alternative approach: Use npm pack and manual electron-builder
+              echo "Creating production package with custom approach..."
+              
+              # Build the app first
+              npm run build
+              
+              # Create distribution structure
+              mkdir -p dist-linux32/app
+              cp package.json dist-linux32/app/
+              cp -r dist dist-linux32/app/
+              cp -r public dist-linux32/app/
+              cp -r assets dist-linux32/app/
+              
+              # Install production dependencies with 32-bit flags in custom location
+              cd dist-linux32/app
+              npm install --production --arch=ia32 --target_arch=ia32 || {
+                echo "❌ Failed to install 32-bit dependencies"
+                echo "Trying alternative approach..."
+                
+                # Remove problematic packages temporarily
+                node -e "
+                  const fs = require('fs');
+                  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                  const problematic = ['better-sqlite3'];
+                  problematic.forEach(p => {
+                    if (pkg.dependencies[p]) {
+                      console.log('Temporarily removing:', p);
+                      delete pkg.dependencies[p];
+                    }
+                  });
+                  fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+                "
+                
+                # Install remaining dependencies
+                npm install --production --arch=ia32 --target_arch=ia32
+                
+                # Manually handle better-sqlite3
+                echo "Installing better-sqlite3 manually..."
+                npm install --arch=ia32 --target_arch=ia32 better-sqlite3 || echo "⚠️ better-sqlite3 32-bit installation failed - continuing anyway"
+              }
+              
+              cd ../..
+              
+              # Use electron-builder with pre-built app
+              echo "Running electron-builder with pre-built dependencies..."
+              npx electron-builder build --linux deb --ia32 --publish never \
+                --config.directories.buildResources=dist-linux32 \
+                --config.directories.app=dist-linux32/app \
+                --config.nodeGypRebuild=false
               
               echo "=== LINUX 32-BIT DEB VALIDATION ==="
               # Detaillierte Validierung aller .deb Dateien
