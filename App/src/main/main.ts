@@ -159,10 +159,17 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
+  // Prüfe Kommandozeilenargumente für Fullscreen
+  const isFullscreenMode = process.argv.includes('--fullscreen') ||
+    process.argv.includes('--kiosk') ||
+    process.env.KIOSK_MODE === 'true';
+
   mainWindow = new BrowserWindow({
     show: false,
     width: 1024,
     height: 728,
+    fullscreen: isFullscreenMode,
+    frame: !isFullscreenMode, // Kein Frame im Kiosk-Modus
     icon: getAssetPath('icon.png'),
     webPreferences: {
       preload: app.isPackaged
@@ -182,6 +189,25 @@ const createWindow = async () => {
       mainWindow.show();
       mainWindow.focus();
 
+      // Sicherstellen, dass Fullscreen aktiviert ist (falls über Kommandozeile aktiviert)
+      const needsFullscreen = process.argv.includes('--fullscreen') ||
+        process.argv.includes('--kiosk') ||
+        process.env.KIOSK_MODE === 'true';
+
+      if (needsFullscreen && !mainWindow.isFullScreen()) {
+        mainWindow.setFullScreen(true);
+      }
+
+      // Zusätzlicher Focus für Kiosk-Modus
+      if (needsFullscreen) {
+        mainWindow.moveTop();
+        mainWindow.setAlwaysOnTop(true);
+        setTimeout(() => {
+          if (mainWindow) {
+            mainWindow.setAlwaysOnTop(false);
+          }
+        }, 1000);
+      }
     }
   });
 
