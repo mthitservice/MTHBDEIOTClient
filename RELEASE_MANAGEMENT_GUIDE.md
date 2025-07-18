@@ -266,8 +266,8 @@ GIT_TRACE=1 npm run release
 ### Nützliche Links
 
 - **Azure DevOps Builds**: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build
-- **GitHub Repository**: https://github.com/mth-it-service/MTHBDEIOTClient
-- **Latest Release**: https://github.com/mth-it-service/MTHBDEIOTClient/tree/master/releases/latest
+- **GitHub Repository**: https://github.com/mthitservice/MthBdeIotClient
+- **Latest Release**: https://github.com/mthitservice/MthBdeIotClient/releases/latest
 
 ### Status Checking
 
@@ -279,7 +279,7 @@ git tag -l --sort=-version:refname "v*" | head -5
 az pipelines show --name "MthBdeIotClient-Raspberry-CI" --organization https://dev.azure.com/mth-it-service
 
 # GitHub Release Status
-curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest
+curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/mthitservice/MthBdeIotClient/releases/latest
 ```
 
 ## 🎉 Best Practices
