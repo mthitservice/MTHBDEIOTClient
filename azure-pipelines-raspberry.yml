@@ -423,6 +423,22 @@ stages:
               fi
             displayName: "Verify Downloaded Artifacts"
 
+          - script: |
+              echo "=== SYNCHRONIZING WITH GITHUB ==="
+              # Configure Git
+              git config --global user.email "azure-devops@mth-it-service.com"
+              git config --global user.name "Azure DevOps Pipeline"
+              
+              # Add GitHub remote if not exists
+              git remote remove github 2>/dev/null || true
+              git remote add github https://$(githubConnection):x-oauth-basic@github.com/$(githubRepository).git
+              
+              # Push tag to GitHub
+              git push github $(Build.SourceBranchName) --force
+              
+              echo "Tag $(Build.SourceBranchName) pushed to GitHub"
+            displayName: "Sync Tag with GitHub"
+
           - task: GitHubRelease@1
             displayName: "Create GitHub Release"
             inputs:
@@ -432,7 +448,7 @@ stages:
               target: "$(Build.SourceVersion)"
               tagSource: "userSpecifiedTag"
               tag: "$(Build.SourceBranchName)"
-              title: "Release $(releaseVersion)"
+              title: "MthBdeIotClient $(releaseVersion)"
               releaseNotesSource: "inline"
               releaseNotesInline: |
                 ## Release $(releaseVersion)
