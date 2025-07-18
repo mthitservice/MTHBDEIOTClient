@@ -23,43 +23,7 @@ variables:
   releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
   
   # Artifact Names
-  artifactName: "MthBdeIotClie                      ### 📦 Schnell-Install                      ### � Anwendung starten
-                      
-                      ``````bash
-                      # Normale Ausführung
-                      mthbdeiotclient
-                      
-                      # Im Vollbild-Modus starten
-                      mthbdeiotclient --fullscreen
-                      
-                      # Mit Debug-Ausgabe
-                      mthbdeiotclient --verbose
-                      
-                      # Vollbild mit Debug
-                      mthbdeiotclient --fullscreen --verbose
-                      
-                      # Im Hintergrund starten
-                      nohup mthbdeiotclient --fullscreen &
-                      ``````                      ### 📦 Alternative: Automatische Installation
-                      
-                      ```bash
-                      # Abhängigkeiten vorinstallieren
-                      sudo apt-get update
-                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0
-                      
-                      # Automatisches Download der neuesten Version
-                      wget -qO- https://api.github.com/repos/$repo/releases/latest | grep "browser_download_url.*\.deb" | cut -d '"' -f 4 | wget -i -
-                      sudo dpkg -i *.deb && sudo apt-get install -f
-                      ```          
-                      ```bash
-                      # Abhängigkeiten vorinstallieren
-                      sudo apt-get update
-                      sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0
-                      
-                      # Download und Installation
-                      wget -O $debFileName https://github.com/$repo/releases/download/$tagName/$debFileName
-                      sudo dpkg -i $debFileName && sudo apt-get install -f
-                      ```berryPi"
+  artifactName: "MthBdeIotClient-RaspberryPi"
   
   # GitHub Configuration
   githubRepository: "mthitservice/MTHBDEIOTClient"
