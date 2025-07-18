@@ -2,17 +2,13 @@
 
 ## Übersicht
 
-Das **MthBdeIotClient Release Management System** bietet eine vollständige Automatisierung für Versionierung, Building und Deployment der Electron-App für Raspberry Pi Systeme. D## 🔗 Nützliche Links
-
-- **Azure DevOps Builds**: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build
-- **GitHub Repository**: https://github.com/mthitservice/MTHBDEIOTClient
-- **Latest Release**: https://github.com/mthitservice/MTHBDEIOTClient/tree/master/releases/lateststem umfasst:
+Das **MthBdeIotClient Release Management System** bietet eine vollständige Automatisierung für Versionierung, Building und Deployment der Electron-App für Raspberry Pi Systeme. Das System umfasst:
 
 - **Automatische Versionierung** mit Semantic Versioning
 - **Cross-Platform Skripte** für Windows, Linux und macOS
 - **Azure DevOps Pipeline Integration** für automatisches Building
 - **GitHub Release Automation** für Distribution
-- **Raspberry Pi Debian Package** (.deb) Generation
+- **Raspberry Pi Debian Package** (.deb) Generation für ARM64 und ARMv7l
 
 ## 🚀 Schnellstart
 
@@ -132,7 +128,7 @@ bash scripts/release-version.sh --help
 ### 4. Deployment
 - Package wird als GitHub Release Asset verfügbar
 - Automatische "Latest" Release Kennzeichnung
-- Debian Package für `armv7l` Architektur
+- Debian Packages für `arm64` (aarch64) und `armv7l` Architekturen
 
 ## 📁 Dateistruktur
 
@@ -147,6 +143,32 @@ MthBdeIotClient/
 │   └── .env                   # Environment Variables
 ├── azure-pipelines-raspberry.yml  # Azure DevOps Pipeline
 └── azure-pipelines-release.yml    # GitHub Release Pipeline
+```
+
+## 🍓 Raspberry Pi Unterstützung
+
+### Unterstützte Architekturen
+
+| Raspberry Pi Modell        | Architektur     | DEB Package    | Empfehlung       |
+| -------------------------- | --------------- | -------------- | ---------------- |
+| Raspberry Pi 4 (64-bit OS) | ARM64 (aarch64) | `*arm64*.deb`  | ✅ **Empfohlen**  |
+| Raspberry Pi 4 (32-bit OS) | ARMv7l          | `*armv7l*.deb` | ✅ Kompatibilität |
+| Raspberry Pi 3/3+          | ARMv7l          | `*armv7l*.deb` | ✅ Standard       |
+| Raspberry Pi Zero 2 W      | ARMv7l          | `*armv7l*.deb` | ✅ Unterstützt    |
+
+### Installation je nach System
+
+```bash
+# Systemarchitektur prüfen
+uname -m
+# arm64/aarch64 = ARM64 Package verwenden
+# armv7l = ARMv7l Package verwenden
+
+# Für ARM64 (Raspberry Pi 4 mit 64-bit OS)
+sudo dpkg -i mthbdeiotclient_*_arm64.deb
+
+# Für ARMv7l (Raspberry Pi 3/3+/4 mit 32-bit OS)
+sudo dpkg -i mthbdeiotclient_*_armv7l.deb
 ```
 
 ## 🔧 Konfiguration
@@ -229,7 +251,7 @@ GIT_TRACE=1 npm run release
 
 ### Azure DevOps Pipeline
 - **Trigger**: Git Tag Push (Pattern: `v*`)
-- **Build**: Raspberry Pi ARMv7l .deb Package
+- **Build**: Raspberry Pi ARM64 und ARMv7l .deb Packages
 - **Test**: Automatische Tests vor Release
 - **Deploy**: GitHub Release Creation
 
