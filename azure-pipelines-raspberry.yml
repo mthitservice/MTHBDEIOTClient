@@ -437,46 +437,93 @@ stages:
               releaseNotesInline: |
                 ## Release $(releaseVersion)
                 
-                ### 📦 Download
-                - **Raspberry Pi 64-bit (ARM64)**: `*arm64*.deb` oder `*aarch64*.deb`
-                - **Raspberry Pi 32-bit (ARMv7l)**: `*armv7l*.deb`
+                ### 📦 Download-Links
+                
+                #### Direkte wget-Befehle:
+                ```bash
+                # ARM64 (Raspberry Pi 4, Pi 400, Pi 5)
+                wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/$(Build.SourceBranchName)/mthbdeiotclient_$(releaseVersion)_arm64.deb
+                
+                # ARMv7l (Raspberry Pi 3, Pi Zero 2 W)  
+                wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/$(Build.SourceBranchName)/mthbdeiotclient_$(releaseVersion)_armv7l.deb
+                ```
+                
+                #### Datei-Downloads:
+                - **Raspberry Pi 64-bit (ARM64)**: `mthbdeiotclient_$(releaseVersion)_arm64.deb`
+                - **Raspberry Pi 32-bit (ARMv7l)**: `mthbdeiotclient_$(releaseVersion)_armv7l.deb`
                 
                 ### 🔧 Installation
                 ```bash
-                # Abhängigkeiten installieren
+                # 1. Abhängigkeiten installieren
                 sudo apt-get update
                 sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
                 
-                # DEB Package installieren
-                sudo dpkg -i mth-bde-iot-client_$(releaseVersion)_*.deb
+                # 2. DEB Package installieren (ARM64)
+                sudo dpkg -i mthbdeiotclient_$(releaseVersion)_arm64.deb
                 sudo apt-get install -f
+                
+                # ODER für ARMv7l:
+                # sudo dpkg -i mthbdeiotclient_$(releaseVersion)_armv7l.deb
+                # sudo apt-get install -f
+                
+                # 3. Anwendung starten
+                mthbdeiotclient
                 ```
                 
-                ### 🖥️ Kiosk-Modus
+                ### �️ Deinstallation
                 ```bash
-                # Autostart für Kiosk-Modus
+                # Anwendung vollständig entfernen
+                sudo apt-get remove --purge mthbdeiotclient
+                sudo apt-get autoremove
+                
+                # Benutzerdaten löschen (optional)
+                rm -rf ~/.config/MthBdeIotClient
+                rm -rf ~/.local/share/MthBdeIotClient
+                ```
+                
+                ### �🖥️ Kiosk-Modus
+                ```bash
+                # Autostart für Kiosk-Modus konfigurieren
                 sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
                 
-                # Diese Zeilen hinzufügen:
+                # Diese Zeilen am Ende hinzufügen:
                 @xset s off
-                @xset -dpms
+                @xset -dpms  
                 @xset s noblank
                 @mthbdeiotclient --fullscreen
+                
+                # Oder für Wayland/moderne Desktop-Umgebungen:
+                # ~/.config/autostart/mthbdeiotclient.desktop erstellen
+                ```
+                
+                ### 🔧 Problembehandlung
+                ```bash
+                # Bei Problemen: Logs anzeigen
+                journalctl --user -u mthbdeiotclient.service -f
+                
+                # Datenbank-Berechtigungen reparieren (falls nötig)
+                sudo chown -R $USER:$USER ~/.local/share/MthBdeIotClient
+                sudo chmod -R 755 ~/.local/share/MthBdeIotClient
+                
+                # X11-Display für SSH-Verbindungen
+                export DISPLAY=:0
+                mthbdeiotclient
                 ```
                 
                 ### 📋 Systemanforderungen
-                - **Raspberry Pi 4 (ARM64)**: 64-bit Raspberry Pi OS
-                - **Raspberry Pi 3/3+ (ARMv7l)**: 32-bit Raspberry Pi OS
-                - Mindestens 1GB RAM
-                - Desktop-Umgebung (X11)
+                - **Raspberry Pi 4/5 (ARM64)**: 64-bit Raspberry Pi OS (empfohlen)
+                - **Raspberry Pi 3/3+ (ARMv7l)**: 32-bit Raspberry Pi OS  
+                - **Mindestens 1GB RAM** (2GB+ empfohlen)
+                - **Desktop-Umgebung** (X11/Wayland)
+                - **Internetverbindung** für Updates
                 
                 ### 📋 Changelog
                 Automatisierte Release von Tag $(Build.SourceBranchName)
                 
                 **Build Information:**
-                - Build: $(Build.BuildNumber)
-                - Commit: $(Build.SourceVersion)
-                - Datum: $(System.DateTime)
+                - **Build**: $(Build.BuildNumber)
+                - **Commit**: $(Build.SourceVersion)
+                - **Datum**: $[format('{0:yyyy-MM-dd HH:mm:ss} UTC', pipeline.startTime)]
               assets: |
                 $(Pipeline.Workspace)/$(artifactName)/packages/*.deb
               assetUploadMode: "replace"
