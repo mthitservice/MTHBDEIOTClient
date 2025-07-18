@@ -430,8 +430,8 @@ stages:
               repositoryName: $(githubRepository)
               action: "create"
               target: "$(Build.SourceVersion)"
-              tagSource: "gitTag"
-              tagPattern: "v*"
+              tagSource: "userSpecifiedTag"
+              tag: "$(Build.SourceBranchName)"
               title: "Release $(releaseVersion)"
               releaseNotesSource: "inline"
               releaseNotesInline: |
