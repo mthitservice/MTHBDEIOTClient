@@ -98,6 +98,7 @@ stages:
 
               # Environment Variables setzen
               echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=VERSION]$VERSION"
 
               # Package.json Version aktualisieren
               node -e "
@@ -107,6 +108,19 @@ stages:
                 fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
                 console.log('Updated package.json version to: $VERSION');
               "
+              
+              # .env Datei mit allen Variablen erstellen
+              echo \"NODE_ENV=production\" > .env
+              echo \"APP_VERSION=$VERSION\" >> .env
+              echo \"VERSION=$VERSION\" >> .env
+              echo \"APP_NAME=MTH BDE IOT Client\" >> .env
+              echo \"APP_COPYRIGHT=MTH-IT-SERVICE\" >> .env
+              echo \"APP_AUTHOR=Michael Lindner\" >> .env
+              echo \"APP_DESCRIPTION=Anwendung zum Erfassen von Betriebsdaten\" >> .env
+              echo \"DB_NAME=bde.sqlite\" >> .env
+              
+              echo "Environment variables set:"
+              cat .env
               
               echo "Version set to: $VERSION"
             displayName: "Set Application Version"
@@ -242,6 +256,7 @@ stages:
 
               # Environment Variables setzen
               echo "##vso[task.setvariable variable=APP_VERSION]$VERSION"
+              echo "##vso[task.setvariable variable=VERSION]$VERSION"
 
               # Package.json Version aktualisieren
               node -e "
@@ -251,6 +266,19 @@ stages:
                 fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
                 console.log('Updated package.json version to: $VERSION');
               "
+              
+              # .env Datei mit allen Variablen erstellen
+              echo \"NODE_ENV=production\" > .env
+              echo \"APP_VERSION=$VERSION\" >> .env
+              echo \"VERSION=$VERSION\" >> .env
+              echo \"APP_NAME=MTH BDE IOT Client\" >> .env
+              echo \"APP_COPYRIGHT=MTH-IT-SERVICE\" >> .env
+              echo \"APP_AUTHOR=Michael Lindner\" >> .env
+              echo \"APP_DESCRIPTION=Anwendung zum Erfassen von Betriebsdaten\" >> .env
+              echo \"DB_NAME=bde.sqlite\" >> .env
+              
+              echo "Environment variables set:"
+              cat .env
               
               echo "Version set to: $VERSION"
             displayName: "Set Application Version"
