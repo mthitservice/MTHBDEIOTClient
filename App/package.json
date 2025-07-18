@@ -1,6 +1,6 @@
 {
   "name": "mthbdeiotclient",
-  "version": "1.0.84",
+  "version": "1.0.83",
   "description": "Anwendung zum Erfassen von Betriebsdaten",
   "keywords": [
     "electron",
