@@ -112,9 +112,18 @@ export default class MenuBuilder {
         },
         {
           label: 'Toggle Full Screen',
-          accelerator: 'Ctrl+Command+F',
+          accelerator: 'F11',
           click: () => {
             this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
+          },
+        },
+        {
+          label: 'Exit Full Screen',
+          accelerator: 'Escape',
+          click: () => {
+            if (this.mainWindow.isFullScreen()) {
+              this.mainWindow.setFullScreen(false);
+            }
           },
         },
         {
@@ -131,9 +140,34 @@ export default class MenuBuilder {
       submenu: [
         {
           label: 'Toggle Full Screen',
-          accelerator: 'Ctrl+Command+F',
+          accelerator: 'F11',
           click: () => {
             this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
+          },
+        },
+        {
+          label: 'Exit Full Screen',
+          accelerator: 'Escape',
+          click: () => {
+            if (this.mainWindow.isFullScreen()) {
+              this.mainWindow.setFullScreen(false);
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit Application',
+          accelerator: 'Ctrl+Q',
+          click: () => {
+            app.quit();
+          },
+        },
+        {
+          label: 'Emergency Exit',
+          accelerator: 'Ctrl+Shift+Q',
+          click: () => {
+            console.log('Emergency exit from menu');
+            app.quit();
           },
         },
       ],

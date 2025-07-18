@@ -10,7 +10,7 @@
  */
 import path from 'path';
 
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 
@@ -224,6 +224,60 @@ const createWindow = async () => {
     return { action: 'deny' };
   });
 
+  // Keyboard Shortcuts für Fullscreen-Modus registrieren
+  const registerShortcuts = () => {
+    // Alt + F4 - App beenden (Windows Standard)
+    globalShortcut.register('Alt+F4', () => {
+      if (mainWindow) {
+        mainWindow.close();
+      }
+    });
+
+    // Ctrl + Q - App beenden (Cross-Platform)
+    globalShortcut.register('Ctrl+Q', () => {
+      app.quit();
+    });
+
+    // Escape - Fullscreen beenden (aber App läuft weiter)
+    globalShortcut.register('Escape', () => {
+      if (mainWindow && mainWindow.isFullScreen()) {
+        mainWindow.setFullScreen(false);
+      }
+    });
+
+    // F11 - Fullscreen umschalten
+    globalShortcut.register('F11', () => {
+      if (mainWindow) {
+        mainWindow.setFullScreen(!mainWindow.isFullScreen());
+      }
+    });
+
+    // Ctrl + Shift + Q - Notfall-Beendigung für Kiosk-Modus
+    globalShortcut.register('Ctrl+Shift+Q', () => {
+      console.log('Emergency exit triggered');
+      app.quit();
+    });
+
+    // Alt + Tab - zwischen Fenstern wechseln (deaktiviert im Kiosk-Modus)
+    const isKioskMode = process.argv.includes('--kiosk') || process.env.KIOSK_MODE === 'true';
+    if (!isKioskMode) {
+      globalShortcut.register('Alt+Tab', () => {
+        // Lasse Alt+Tab im normalen Modus zu
+        return false;
+      });
+    }
+
+    console.log('Keyboard shortcuts registered:');
+    console.log('- Alt+F4: Close app');
+    console.log('- Ctrl+Q: Quit app');
+    console.log('- Escape: Exit fullscreen');
+    console.log('- F11: Toggle fullscreen');
+    console.log('- Ctrl+Shift+Q: Emergency quit');
+  };
+
+  // Shortcuts registrieren
+  registerShortcuts();
+
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
   new AppUpdater();
@@ -234,11 +288,19 @@ const createWindow = async () => {
  */
 
 app.on('window-all-closed', () => {
+  // Alle Shortcuts freigeben beim Schließen
+  globalShortcut.unregisterAll();
+  
   // Respect the OSX convention of having the application in memory even
   // after all windows have been closed
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  // Shortcuts freigeben bevor die App beendet wird
+  globalShortcut.unregisterAll();
 });
 
 app
@@ -261,6 +323,30 @@ app
   .catch(console.log);
 
 // IPC env
+
+ipcMain.handle('toggle-fullscreen', () => {
+  if (mainWindow) {
+    mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    return mainWindow.isFullScreen();
+  }
+  return false;
+});
+
+ipcMain.handle('exit-fullscreen', () => {
+  if (mainWindow && mainWindow.isFullScreen()) {
+    mainWindow.setFullScreen(false);
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('quit-app', () => {
+  app.quit();
+});
+
+ipcMain.handle('get-fullscreen-state', () => {
+  return mainWindow ? mainWindow.isFullScreen() : false;
+});
 
 ipcMain.handle('get-env', async () => {
   return {
