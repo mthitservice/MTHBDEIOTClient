@@ -169,6 +169,13 @@ stages:
               targetFolder: "$(Build.ArtifactStagingDirectory)/arm64"
               flattenFolders: false
 
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish ARM64 Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)/arm64"
+              artifactName: "arm64-packages"
+              publishLocation: "Container"
+
       - job: BuildRaspberryPiARMv7l
         displayName: "Build Raspberry Pi 32-bit (ARMv7l)"
         dependsOn: BuildRaspberryPiARM64
@@ -306,6 +313,13 @@ stages:
               targetFolder: "$(Build.ArtifactStagingDirectory)/armv7l"
               flattenFolders: false
 
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish ARMv7l Artifacts"
+            inputs:
+              pathToPublish: "$(Build.ArtifactStagingDirectory)/armv7l"
+              artifactName: "armv7l-packages"
+              publishLocation: "Container"
+
       - job: CombineArtifacts
         displayName: "Combine All Packages"
         dependsOn: 
@@ -316,7 +330,18 @@ stages:
         
         steps:
           - download: current
-            displayName: "Download Build Artifacts"
+            artifact: arm64-packages
+            displayName: "Download ARM64 Packages"
+
+          - download: current
+            artifact: armv7l-packages
+            displayName: "Download ARMv7l Packages"
+
+          - script: |
+              echo "=== DOWNLOADED ARTIFACTS OVERVIEW ==="
+              echo "Pipeline workspace contents:"
+              find $(Pipeline.Workspace) -type f -exec ls -lh {} \;
+            displayName: "Show Downloaded Artifacts"
 
           - task: CopyFiles@2
             displayName: "Copy All Packages to Combined Folder"
@@ -374,9 +399,29 @@ stages:
           vmImage: "ubuntu-latest"
         
         steps:
-          - download: current
-            artifact: $(artifactName)
+          - task: DownloadPipelineArtifact@2
             displayName: "Download Build Artifacts"
+            inputs:
+              artifact: $(artifactName)
+              path: "$(Pipeline.Workspace)/$(artifactName)"
+
+          - script: |
+              echo "=== DOWNLOADED ARTIFACTS VERIFICATION ==="
+              echo "Workspace contents:"
+              find $(Pipeline.Workspace) -name "*.deb" -exec ls -lh {} \;
+              
+              deb_count=$(find $(Pipeline.Workspace) -name "*.deb" | wc -l)
+              echo "DEB packages found: $deb_count"
+              
+              if [ $deb_count -eq 0 ]; then
+                echo "❌ No DEB packages found for GitHub Release"
+                echo "Available files in workspace:"
+                find $(Pipeline.Workspace) -type f
+                exit 1
+              else
+                echo "✅ Found $deb_count DEB packages for release"
+              fi
+            displayName: "Verify Downloaded Artifacts"
 
           - task: GitHubRelease@1
             displayName: "Create GitHub Release"
@@ -433,7 +478,7 @@ stages:
                 - Commit: $(Build.SourceVersion)
                 - Datum: $(Build.BuildDateTime)
               assets: |
-                $(Pipeline.Workspace)/$(artifactName)/**/*.deb
+                $(Pipeline.Workspace)/$(artifactName)/packages/*.deb
               assetUploadMode: "replace"
               isDraft: false
               isPreRelease: false
