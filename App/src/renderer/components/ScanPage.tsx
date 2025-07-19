@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 // ...deine weiteren Imports...
 
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ import Form from 'react-bootstrap/Form';
 import Toast from 'react-bootstrap/Toast';
 import UserSelect from '../helper/UserSelect';
 import ToastContainer from 'react-bootstrap/ToastContainer';
+import data from '../helper/bde_user_test.json';
 
 import TaskScan from '../helper/TaskScan';
 import './ScanPage.css';
@@ -102,23 +103,183 @@ export function ScanPage() {
   }, [counter, router]);
 
   // Reset bei Eingabe oder Scan
-  const handleUserActivity = () => {
+  const handleUserActivity = useCallback(() => {
     setCounter(60);
     focusInput();
-  };
+  }, []);
+
+  const handleBarcodeAction = useCallback(
+    (code: string) => {
+      // Automatische Aktionen basierend auf Barcode
+      switch (code) {
+        case '000001': {
+          // Auftrag starten
+          setShowUserSelect(true); // Userauswahl anzeigen
+          break;
+        }
+
+        case '000002': {
+          // Auftrag beenden
+          setToast({
+            show: true,
+            msg: 'Auftrag beenden - Funktion wird implementiert',
+            timestamp: new Date().toLocaleTimeString(),
+          });
+          // Hier weitere Logik für Auftrag beenden
+          break;
+        }
+
+        case '000003': {
+          // Problem melden
+          setToast({
+            show: true,
+            msg: 'Problem melden - Funktion wird implementiert',
+            timestamp: new Date().toLocaleTimeString(),
+          });
+          // Hier weitere Logik für Problem melden
+          break;
+        }
+
+        case '000005': {
+          // Auftrag scannen - warten auf Auftragsnummer
+          setToast({
+            show: true,
+            msg: 'Auftrag scannen - Bitte Auftragsnummer eingeben/scannen',
+            timestamp: new Date().toLocaleTimeString(),
+          });
+          // Focus auf Eingabefeld für Auftragsnummer
+          focusInput();
+          break;
+        }
+
+        case '000006': {
+          // Abbrechen/Zurück zum Hauptmenü
+          router('/main');
+          break;
+        }
+
+        case '000010': {
+          // Weiter zum Auftrag starten (aus UserSelect)
+          if (selectedUser) {
+            setShowUserSelect(false);
+            setShowTaskScan(false);
+            setToast({
+              show: true,
+              msg: `Auftrag wird für ${selectedUser.Name} gestartet!`,
+              timestamp: new Date().toLocaleTimeString(),
+            });
+            // Hier weitere Logik für Auftragsstart
+          } else {
+            setToast({
+              show: true,
+              msg: 'Bitte zuerst einen Mitarbeiter auswählen',
+              timestamp: new Date().toLocaleTimeString(),
+            });
+          }
+          break;
+        }
+
+        case '000011': {
+          // Zurück (aus UserSelect)
+          setShowUserSelect(false);
+          break;
+        }
+
+        case '000012': {
+          // Vorheriger Mitarbeiter
+          if (selectedUser && data.length > 0) {
+            const currentIndex = data.findIndex(
+              (user) => user.MitarbeiterNr === selectedUser.MitarbeiterNr,
+            );
+            if (currentIndex > 0) {
+              const prevUser = data[currentIndex - 1];
+              setSelectedUser(prevUser);
+              setToast({
+                show: true,
+                msg: `Mitarbeiter: ${prevUser.Name}`,
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            }
+          }
+          break;
+        }
+
+        case '000013': {
+          // Nächster Mitarbeiter
+          if (selectedUser && data.length > 0) {
+            const currentIndex = data.findIndex(
+              (user) => user.MitarbeiterNr === selectedUser.MitarbeiterNr,
+            );
+            if (currentIndex < data.length - 1) {
+              const nextUser = data[currentIndex + 1];
+              setSelectedUser(nextUser);
+              setToast({
+                show: true,
+                msg: `Mitarbeiter: ${nextUser.Name}`,
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            }
+          }
+          break;
+        }
+
+        default: {
+          // Prüfen ob es eine Auftragsnummer ist (ab 6-stellig)
+          if (/^\d{6,}$/.test(code)) {
+            setToast({
+              show: true,
+              msg: `Auftragsnummer gescannt: ${code}`,
+              timestamp: new Date().toLocaleTimeString(),
+            });
+            // TaskScan-Komponente mit Auftragsnummer anzeigen
+            setShowTaskScan(true);
+            // Hier könnte weitere Logik für Auftragsnummer-Verarbeitung implementiert werden
+          } else {
+            // Prüfen ob es eine Mitarbeiternummer ist
+            const userData = data?.find((user) => user.MitarbeiterNr === code);
+            if (userData) {
+              setSelectedUser(userData);
+              setToast({
+                show: true,
+                msg: `Mitarbeiter ausgewählt: ${userData.Name}`,
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            } else {
+              setToast({
+                show: true,
+                msg: `Unbekannter Barcode: ${code}`,
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            }
+          }
+          break;
+        }
+      }
+    },
+    [router, selectedUser],
+  );
 
   useEffect(() => {
     // Keydown für Scan/Eingabe
     const handleKeyDown = (e: KeyboardEvent) => {
       handleUserActivity();
-      // Wenn Enter gedrückt wird, TaskScan anzeigen
+      // Wenn Enter gedrückt wird, nur Barcode setzen und TaskScan anzeigen
       if (e.key === 'Enter' && inputRef.current) {
-        setBarcode(inputRef.current.value);
-        setShowTaskScan(true);
+        const scannedCode = inputRef.current.value.trim();
+        setBarcode(scannedCode);
+
+        // Automatisch die entsprechende Barcode-Aktion ausführen
+        if (scannedCode) {
+          handleBarcodeAction(scannedCode);
+        }
+
+        // Input-Feld leeren für nächsten Scan
+        inputRef.current.value = '';
       }
     };
+
     // Input für Textboxen
-    const handleInput = (e: Event) => {
+    const handleInput = () => {
       handleUserActivity();
     };
 
@@ -129,7 +290,7 @@ export function ScanPage() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('input', handleInput);
     };
-  }, []);
+  }, [handleBarcodeAction, handleUserActivity]);
 
   const handleSubmit = (event: any) => {
     const form = event.currentTarget;
@@ -149,35 +310,10 @@ export function ScanPage() {
     setTimeout(() => focusInput(), 100);
   };
 
-  const handleBarcodeAction = (code: string) => {
-    setToast({
-      show: true,
-      msg: `Barcode-Aktion: ${code}`,
-      timestamp: new Date().toLocaleTimeString(),
-    });
-    if (code === '000001') {
-      setShowUserSelect(true); // Userauswahl anzeigen
-    } else if (code === '000006') {
-      router('/main');
-    }
-  };
-
   // Barcode-Aktionen aus UserSelect
   const handleUserSelectBarcode = (code: string) => {
-    if (code === '000010') {
-      // Weiter zum Auftrag starten
-      setShowUserSelect(false);
-      setShowTaskScan(false);
-      setToast({
-        show: true,
-        msg: `Auftrag wird für ${selectedUser?.Name || 'unbekannt'} gestartet!`,
-        timestamp: new Date().toLocaleTimeString(),
-      });
-      // Hier ggf. weitere Logik für Auftragsstart
-    } else if (code === '000011') {
-      // Zurück zu TaskScan
-      setShowUserSelect(false);
-    }
+    // Verwende die gleiche handleBarcodeAction Funktion
+    handleBarcodeAction(code);
   };
 
   // User-Auswahl aus UserSelect
@@ -195,7 +331,6 @@ export function ScanPage() {
       <ToastContainer position="top-end" style={{ margin: 20, zIndex: 9999 }}>
                      {' '}
         <Toast
-          key={toast.id}
           onClose={() => setToast({ ...toast, show: false })}
           show={toast.show}
           delay={5000}

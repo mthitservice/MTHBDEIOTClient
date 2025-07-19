@@ -74,10 +74,103 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
 
   handleBarcodeEvent(e: any) {
     console.log('Barcode erkannt:', e.detail);
+
+    // Automatische Aktionen basierend auf Barcode
+    const barcode = e.detail?.value || e.detail;
+    if (barcode) {
+      this.handleBarcodeAction(barcode);
+    }
+
     if (this.props.onBarcodeScanned) {
       this.props.onBarcodeScanned(e.detail);
     }
   }
+
+  handleBarcodeAction = (code: string) => {
+    // Automatische Aktionen basierend auf Barcode
+    switch (code) {
+      case '000001': {
+        // Zurück (nur im start-Status)
+        if (this.state.status === 'start') {
+          this.handleGoPrev();
+        }
+        break;
+      }
+
+      case '000002': {
+        // Vor (nur im start-Status)
+        if (this.state.status === 'start') {
+          this.handleGoNext();
+        }
+        break;
+      }
+
+      case '000003': {
+        // Liste nach oben (nur im function-Status)
+        if (this.state.status === 'function') {
+          this.handleGoUp();
+        }
+        break;
+      }
+
+      case '000004': {
+        // Liste nach unten (nur im function-Status)
+        if (this.state.status === 'function') {
+          this.handleGoDown();
+        }
+        break;
+      }
+
+      case '000005': {
+        // Auftrag scannen
+        this.handleGoScan();
+        break;
+      }
+
+      case '000006': {
+        // Standard Funktionen (nur im function-Status)
+        if (this.state.status === 'function') {
+          this.handleGoFunction();
+        }
+        break;
+      }
+
+      case '000007': {
+        // Weitere Funktionen (nur im start-Status)
+        if (this.state.status === 'start') {
+          this.handleGoFunction();
+        }
+        break;
+      }
+
+      case '000008': {
+        // Auftrag auswählen (nur im function-Status)
+        if (this.state.status === 'function') {
+          this.handleGoTask();
+        }
+        break;
+      }
+
+      case '000009': {
+        // Zurück zur Liste (nur wenn selectedTask vorhanden)
+        if (this.state.selectedTask) {
+          this.handleBackToList();
+        }
+        break;
+      }
+
+      default: {
+        // Prüfen ob es eine Auftragsnummer ist (ab 6-stellig)
+        if (/^\d{6,}$/.test(code)) {
+          this.addToast(`Auftragsnummer gescannt: ${code}`);
+          // Hier könnte weitere Logik für Auftragsnummern implementiert werden
+        } else {
+          this.addToast(`Unbekannter Barcode: ${code}`);
+        }
+        break;
+      }
+    }
+  };
 
   handleKeyDown(e: any) {
     if (e.key.length > 1 && e.key !== 'Enter') return;
@@ -85,12 +178,10 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
     if (e.key === 'Enter') {
       const trimmed = this.buffer.trim();
 
-      if (/^\d{6}$/.test(trimmed)) {
-        this.addToast('Barcode:' + trimmed);
+      if (/^\d{6,}$/.test(trimmed)) {
         const event = new CustomEvent('barcode-scan-complete', {
-          detail: { type: '6-digit', value: trimmed },
+          detail: { type: 'auftragsnummer', value: trimmed },
         });
-
         document.dispatchEvent(event);
       } else if (/^\d{2}$/.test(trimmed)) {
         const event = new CustomEvent('barcode-scan-complete', {
