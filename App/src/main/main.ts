@@ -24,12 +24,15 @@ let mainWindow: BrowserWindow | null = null;
 
 require('dotenv').config({
   path: path.resolve(__dirname, '../../.env'),
-  debug: true
+  debug: true,
 });
 
 const packageJson = require('../../package.json');
 
-console.log('ENV Debug - dotenv loaded from:', path.resolve(__dirname, '../../.env'));
+console.log(
+  'ENV Debug - dotenv loaded from:',
+  path.resolve(__dirname, '../../.env'),
+);
 console.log('APP Name:', process.env.APP_NAME);
 console.log('APP Version from ENV:', process.env.APP_VERSION);
 console.log('APP Version from package.json:', packageJson.version);
@@ -118,7 +121,9 @@ class AppUpdater {
       console.error('Error in auto-updater:', err);
       // Für ARM/Linux-Systeme: Auto-Update Fehler sind normal (DEB-Pakete unterstützen kein Auto-Update)
       if (isArmSystem || process.platform === 'linux') {
-        console.log('Auto-Update ist für ARM/Linux DEB-Installationen nicht verfügbar - verwenden Sie die manuelle Update-Methode');
+        console.log(
+          'Auto-Update ist für ARM/Linux DEB-Installationen nicht verfügbar - verwenden Sie die manuelle Update-Methode',
+        );
       }
     });
 
@@ -136,18 +141,25 @@ class AppUpdater {
       }
     });
 
-    // Auto-Update nur für Windows und nicht-ARM Systeme aktivieren
-    // ARM/Linux DEB-Pakete unterstützen kein Auto-Update über GitHub
-    const shouldCheckForUpdates = process.env.NODE_ENV === 'production' &&
-      !isArmSystem &&
-      process.platform !== 'linux';
+    // Auto-Update für alle Plattformen aktivieren, da DEB-Pakete jetzt funktionieren
+    // Intelligentes Update-System: Internet primär, lokaler Server als Fallback
+    const shouldCheckForUpdates = process.env.NODE_ENV === 'production';
 
     if (shouldCheckForUpdates) {
-      console.log('Auto-Update aktiviert für unterstützte Plattform');
-      autoUpdater.checkForUpdatesAndNotify();
+      console.log(
+        '✅ Auto-Update aktiviert - intelligentes Update-System (Internet + lokaler Fallback)',
+      );
+      // Für electron-updater kompatible Systeme (Windows/macOS)
+      if (!isArmSystem && process.platform !== 'linux') {
+        autoUpdater.checkForUpdatesAndNotify();
+      } else {
+        // Für ARM/Linux: Verwende unser intelligentes Update-System
+        console.log(
+          '🍓 Using intelligent update system for ARM/Linux platform',
+        );
+      }
     } else {
-      console.log('Auto-Update deaktiviert für diese Plattform (ARM/Linux DEB)');
-      console.log('Für Updates: Neues DEB-Paket von GitHub herunterladen und installieren');
+      console.log('⚙️ Development mode - Auto-Update disabled');
     }
   }
 }
@@ -161,38 +173,110 @@ ipcMain.on('ipc-example', async (event, arg) => {
 // AutoUpdater IPC Handlers
 ipcMain.handle('check-for-updates', async () => {
   try {
-    // Für ARM/Linux: Manueller Update-Check über GitHub API
-    if (isArmSystem || process.platform === 'linux') {
-      console.log(
-        'Checking for updates via GitHub API for ARM/Linux system...',
-      );
+    console.log('Checking for updates with intelligent fallback...');
+
+    // Hole die lokale Server IP aus der Config
+    const localServerIP = globalConfig?.find(
+      (item: any) => item.key === 'ipv4Address',
+    )?.value;
+
+    // Versuche zuerst Internet-Update (GitHub)
+    try {
+      console.log('Trying internet update from GitHub...');
+
+      // AbortController für Timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 Sekunden
 
       const response = await fetch(
         'https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest',
+        { signal: controller.signal },
       );
-      const data = await response.json();
 
-      const latestVersion = data.tag_name.replace('v', '');
-      const currentVersion = process.env.APP_VERSION || '1.0.0';
+      clearTimeout(timeoutId);
 
-      const updateInfo = {
-        currentVersion,
-        latestVersion,
-        hasUpdate: latestVersion !== currentVersion,
-        downloadUrl: `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${data.tag_name}`,
-        releaseNotes: data.body,
-        publishedAt: data.published_at,
-      };
+      if (response.ok) {
+        const data = await response.json();
+        const latestVersion = data.tag_name.replace('v', '');
+        const currentVersion = packageJson.version;
 
-      console.log('Update check result:', updateInfo);
-      return updateInfo;
+        const updateInfo = {
+          source: 'internet',
+          currentVersion,
+          latestVersion,
+          hasUpdate: latestVersion !== currentVersion,
+          downloadUrl: `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${data.tag_name}`,
+          releaseNotes: data.body,
+          publishedAt: data.published_at,
+        };
+
+        console.log('✅ Internet update check successful:', updateInfo);
+        return updateInfo;
+      }
+    } catch (internetError) {
+      console.log(
+        '❌ Internet update failed, trying local server...',
+        internetError,
+      );
     }
 
-    // Standard Auto-Updater für andere Plattformen
-    return autoUpdater.checkForUpdates();
+    // Fallback: Lokaler Server Update
+    if (localServerIP) {
+      try {
+        console.log(
+          `Trying local server update from http://${localServerIP}/update`,
+        );
+
+        // AbortController für lokalen Server
+        const localController = new AbortController();
+        const localTimeoutId = setTimeout(() => localController.abort(), 3000); // 3 Sekunden
+
+        const localResponse = await fetch(
+          `http://${localServerIP}/update/version.json`,
+          { signal: localController.signal },
+        );
+
+        clearTimeout(localTimeoutId);
+
+        if (localResponse.ok) {
+          const localData = await localResponse.json();
+          const currentVersion = packageJson.version;
+
+          const updateInfo = {
+            source: 'local',
+            currentVersion,
+            latestVersion: localData.version,
+            hasUpdate: localData.version !== currentVersion,
+            downloadUrl: `http://${localServerIP}/update/${localData.filename}`,
+            releaseNotes: localData.releaseNotes || 'Local server update',
+            publishedAt: localData.publishedAt || new Date().toISOString(),
+          };
+
+          console.log('✅ Local server update check successful:', updateInfo);
+          return updateInfo;
+        }
+      } catch (localError) {
+        console.log('❌ Local server update failed:', localError);
+      }
+    }
+
+    // Wenn beide fehlschlagen
+    console.log('⚠️ Both internet and local server updates failed');
+    return {
+      source: 'none',
+      currentVersion: packageJson.version,
+      latestVersion: packageJson.version,
+      hasUpdate: false,
+      error:
+        'No update source available - neither internet nor local server accessible',
+    };
   } catch (error: any) {
-    console.error('Error checking for updates:', error);
-    return { error: error.message };
+    console.error('Error in update check:', error);
+    return {
+      error: error.message,
+      currentVersion: packageJson.version,
+      hasUpdate: false,
+    };
   }
 });
 
@@ -283,8 +367,7 @@ const createWindow = async () => {
 
   // 1920x1080 Optimierung für Entwicklung und Produktion
   const isDev1080Mode =
-    process.argv.includes('--dev1080') ||
-    process.env.DEV_1080 === 'true';
+    process.argv.includes('--dev1080') || process.env.DEV_1080 === 'true';
 
   // Fenstergröße bestimmen
   let windowWidth = 1024;
@@ -295,7 +378,9 @@ const createWindow = async () => {
     windowHeight = 1080;
   }
 
-  console.log(`🖥️  Window size: ${windowWidth}x${windowHeight} (Fullscreen: ${isFullscreenMode}, Dev1080: ${isDev1080Mode})`);
+  console.log(
+    `🖥️  Window size: ${windowWidth}x${windowHeight} (Fullscreen: ${isFullscreenMode}, Dev1080: ${isDev1080Mode})`,
+  );
 
   mainWindow = new BrowserWindow({
     show: false,
@@ -380,12 +465,15 @@ const createWindow = async () => {
       console.log('🎯 DOM ist bereit');
 
       // Raspberry Pi Dev-Tools für Auflösungstests
-      if (process.env.RASPBERRY_PI === 'true' && process.env.NODE_ENV === 'development') {
+      if (
+        process.env.RASPBERRY_PI === 'true' &&
+        process.env.NODE_ENV === 'development'
+      ) {
         console.log('🍓 Raspberry Pi Entwicklungsmodus aktiviert');
 
         // DevTools öffnen mit Responsive Design Mode
         mainWindow?.webContents.openDevTools({
-          mode: 'right'
+          mode: 'right',
         });
 
         // Raspberry Pi typische Viewport-Größen für Tests verfügbar machen
