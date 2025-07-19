@@ -103,7 +103,7 @@ const AutoUpdater: React.FC = () => {
     try {
       await window.electron.autoUpdater.checkForUpdates();
     } catch (err) {
-      setError('Fehler beim Prüfen auf Updates: ' + (err as Error).message);
+      setError(`Fehler beim Prüfen auf Updates: ${(err as Error).message}`);
     } finally {
       setChecking(false);
     }
@@ -119,7 +119,7 @@ const AutoUpdater: React.FC = () => {
       await window.electron.autoUpdater.downloadUpdate();
     } catch (err) {
       setError(
-        'Fehler beim Herunterladen des Updates: ' + (err as Error).message,
+        `Fehler beim Herunterladen des Updates: ${(err as Error).message}`,
       );
       setDownloading(false);
     }
@@ -132,7 +132,7 @@ const AutoUpdater: React.FC = () => {
       await window.electron.autoUpdater.installUpdate();
     } catch (err) {
       setError(
-        'Fehler beim Installieren des Updates: ' + (err as Error).message,
+        `Fehler beim Installieren des Updates: ${(err as Error).message}`,
       );
     }
   };
@@ -142,7 +142,7 @@ const AutoUpdater: React.FC = () => {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
   };
 
   return (

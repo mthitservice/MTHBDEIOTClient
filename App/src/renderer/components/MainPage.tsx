@@ -35,6 +35,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
   buffer: string;
 
   timeout: NodeJS.Timeout | undefined;
+
   tableViewRef: any;
 
   toastIdCounter: number;
@@ -64,6 +65,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
     document.body.addEventListener('keydown', this.handleKeyDown, true);
     document.addEventListener('barcode-scan-complete', this.handleBarcodeEvent);
   }
+
   componentWillUnmount() {
     document.body.removeEventListener('keydown', this.handleKeyDown, true);
     document.removeEventListener(
@@ -226,23 +228,28 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
     console.log('Next');
     this.tableViewRef.current?.handleNext();
   };
+
   handleGoPrev = () => {
     console.log('Prev');
     this.tableViewRef.current?.handlePrev();
   };
+
   handleGoUp = () => {
     console.log('Up');
     this.tableViewRef.current?.handlePrevTask();
   };
+
   handleGoDown = () => {
     console.log('Down');
     this.tableViewRef.current?.handleNextTask();
   };
+
   handleGoScan = () => {
     if (this.props.navigate) {
       this.props.navigate('/scan');
     }
   };
+
   handleGoFunction = () => {
     if (this.state.status === 'start') {
       // zurück zu Start
@@ -270,6 +277,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
   handleBackToList = () => {
     this.setState({ selectedTask: null });
   };
+
   render() {
     const { selectedTask } = this.state;
     return (
@@ -309,7 +317,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                           code="000009"
                           text={
                             <>
-                              <i className="bi bi-arrow-left-square-fill"></i>{' '}
+                              <i className="bi bi-arrow-left-square-fill" />{' '}
                               Zurück zur Liste
                             </>
                           }
@@ -334,8 +342,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000005"
                             text={
                               <>
-                                <i className="bi bi-upc-scan"></i> Auftrag
-                                scannen
+                                <i className="bi bi-upc-scan" /> Auftrag scannen
                               </>
                             }
                             onClick={this.handleGoScan}
@@ -346,7 +353,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000007"
                             text={
                               <>
-                                <i className="bi bi-briefcase-fill"></i> weitere
+                                <i className="bi bi-briefcase-fill" /> weitere
                                 Funktionen
                               </>
                             }
@@ -358,7 +365,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000001"
                             text={
                               <>
-                                <i className="bi bi-arrow-left-square-fill"></i>{' '}
+                                <i className="bi bi-arrow-left-square-fill" />{' '}
                                 Zurück
                               </>
                             }
@@ -370,7 +377,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000002"
                             text={
                               <>
-                                <i className="bi bi-arrow-right-square-fill"></i>{' '}
+                                <i className="bi bi-arrow-right-square-fill" />{' '}
                                 Vor
                               </>
                             }
@@ -386,7 +393,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000008"
                             text={
                               <>
-                                <i className="bi bi-border-style"></i> Auftrag
+                                <i className="bi bi-border-style" /> Auftrag
                                 auswählen
                               </>
                             }
@@ -398,8 +405,8 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000006"
                             text={
                               <>
-                                <i className="bi bi-briefcase-fill"></i>{' '}
-                                Standard Funktionen
+                                <i className="bi bi-briefcase-fill" /> Standard
+                                Funktionen
                               </>
                             }
                             onClick={this.handleGoFunction}
@@ -410,7 +417,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000003"
                             text={
                               <>
-                                <i className="bi bi-arrow-up-square-fill"></i>{' '}
+                                <i className="bi bi-arrow-up-square-fill" />{' '}
                                 Liste nach oben
                               </>
                             }
@@ -422,7 +429,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                             code="000004"
                             text={
                               <>
-                                <i className="bi bi-arrow-down-square-fill"></i>{' '}
+                                <i className="bi bi-arrow-down-square-fill" />{' '}
                                 Liste nach unten
                               </>
                             }

@@ -1,8 +1,8 @@
 import React from 'react';
-import data from './bde_user_test.json';
-import BarCode from './BarCode';
 import Stack from 'react-bootstrap/Stack';
 import Card from 'react-bootstrap/Card';
+import data from './bde_user_test.json';
+import BarCode from './BarCode';
 import icon from '../../../assets/icons/person-bounding-box.svg';
 
 interface UserSelectProps {

@@ -90,7 +90,7 @@ export function ConfigPage() {
   return (
     <div className="d-flex flex-column min-vh-100">
       <div className="BdeConfig container ">
-        <div class="alert alert-warning" role="alert">
+        <div className="alert alert-warning" role="alert">
           Dieses Gerät ist noch nicht konfiguriert. <br />
           Legen Sie einen Namen fest und die IPV4 Adresse des BDE Servers.
         </div>
@@ -99,7 +99,7 @@ export function ConfigPage() {
         <Form noValidate validated={validated} onSubmit={handleSubmit}>
           <fieldset>
             <Form.Group className="mb-3">
-              <Form.Label></Form.Label>
+              <Form.Label />
               <Form.Label htmlFor="DeviceName">Gerätename</Form.Label>
               <Form.Control id="DeviceName" placeholder="BDE00x" required />
               <Form.Control.Feedback type="invalid">

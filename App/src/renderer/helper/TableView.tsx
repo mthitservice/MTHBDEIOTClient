@@ -3,8 +3,8 @@ import Table from 'react-bootstrap/Table';
 import './TableView.css';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
-import StatusIndicator from './StatusIndicator';
 import moment from 'moment';
+import StatusIndicator from './StatusIndicator';
 
 interface BdeTask {
   Terminstatus: number;
@@ -57,8 +57,9 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
     };
     this.theTable = this;
   }
+
   public getSelectedTask = () => {
-    const itemsPerPage = this.state.itemsPerPage;
+    const { itemsPerPage } = this.state;
     const startIndex = this.state.currentPage * itemsPerPage;
     const currentData = this.props.Auftraege.slice(
       startIndex,
@@ -68,7 +69,7 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
   };
 
   public handleNext = () => {
-    const itemsPerPage = this.state.itemsPerPage;
+    const { itemsPerPage } = this.state;
     const totalPages = Math.ceil(this.props.Auftraege.length / itemsPerPage);
     if (this.state.currentPage < totalPages - 1) {
       this.setState({
@@ -103,8 +104,9 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
       ausgewaehlterIndex: Math.max(prevState.ausgewaehlterIndex - 1, 0),
     }));
   };
+
   render() {
-    const itemsPerPage = this.state.itemsPerPage;
+    const { itemsPerPage } = this.state;
 
     const totalPages = Math.ceil(this.props.Auftraege.length / itemsPerPage);
     const { currentPage } = this.state;
@@ -138,7 +140,7 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
       }
     };
     const handleNextTask = () => {
-      const itemsPerPage = this.state.itemsPerPage;
+      const { itemsPerPage } = this.state;
       const startIndex = this.state.currentPage * itemsPerPage;
       const currentData = this.props.Auftraege.slice(
         startIndex,
@@ -158,7 +160,7 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
         this.props.onSelectTask(currentData[newIndex] || null);
     };
     const handlePrevTask = () => {
-      const itemsPerPage = this.state.itemsPerPage;
+      const { itemsPerPage } = this.state;
       const startIndex = this.state.currentPage * itemsPerPage;
       const currentData = this.props.Auftraege.slice(
         startIndex,
@@ -194,13 +196,12 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
                       {key}
                     </th>
                   );
-                } else {
-                  return (
-                    <th className="bg-orange fc-white col-2" key={key}>
-                      {key}
-                    </th>
-                  );
                 }
+                return (
+                  <th className="bg-orange fc-white col-2" key={key}>
+                    {key}
+                  </th>
+                );
               })}
             </tr>
           </thead>
@@ -278,10 +279,10 @@ class TableView extends React.Component<TableViewProps, TableViewState> {
 
             <div style={{ marginTop: '1rem' }}>
               <button onClick={handlePrevTask}>
-                <i class="bi bi-arrow-up-square-fill"></i> Nach oben
+                <i className="bi bi-arrow-up-square-fill" /> Nach oben
               </button>
               <button onClick={handleNextTask} style={{ marginLeft: '1rem' }}>
-                <i class="bi bi-arrow-down-square-fill"></i> Nach unten
+                <i className="bi bi-arrow-down-square-fill" /> Nach unten
               </button>
             </div>
           </>

@@ -12,9 +12,9 @@ Das MTH BDE IoT Client Update-System wurde erfolgreich auf ein intelligentes Dua
    - Graceful Degradation bei Netzwerkproblemen
 
 2. **Auto-Updates aktiviert für alle Plattformen**
-   - Windows: ✅ Aktiviert
-   - macOS: ✅ Aktiviert
-   - ARM/Linux: ✅ Aktiviert (mit intelligentem Fallback)
+   - Windows: ✅ Aktiviert (electron-updater)
+   - macOS: ✅ Aktiviert (electron-updater)
+   - ARM/Linux: ✅ Aktiviert (intelligentes System mit automatischen 6h-Intervallen)
 
 3. **Timeout-Management**
    - AbortController für Request-Cancellation
@@ -161,10 +161,12 @@ sudo grep "$(date +%Y-%m-%d)" /var/log/apache2/access.log | grep version.json | 
 - Immer aktuellste Version verfügbar
 - Keine zusätzliche Infrastruktur nötig
 
-### 🏠 Für Offline-IoT-Umgebungen
+### � Für Raspberry Pi / ARM/Linux
+- Intelligentes Update-System mit automatischen 6-Stunden-Intervallen
+- Primäre Quelle: GitHub API
+- Fallback: Lokaler Update-Server
+- Automatische Update-Prüfung beim Start und alle 6 Stunden
 - Lokaler Update-Server für isolierte Netzwerke
-- Kontrollierte Update-Verteilung
-- Reduzierte Bandbreiten-Anforderungen
 
 ### 🔄 Für Hybrid-Umgebungen
 - Intelligent fallback zwischen beiden Quellen

@@ -38,7 +38,7 @@ try {
   console.info('Database file exists:', dbPath);
 } catch (err) {
   console.error('Database file does not exist:', dbPath);
-  throw new Error('Database file not found: ' + err.message);
+  throw new Error(`Database file not found: ${err.message}`);
 }
 
 let db;
@@ -48,7 +48,7 @@ try {
   console.info('Database opened successfully:', dbPath);
 } catch (err) {
   console.error('Failed to open database:', dbPath, err);
-  throw new Error('Failed to open database: ' + err.message);
+  throw new Error(`Failed to open database: ${err.message}`);
 }
 
 try {
@@ -58,7 +58,7 @@ try {
   console.info('Config table created/verified successfully');
 } catch (err) {
   console.error('Failed to create Config Table:', err);
-  throw new Error('Failed to create Config Table: ' + err.message);
+  throw new Error(`Failed to create Config Table: ${err.message}`);
 }
 // Konfigurationstabelle
 

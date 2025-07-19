@@ -32,7 +32,7 @@ const configuration: webpack.Configuration = {
 
   entry: {
     renderer: Object.keys(dependencies || {}).filter(
-      (dependency) => !['bootstrap-icons'].includes(dependency)
+      (dependency) => !['bootstrap-icons'].includes(dependency),
     ),
   },
 

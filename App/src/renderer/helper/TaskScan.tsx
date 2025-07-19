@@ -1,6 +1,6 @@
 import React from 'react';
 import moment from 'moment';
-import BarCode from '../helper/BarCode';
+import BarCode from './BarCode';
 import './TaskView.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -126,7 +126,7 @@ const TaskScan: React.FC<TaskScanProps> = (props) => {
                 {row[0]?.value}
               </td>
               {/* Leere Spalte ohne Rahmen/Linien */}
-              <td className="noborder-cell"></td>
+              <td className="noborder-cell" />
               {/* Zweites Feld */}
               {row[1] ? (
                 <>
@@ -144,8 +144,8 @@ const TaskScan: React.FC<TaskScanProps> = (props) => {
                 </>
               ) : (
                 <>
-                  <th style={{ width: '10%' }}></th>
-                  <td style={{ width: '30%' }}></td>
+                  <th style={{ width: '10%' }} />
+                  <td style={{ width: '30%' }} />
                 </>
               )}
             </tr>
@@ -171,7 +171,7 @@ const TaskScan: React.FC<TaskScanProps> = (props) => {
             code="000001"
             text={
               <>
-                <i className="bi bi-border-style"></i> Auftrag starten
+                <i className="bi bi-border-style" /> Auftrag starten
               </>
             }
             onClick={() => handleBarcodeClick('000001')}
@@ -182,7 +182,7 @@ const TaskScan: React.FC<TaskScanProps> = (props) => {
             code="00002"
             text={
               <>
-                <i className="bi bi-border-style"></i> Auftrag beenden
+                <i className="bi bi-border-style" /> Auftrag beenden
               </>
             }
             onClick={() => handleBarcodeClick('000002')}
@@ -193,7 +193,7 @@ const TaskScan: React.FC<TaskScanProps> = (props) => {
             code="000003"
             text={
               <>
-                <i className="bi bi-border-style"></i> Problem melden
+                <i className="bi bi-border-style" /> Problem melden
               </>
             }
             onClick={() => handleBarcodeClick('000003')}
@@ -204,7 +204,7 @@ const TaskScan: React.FC<TaskScanProps> = (props) => {
             code="000006"
             text={
               <>
-                <i className="bi bi-briefcase-fill"></i> Abbrechen
+                <i className="bi bi-briefcase-fill" /> Abbrechen
               </>
             }
             onClick={() => handleBarcodeClick('000006')}

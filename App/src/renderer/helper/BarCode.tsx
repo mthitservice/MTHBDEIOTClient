@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Barcode from 'react-barcode';
 import './BarCode.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+
 interface BarCodeProps {
   code: string;
   text: string;
@@ -22,7 +23,7 @@ class BarCode extends React.Component<BarCodeProps> {
               value={this.props.code}
               displayValue={false}
               ean128={false}
-              format={'CODE39'}
+              format="CODE39"
               height={60}
               width={3}
               className="BdeBarCode"

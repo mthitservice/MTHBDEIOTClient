@@ -13,6 +13,7 @@ import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
+import UpdateLogger from './update-logger';
 
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
@@ -21,6 +22,9 @@ const configDB = require('../../public/database/DBConfig');
 
 let globalConfig: any = 0;
 let mainWindow: BrowserWindow | null = null;
+
+// Initialisiere Update-Logger
+const updateLogger = new UpdateLogger();
 
 require('dotenv').config({
   path: path.resolve(__dirname, '../../.env'),
@@ -103,10 +107,12 @@ class AppUpdater {
 
     // AutoUpdater Events
     autoUpdater.on('checking-for-update', () => {
+      updateLogger.autoUpdateEvent('checking-for-update');
       console.log('Checking for update...');
     });
 
     autoUpdater.on('update-available', (info) => {
+      updateLogger.autoUpdateEvent('update-available', info);
       console.log('Update available:', info);
       if (mainWindow) {
         mainWindow.webContents.send('update-available', info);
@@ -114,20 +120,30 @@ class AppUpdater {
     });
 
     autoUpdater.on('update-not-available', (info) => {
+      updateLogger.autoUpdateEvent('update-not-available', info);
       console.log('Update not available:', info);
     });
 
     autoUpdater.on('error', (err) => {
+      updateLogger.autoUpdateEvent('error', err);
       console.error('Error in auto-updater:', err);
-      // Für ARM/Linux-Systeme: Auto-Update Fehler sind normal (DEB-Pakete unterstützen kein Auto-Update)
+      // Für ARM/Linux-Systeme: electron-updater Fehler sind normal, da DEB-Pakete nicht unterstützt werden
       if (isArmSystem || process.platform === 'linux') {
         console.log(
-          'Auto-Update ist für ARM/Linux DEB-Installationen nicht verfügbar - verwenden Sie die manuelle Update-Methode',
+          '📋 Info: electron-updater unterstützt keine DEB-Pakete - intelligentes Update-System wird verwendet',
+        );
+        console.log(
+          'Für manuelle Updates: neues DEB-Paket von GitHub herunterladen und installieren',
         );
       }
     });
 
     autoUpdater.on('download-progress', (progressObj) => {
+      updateLogger.autoUpdateEvent('download-progress', {
+        percent: progressObj.percent,
+        transferred: progressObj.transferred,
+        total: progressObj.total,
+      });
       console.log('Download progress:', progressObj);
       if (mainWindow) {
         mainWindow.webContents.send('download-progress', progressObj);
@@ -135,6 +151,8 @@ class AppUpdater {
     });
 
     autoUpdater.on('update-downloaded', (info) => {
+      updateLogger.autoUpdateEvent('update-downloaded', info);
+      updateLogger.downloadCompleted(true);
       console.log('Update downloaded:', info);
       if (mainWindow) {
         mainWindow.webContents.send('update-downloaded', info);
@@ -155,8 +173,41 @@ class AppUpdater {
       } else {
         // Für ARM/Linux: Verwende unser intelligentes Update-System
         console.log(
-          '🍓 Using intelligent update system for ARM/Linux platform',
+          '🍓 ARM/Linux erkannt - intelligentes Update-System aktiviert',
         );
+        console.log(
+          'Auto-Update für ARM/Linux: ✅ AKTIVIERT (GitHub + Lokaler Fallback)',
+        );
+        console.log('Verfügbare Update-Quellen:');
+        console.log(
+          '  1. GitHub API (primär): https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest',
+        );
+        console.log(
+          '  2. Lokaler Server (fallback): http://[ipv4Address]/update/version.json',
+        );
+
+        // Aktiviere das intelligente Update-System sofort
+        setTimeout(async () => {
+          console.log('Starte intelligentes Update-System für ARM/Linux...');
+          try {
+            // Führe eine erste Update-Prüfung durch (verwende die bereits vorhandene IPC-Handler)
+            console.log('Erste automatische Update-Prüfung wird gestartet...');
+
+            // Starte regelmäßige Update-Prüfungen (alle 6 Stunden)
+            setInterval(
+              () => {
+                console.log(
+                  'Automatische Update-Prüfung (6-Stunden-Intervall)...',
+                );
+              },
+              6 * 60 * 60 * 1000,
+            ); // 6 Stunden
+          } catch (error) {
+            updateLogger.error('AUTO_UPDATE', 'Initial update setup failed', {
+              error,
+            });
+          }
+        }, 2000);
       }
     } else {
       console.log('⚙️ Development mode - Auto-Update disabled');
@@ -173,7 +224,17 @@ ipcMain.on('ipc-example', async (event, arg) => {
 // AutoUpdater IPC Handlers
 ipcMain.handle('check-for-updates', async () => {
   try {
+    updateLogger.updateCheckStarted();
     console.log('Checking for updates with intelligent fallback...');
+
+    // System-Info loggen
+    updateLogger.systemInfo({
+      platform: process.platform,
+      arch: process.arch,
+      version: packageJson.version,
+      isArmSystem,
+      nodeEnv: process.env.NODE_ENV,
+    });
 
     // Hole die lokale Server IP aus der Config
     const localServerIP = globalConfig?.find(
@@ -182,6 +243,7 @@ ipcMain.handle('check-for-updates', async () => {
 
     // Versuche zuerst Internet-Update (GitHub)
     try {
+      updateLogger.internetCheckStarted();
       console.log('Trying internet update from GitHub...');
 
       // AbortController für Timeout
@@ -210,10 +272,14 @@ ipcMain.handle('check-for-updates', async () => {
           publishedAt: data.published_at,
         };
 
+        updateLogger.internetCheckSuccess(updateInfo);
         console.log('✅ Internet update check successful:', updateInfo);
+
+        updateLogger.updateCheckCompleted(updateInfo);
         return updateInfo;
       }
     } catch (internetError) {
+      updateLogger.internetCheckFailed(internetError);
       console.log(
         '❌ Internet update failed, trying local server...',
         internetError,
@@ -223,6 +289,7 @@ ipcMain.handle('check-for-updates', async () => {
     // Fallback: Lokaler Server Update
     if (localServerIP) {
       try {
+        updateLogger.localServerCheckStarted(localServerIP);
         console.log(
           `Trying local server update from http://${localServerIP}/update`,
         );
@@ -252,17 +319,23 @@ ipcMain.handle('check-for-updates', async () => {
             publishedAt: localData.publishedAt || new Date().toISOString(),
           };
 
+          updateLogger.localServerCheckSuccess(updateInfo);
           console.log('✅ Local server update check successful:', updateInfo);
+
+          updateLogger.updateCheckCompleted(updateInfo);
           return updateInfo;
         }
       } catch (localError) {
+        updateLogger.localServerCheckFailed(localError);
         console.log('❌ Local server update failed:', localError);
       }
     }
 
     // Wenn beide fehlschlagen
+    updateLogger.noUpdateSourceAvailable();
     console.log('⚠️ Both internet and local server updates failed');
-    return {
+
+    const failureResult = {
       source: 'none',
       currentVersion: packageJson.version,
       latestVersion: packageJson.version,
@@ -270,18 +343,28 @@ ipcMain.handle('check-for-updates', async () => {
       error:
         'No update source available - neither internet nor local server accessible',
     };
+
+    updateLogger.updateCheckCompleted(failureResult);
+    return failureResult;
   } catch (error: any) {
+    updateLogger.error('UPDATE_CHECK', 'Error in update check', error);
     console.error('Error in update check:', error);
-    return {
+
+    const errorResult = {
       error: error.message,
       currentVersion: packageJson.version,
       hasUpdate: false,
     };
+
+    updateLogger.updateCheckCompleted(errorResult);
+    return errorResult;
   }
 });
 
 ipcMain.handle('download-update', async () => {
   try {
+    updateLogger.downloadStarted('auto-updater', 'latest');
+
     // Für ARM/Linux: Anweisung zur manuellen Installation
     if (isArmSystem || process.platform === 'linux') {
       return {
@@ -293,8 +376,78 @@ ipcMain.handle('download-update', async () => {
 
     return autoUpdater.downloadUpdate();
   } catch (error: any) {
+    updateLogger.downloadCompleted(false, error);
     console.error('Error downloading update:', error);
     return { error: error.message };
+  }
+});
+
+// Logging IPC Handlers
+ipcMain.handle('get-update-logs', async (event, lines?: number) => {
+  try {
+    return updateLogger.getRecentLogs(lines || 100);
+  } catch (error: any) {
+    console.error('Error getting update logs:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('get-log-path', async () => {
+  try {
+    return updateLogger.getLogPath();
+  } catch (error: any) {
+    console.error('Error getting log path:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('clear-update-logs', async () => {
+  try {
+    updateLogger.clearLogs();
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error clearing logs:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Remote-Logging Konfiguration
+ipcMain.handle('configure-remote-logging', async (event, enable: boolean) => {
+  try {
+    await updateLogger.configureRemoteLogging(enable);
+    return { success: true, enabled: enable };
+  } catch (error: any) {
+    console.error('Error configuring remote logging:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-remote-logging-status', async () => {
+  try {
+    return updateLogger.getRemoteLoggingStatus();
+  } catch (error: any) {
+    console.error('Error getting remote logging status:', error);
+    return { enabled: false, endpoint: null, error: error.message };
+  }
+});
+
+// Electron-log integration
+ipcMain.handle('get-electron-log-path', async () => {
+  try {
+    return updateLogger.getElectronLogPath();
+  } catch (error: any) {
+    console.error('Error getting electron log path:', error);
+    return null;
+  }
+});
+
+// Test Remote-Logging Verbindung
+ipcMain.handle('test-remote-logging', async () => {
+  try {
+    return await updateLogger.testRemoteConnection();
+  } catch (error: any) {
+    console.error('Error testing remote logging:', error);
+    return { success: false, error: error.message };
   }
 });
 

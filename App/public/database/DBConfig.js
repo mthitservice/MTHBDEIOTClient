@@ -1,6 +1,6 @@
 const dbmgr = require('./DBManager');
 
-const db = dbmgr.db;
+const { db } = dbmgr;
 
 const readAllConfig = () => {
   const stmt = db.prepare('SELECT * FROM config');

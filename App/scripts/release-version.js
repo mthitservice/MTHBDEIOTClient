@@ -140,7 +140,7 @@ function setPackageVersion(packageJsonPath, version) {
     packageJson.version = version;
     fs.writeFileSync(
       packageJsonPath,
-      JSON.stringify(packageJson, null, 2) + '\n',
+      `${JSON.stringify(packageJson, null, 2)}\n`,
     );
     return true;
   } catch (error) {
@@ -239,7 +239,7 @@ function updateEnvFile(envFilePath, version) {
       envContent.pop();
     }
 
-    fs.writeFileSync(envFilePath, envContent.join('\n') + '\n');
+    fs.writeFileSync(envFilePath, `${envContent.join('\n')}\n`);
     return true;
   } catch (error) {
     coloredOutput(
@@ -337,16 +337,14 @@ async function main() {
       for (const tag of tags) {
         if (tag.match(/-(beta|alpha|rc|dev)/)) {
           if (!latestBetaTag) latestBetaTag = tag;
-        } else {
-          if (!latestStableTag) latestStableTag = tag;
-        }
+        } else if (!latestStableTag) latestStableTag = tag;
       }
 
       // Prefer stable releases over beta releases
       const selectedTag = latestStableTag || latestBetaTag || tags[0];
 
       if (selectedTag) {
-        let tagVersion = selectedTag.substring(1); // Remove 'v' prefix
+        const tagVersion = selectedTag.substring(1); // Remove 'v' prefix
         // Clean version (remove beta, alpha, etc.)
         const cleanVersion = tagVersion.replace(/-(beta|alpha|rc|dev).*$/, '');
         if (cleanVersion.match(/^[0-9]+\.[0-9]+\.[0-9]+$/)) {

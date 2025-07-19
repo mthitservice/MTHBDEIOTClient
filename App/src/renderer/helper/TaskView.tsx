@@ -116,7 +116,7 @@ const TaskView: React.FC<TaskViewProps> = ({ Task, LogData }) => {
                   {row[0]?.value}
                 </td>
                 {/* Leere Spalte ohne Rahmen/Linien */}
-                <td className="noborder-cell"></td>
+                <td className="noborder-cell" />
                 {/* Zweites Feld */}
                 {row[1] ? (
                   <>
@@ -135,8 +135,8 @@ const TaskView: React.FC<TaskViewProps> = ({ Task, LogData }) => {
                   </>
                 ) : (
                   <>
-                    <th style={{ width: '10%' }}></th>
-                    <td style={{ width: '20%' }}></td>
+                    <th style={{ width: '10%' }} />
+                    <td style={{ width: '20%' }} />
                   </>
                 )}
                 {/* Rechte Objekt-Spalte nur beim ersten Row mit Rowspan */}
