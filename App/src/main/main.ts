@@ -54,6 +54,20 @@ if (isArmSystem) {
   app.commandLine.appendSwitch('--disable-features=TranslateUI');
   app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
 
+  // Shared Memory / Temp-Directory Fixes für Raspberry Pi
+  app.commandLine.appendSwitch('--disable-shared-memory');
+  app.commandLine.appendSwitch('--temp-dir=/tmp');
+  app.commandLine.appendSwitch('--user-data-dir=/tmp/electron-user-data');
+  app.commandLine.appendSwitch('--disk-cache-dir=/tmp/electron-cache');
+  app.commandLine.appendSwitch('--disable-web-security');
+  app.commandLine.appendSwitch('--disable-features=VizDisplayCompositor');
+
+  // Renderer-Prozess Stabilität
+  app.commandLine.appendSwitch('--in-process-gpu');
+  app.commandLine.appendSwitch('--disable-extensions');
+  app.commandLine.appendSwitch('--disable-plugins');
+  app.commandLine.appendSwitch('--disable-plugins-discovery');
+
   // Speicher-Optimierungen
   app.commandLine.appendSwitch('--memory-pressure-off');
   app.commandLine.appendSwitch('--max_old_space_size=512'); // Begrenze RAM-Nutzung
@@ -212,19 +226,104 @@ const createWindow = async () => {
       backgroundThrottling: false, // Verhindert Throttling im Hintergrund
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true,
+      webSecurity: !isArmSystem, // Deaktiviert für ARM-Systeme
       // Renderer-Performance
       experimentalFeatures: false,
-      v8CacheOptions: 'code', // V8 Code-Caching aktivieren
+      v8CacheOptions: isArmSystem ? 'none' : 'code', // Kein Caching auf ARM
       spellcheck: false, // Rechtschreibprüfung deaktivieren
+      // ARM-spezifische Optimierungen
+      sandbox: false,
+      allowRunningInsecureContent: isArmSystem,
+      offscreen: false,
     },
   });
 
-  mainWindow.loadURL(resolveHtmlPath('index.html'));
+  console.log('🔄 Loading HTML file:', resolveHtmlPath('index.html'));
+  
+  // Zusätzliche URL-Debugging für ARM-Systeme
+  if (isArmSystem) {
+    const htmlPath = resolveHtmlPath('index.html');
+    console.log('📁 Aufgelöster HTML-Pfad:', htmlPath);
+    console.log('🏠 Arbeitsverzeichnis:', process.cwd());
+    console.log('📂 __dirname:', __dirname);
+    console.log('🎯 app.getAppPath():', app.getAppPath());
+    
+    // Prüfen ob die HTML-Datei existiert
+    const fs = require('fs');
+    try {
+      const stats = fs.statSync(htmlPath.replace('file://', ''));
+      console.log('✅ HTML-Datei gefunden:', stats.size, 'bytes');
+    } catch (error: any) {
+      console.error('❌ HTML-Datei nicht gefunden:', error.message);
+    }
+  }
+  
+  mainWindow.loadURL(resolveHtmlPath('index.html')).catch((error) => {
+    console.error('❌ Fehler beim Laden der HTML-Datei:', error);
+    if (isArmSystem) {
+      console.log('🔄 Versuche Fallback-URL für ARM-System...');
+      // Fallback für ARM-Systeme
+      const fallbackUrl = `file://${path.join(__dirname, '../renderer/index.html')}`;
+      console.log('🔄 Fallback-URL:', fallbackUrl);
+      mainWindow?.loadURL(fallbackUrl);
+    }
+  });
+  
+  // Debugging Events für ARM-Systeme
+  if (isArmSystem) {
+    mainWindow.webContents.on('did-start-loading', () => {
+      console.log('📄 Webinhalt hat angefangen zu laden...');
+    });
+    
+    mainWindow.webContents.on('did-finish-load', () => {
+      console.log('✅ Webinhalt wurde vollständig geladen');
+    });
+    
+    mainWindow.webContents.on(
+      'did-fail-load',
+      (event, errorCode, errorDescription, validatedURL) => {
+        console.error('❌ Fehler beim Laden des Webinhalts:', {
+          errorCode,
+          errorDescription,
+          validatedURL,
+        });
+      },
+    );
+    
+    mainWindow.webContents.on('dom-ready', () => {
+      console.log('🎯 DOM ist bereit');
+    });
+    
+    mainWindow.webContents.on('did-frame-finish-load', () => {
+      console.log('🖼️ Frame wurde vollständig geladen');
+    });
+    
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('💥 Render-Prozess ist gestorben:', details);
+    });
+    
+    mainWindow.webContents.on('unresponsive', () => {
+      console.warn('⏰ Webinhalt reagiert nicht mehr');
+    });
+    
+    mainWindow.webContents.on('responsive', () => {
+      console.log('✨ Webinhalt reagiert wieder');
+    });
+  }
+  
   mainWindow.on('ready-to-show', () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
     }
+    
+    console.log('👁️ Fenster ist bereit zum Anzeigen');
+    
+    // Für ARM-Systeme: DevTools aktivieren für Debugging
+    if (isArmSystem && process.env.NODE_ENV === 'development') {
+      console.log('🔧 Öffne DevTools für ARM-Debugging...');
+      mainWindow.webContents.openDevTools();
+    }
+    
     if (process.env.START_MINIMIZED) {
       mainWindow.minimize();
     } else {
