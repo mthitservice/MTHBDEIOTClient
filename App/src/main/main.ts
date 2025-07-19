@@ -126,10 +126,10 @@ class AppUpdater {
 
     // Auto-Update nur für Windows und nicht-ARM Systeme aktivieren
     // ARM/Linux DEB-Pakete unterstützen kein Auto-Update über GitHub
-    const shouldCheckForUpdates = process.env.NODE_ENV === 'production' && 
-                                  !isArmSystem && 
-                                  process.platform !== 'linux';
-                                  
+    const shouldCheckForUpdates = process.env.NODE_ENV === 'production' &&
+      !isArmSystem &&
+      process.platform !== 'linux';
+
     if (shouldCheckForUpdates) {
       console.log('Auto-Update aktiviert für unterstützte Plattform');
       autoUpdater.checkForUpdatesAndNotify();
