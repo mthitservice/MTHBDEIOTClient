@@ -123,6 +123,30 @@ Wenn nach der Installation das Standard-Electron-Icon angezeigt wird:
 ./shell-scripts/dev-modes.sh --verbose
 ```
 
+### Raspberry Pi Auflösungstests (Windows Development)
+
+Für das Testen verschiedener Raspberry Pi Auflösungen unter Windows 11:
+
+```powershell
+# Verschiedene Raspberry Pi Display-Größen testen
+.\mth-manager.ps1 rpi-test small      # 1024x768 (kleine Displays)
+.\mth-manager.ps1 rpi-test medium     # 1280x720 (mittlere Displays) 
+.\mth-manager.ps1 rpi-test large      # 1920x1080 (Standard Pi 4)
+.\mth-manager.ps1 rpi-test fullscreen # 1920x1080 Vollbild/Kiosk
+
+# Direkte npm Scripts
+npm run start:raspberry              # Standard Raspberry Pi Modus
+npm run start:raspberry-small        # Kleinere Auflösung
+npm run start:raspberry-fullscreen   # Kiosk-Modus
+```
+
+**Features des Raspberry Pi Dev-Modus:**
+- Automatisches Öffnen der DevTools
+- Responsive Design Vorschau
+- CSS Media Query Tests
+- Touch-Target Optimierungen
+- Display-Anzeige für aktuelle Auflösung
+
 ## 📁 Projektstruktur
 
 ```text

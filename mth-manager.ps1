@@ -3,7 +3,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'build', 'dev', 'release', 'debug', 'deploy', 'trigger', 'validate', 'fix')]
+    [ValidateSet('help', 'build', 'dev', 'release', 'debug', 'deploy', 'trigger', 'validate', 'fix', 'rpi-test', 'install-fonts')]
     [string]$Command = 'help',
     
     [Parameter(Position = 1)]
@@ -28,11 +28,15 @@ function Show-Help {
     Write-Host "⚡ trigger   - Pipeline triggern" -ForegroundColor Cyan
     Write-Host "✅ validate  - DEB-Paket validieren" -ForegroundColor Cyan
     Write-Host "🔧 fix       - Schnelle Fehlerbehebung" -ForegroundColor Cyan
+    Write-Host "🍓 rpi-test  - Raspberry Pi Auflösung testen" -ForegroundColor Cyan
+    Write-Host "🔤 install-fonts - Segoe UI Fonts für Raspberry Pi installieren" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Beispiele:" -ForegroundColor Yellow
     Write-Host "  .\mth-manager.ps1 dev" -ForegroundColor White
     Write-Host "  .\mth-manager.ps1 build raspberry" -ForegroundColor White
     Write-Host "  .\mth-manager.ps1 release 1.0.50" -ForegroundColor White
+    Write-Host "  .\mth-manager.ps1 rpi-test large" -ForegroundColor White
+    Write-Host "  .\mth-manager.ps1 install-fonts" -ForegroundColor White
     Write-Host ""
 }
 
@@ -114,6 +118,45 @@ function Invoke-Fix {
     & ".\powershell-scripts\quick-fix-deb.ps1"
 }
 
+function Invoke-RaspberryTest {
+    param([string]$Resolution = "large")
+    
+    Write-Host "🍓 Starte Raspberry Pi Auflösungstest..." -ForegroundColor Magenta
+    
+    if (-not (Test-Path "powershell-scripts\raspberry-dev-test.ps1")) {
+        Write-Host "❌ Raspberry Pi Test-Skript nicht gefunden!" -ForegroundColor Red
+        return
+    }
+    
+    & ".\powershell-scripts\raspberry-dev-test.ps1" $Resolution
+}
+
+function Invoke-InstallFonts {
+    Write-Host "🔤 Installiere Segoe UI Fonts für Raspberry Pi..." -ForegroundColor Blue
+    Write-Host ""
+    
+    $scriptPath = "App\scripts\install-segoe-ui-fonts.sh"
+    
+    if (-not (Test-Path $scriptPath)) {
+        Write-Host "❌ Font-Installations-Skript nicht gefunden: $scriptPath" -ForegroundColor Red
+        return
+    }
+    
+    Write-Host "📋 Anweisungen für Raspberry Pi:" -ForegroundColor Yellow
+    Write-Host "1. Kopiere das Skript auf den Raspberry Pi:" -ForegroundColor White
+    Write-Host "   scp $scriptPath pi@raspberry-ip:~/" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "2. Führe das Skript auf dem Raspberry Pi aus:" -ForegroundColor White
+    Write-Host "   sudo bash install-segoe-ui-fonts.sh" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "3. Kopiere Segoe UI Fonts von Windows:" -ForegroundColor White
+    Write-Host "   Von: C:\Windows\Fonts\" -ForegroundColor Gray
+    Write-Host "   Nach: /usr/share/fonts/truetype/segoe-ui/" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "✅ Font-Installations-Skript bereit!" -ForegroundColor Green
+    Write-Host "   Datei: $scriptPath" -ForegroundColor Gray
+}
+
 # Hauptlogik
 Show-Header
 
@@ -127,6 +170,8 @@ switch ($Command.ToLower()) {
     'trigger' { Invoke-Trigger }
     'validate' { Invoke-Validate }
     'fix' { Invoke-Fix }
+    'rpi-test' { Invoke-RaspberryTest -Resolution $Parameter }
+    'install-fonts' { Invoke-InstallFonts }
     default { 
         Write-Host "❌ Unbekannter Befehl: $Command" -ForegroundColor Red
         Show-Help 

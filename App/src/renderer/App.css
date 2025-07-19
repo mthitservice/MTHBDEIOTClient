@@ -3,6 +3,9 @@
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
 
+/* Import Raspberry Pi Development Mode CSS */
+@import './styles/raspberry-dev.css';
+
 body {
   position: relative;
 
@@ -10,7 +13,9 @@ body {
   font-size: 14px !important;
   height: 100vh;
   background: #cccccc;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+  font-family:
+    'Segoe UI', 'Liberation Sans', 'DejaVu Sans', 'Noto Sans', Tahoma, Geneva,
+    Verdana, sans-serif !important;
   overflow-y: hidden;
   display: block !important;
   justify-content: center;
@@ -56,14 +61,18 @@ button {
 }
 
 h1 {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family:
+    'Segoe UI', 'Liberation Sans', 'DejaVu Sans', 'Noto Sans', Tahoma, Geneva,
+    Verdana, sans-serif;
   font-size: 2.2rem;
   font-weight: 100 !important;
   margin: 0;
   color: #ff9800 !important;
 }
 h2 {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family:
+    'Segoe UI', 'Liberation Sans', 'DejaVu Sans', 'Noto Sans', Tahoma, Geneva,
+    Verdana, sans-serif;
   font-size: 1.4rem;
   font-weight: 100;
   margin: 0;

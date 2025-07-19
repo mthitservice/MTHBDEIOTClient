@@ -22,11 +22,22 @@ const configDB = require('../../public/database/DBConfig');
 let globalConfig: any = 0;
 let mainWindow: BrowserWindow | null = null;
 
-require('dotenv').config();
+require('dotenv').config({
+  path: path.resolve(__dirname, '../../.env'),
+  debug: true
+});
 
+const packageJson = require('../../package.json');
+
+console.log('ENV Debug - dotenv loaded from:', path.resolve(__dirname, '../../.env'));
 console.log('APP Name:', process.env.APP_NAME);
-console.log('APP Version:', process.env.APP_VERSION);
+console.log('APP Version from ENV:', process.env.APP_VERSION);
+console.log('APP Version from package.json:', packageJson.version);
+console.log('APP Version final (using package.json):', packageJson.version);
 console.log('Raspberry Pi Mode:', process.env.RASPBERRY_PI);
+console.log('DEV_1080 Mode:', process.env.DEV_1080);
+console.log('KIOSK_MODE:', process.env.KIOSK_MODE);
+console.log('Process Args:', process.argv);
 
 // Performance-Optimierungen für Raspberry Pi (ARM-basierte Systeme)
 // WICHTIG: Muss vor app.ready ausgeführt werden!
@@ -367,6 +378,32 @@ const createWindow = async () => {
 
     mainWindow.webContents.on('dom-ready', () => {
       console.log('🎯 DOM ist bereit');
+
+      // Raspberry Pi Dev-Tools für Auflösungstests
+      if (process.env.RASPBERRY_PI === 'true' && process.env.NODE_ENV === 'development') {
+        console.log('🍓 Raspberry Pi Entwicklungsmodus aktiviert');
+
+        // DevTools öffnen mit Responsive Design Mode
+        mainWindow?.webContents.openDevTools({
+          mode: 'right'
+        });
+
+        // Raspberry Pi typische Viewport-Größen für Tests verfügbar machen
+        mainWindow?.webContents.executeJavaScript(`
+          console.log('%c🍓 Raspberry Pi Dev Mode', 'color: #ff6b6b; font-weight: bold; font-size: 16px;');
+          console.log('Verfügbare Test-Auflösungen:');
+          console.log('• 1920x1080 (Standard Raspberry Pi 4)');
+          console.log('• 1280x720 (Kleinere Displays)');
+          console.log('• 1024x768 (Ältere Displays)');
+          console.log('');
+          console.log('CSS-Media-Queries für Tests:');
+          console.log('• @media (max-width: 1024px) - Kleine Displays');
+          console.log('• @media (max-height: 768px) - Niedrige Displays');
+
+          // CSS-Klasse für Raspberry Pi Simulation hinzufügen
+          document.documentElement.classList.add('raspberry-dev-mode');
+        `);
+      }
     });
 
     mainWindow.webContents.on('did-frame-finish-load', () => {
@@ -475,21 +512,63 @@ const createWindow = async () => {
       app.quit();
     });
 
-    // Alt + Tab - zwischen Fenstern wechseln (deaktiviert im Kiosk-Modus)
-    const isKioskMode =
-      process.argv.includes('--kiosk') || process.env.KIOSK_MODE === 'true';
-    if (!isKioskMode) {
-      globalShortcut.register('Alt+Tab', () => {
-        // Lasse Alt+Tab im normalen Modus zu
-        return false;
-      });
-    }
+    // F12 - Developer Tools umschalten (auch im Produktivmodus)
+    globalShortcut.register('F12', () => {
+      if (mainWindow) {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+        } else {
+          mainWindow.webContents.openDevTools();
+        }
+      }
+    });
+
+    // Ctrl + Shift + I - Developer Tools (Alternative)
+    globalShortcut.register('Ctrl+Shift+I', () => {
+      if (mainWindow) {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+        } else {
+          mainWindow.webContents.openDevTools();
+        }
+      }
+    });
+
+    // Ctrl + C - Navigation zur Konfigurationsseite
+    globalShortcut.register('Ctrl+C', () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('navigate-to-config');
+      }
+    });
+
+    // Ctrl + Shift + C - Alternative für Konfiguration (falls Ctrl+C verwendet wird)
+    globalShortcut.register('Ctrl+Shift+C', () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('navigate-to-config');
+      }
+    });
+
+    // Escape - Besseres Abbrechen/Zurück-Verhalten
+    globalShortcut.register('Escape', () => {
+      if (mainWindow) {
+        if (mainWindow.isFullScreen()) {
+          mainWindow.setFullScreen(false);
+        } else {
+          // Sende 'escape' Event an Renderer
+          mainWindow.webContents.send('escape-pressed');
+        }
+      }
+    });
 
     console.log('Keyboard shortcuts registered:');
     console.log('- Alt+F4: Close app');
     console.log('- Ctrl+Q: Quit app');
-    console.log('- Escape: Exit fullscreen');
+    console.log('- Escape: Exit fullscreen or go back');
     console.log('- F11: Toggle fullscreen');
+    console.log('- F12: Toggle Developer Tools');
+    console.log('- Ctrl+Shift+I: Toggle Developer Tools');
+    console.log('- Ctrl+C: Navigate to config');
+    console.log('- Ctrl+Shift+C: Navigate to config (alternative)');
     console.log('- Ctrl+Shift+Q: Emergency quit');
   };
 
@@ -569,7 +648,7 @@ ipcMain.handle('get-env', async () => {
   return {
     API_URL: process.env.API_URL,
     APP_NAME: process.env.APP_NAME,
-    APP_VERSION: process.env.APP_VERSION,
+    APP_VERSION: packageJson.version, // Verwende immer package.json Version
     DEBUG_Mode: process.env.DEBUG_MODE,
     DB_NAME: process.env.DB_NAME,
     DB_USER: process.env.DB_USER,

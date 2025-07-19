@@ -8,7 +8,9 @@ export type Channels =
   | 'download-progress'
   | 'update-downloaded'
   | 'update-not-available'
-  | 'update-error';
+  | 'update-error'
+  | 'navigate-to-config'
+  | 'escape-pressed';
 
 const electronHandler = {
   app: {
