@@ -27,6 +27,38 @@ require('dotenv').config();
 console.log('APP Name:', process.env.APP_NAME);
 console.log('APP Version:', process.env.APP_VERSION);
 
+// Performance-Optimierungen für Raspberry Pi (ARM-basierte Systeme)
+// WICHTIG: Muss vor app.ready ausgeführt werden!
+const isArmSystem =
+  process.arch === 'arm' ||
+  process.arch === 'arm64' ||
+  (process.platform === 'linux' &&
+    (process.env.RASPBERRY_PI === 'true' ||
+      process.env.NODE_ENV === 'production'));
+
+if (isArmSystem) {
+  console.log('🔧 Applying Raspberry Pi/ARM performance optimizations...');
+
+  app.disableHardwareAcceleration(); // GPU-Beschleunigung deaktivieren
+
+  // Weitere Performance-Optimierungen
+  app.commandLine.appendSwitch('--no-sandbox');
+  app.commandLine.appendSwitch('--disable-dev-shm-usage');
+  app.commandLine.appendSwitch('--disable-gpu');
+  app.commandLine.appendSwitch('--disable-gpu-compositing');
+  app.commandLine.appendSwitch('--disable-software-rasterizer');
+  app.commandLine.appendSwitch('--disable-background-timer-throttling');
+  app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('--enable-features=VaapiVideoDecoder');
+  app.commandLine.appendSwitch('--disable-features=TranslateUI');
+  app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+
+  // Speicher-Optimierungen
+  app.commandLine.appendSwitch('--memory-pressure-off');
+  app.commandLine.appendSwitch('--max_old_space_size=512'); // Begrenze RAM-Nutzung
+}
+
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -160,39 +192,10 @@ const createWindow = async () => {
   };
 
   // Prüfe Kommandozeilenargumente für Fullscreen
-  const isFullscreenMode = process.argv.includes('--fullscreen') ||
+  const isFullscreenMode =
+    process.argv.includes('--fullscreen') ||
     process.argv.includes('--kiosk') ||
     process.env.KIOSK_MODE === 'true';
-
-  // Performance-Optimierungen für Raspberry Pi (ARM-basierte Systeme)
-  const isArmSystem = process.arch === 'arm' || process.arch === 'arm64' ||
-    process.platform === 'linux' && (
-      process.env.RASPBERRY_PI === 'true' ||
-      process.env.NODE_ENV === 'production'
-    );
-
-  if (isArmSystem) {
-    console.log('🔧 Applying Raspberry Pi/ARM performance optimizations...');
-
-    app.disableHardwareAcceleration(); // GPU-Beschleunigung deaktivieren
-
-    // Weitere Performance-Optimierungen
-    app.commandLine.appendSwitch('--no-sandbox');
-    app.commandLine.appendSwitch('--disable-dev-shm-usage');
-    app.commandLine.appendSwitch('--disable-gpu');
-    app.commandLine.appendSwitch('--disable-gpu-compositing');
-    app.commandLine.appendSwitch('--disable-software-rasterizer');
-    app.commandLine.appendSwitch('--disable-background-timer-throttling');
-    app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
-    app.commandLine.appendSwitch('--disable-renderer-backgrounding');
-    app.commandLine.appendSwitch('--enable-features=VaapiVideoDecoder');
-    app.commandLine.appendSwitch('--disable-features=TranslateUI');
-    app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
-
-    // Speicher-Optimierungen
-    app.commandLine.appendSwitch('--memory-pressure-off');
-    app.commandLine.appendSwitch('--max_old_space_size=512'); // Begrenze RAM-Nutzung
-  }
 
   mainWindow = new BrowserWindow({
     show: false,
@@ -229,7 +232,8 @@ const createWindow = async () => {
       mainWindow.focus();
 
       // Sicherstellen, dass Fullscreen aktiviert ist (falls über Kommandozeile aktiviert)
-      const needsFullscreen = process.argv.includes('--fullscreen') ||
+      const needsFullscreen =
+        process.argv.includes('--fullscreen') ||
         process.argv.includes('--kiosk') ||
         process.env.KIOSK_MODE === 'true';
 
@@ -298,7 +302,8 @@ const createWindow = async () => {
     });
 
     // Alt + Tab - zwischen Fenstern wechseln (deaktiviert im Kiosk-Modus)
-    const isKioskMode = process.argv.includes('--kiosk') || process.env.KIOSK_MODE === 'true';
+    const isKioskMode =
+      process.argv.includes('--kiosk') || process.env.KIOSK_MODE === 'true';
     if (!isKioskMode) {
       globalShortcut.register('Alt+Tab', () => {
         // Lasse Alt+Tab im normalen Modus zu
@@ -350,7 +355,6 @@ app
     if (globalConfig?.DEBUG_MODE === 'true') {
       console.log('Debug mode is enabled');
     }
-
 
     createWindow();
     app.on('activate', () => {
