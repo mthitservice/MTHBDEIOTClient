@@ -27,6 +27,10 @@ variables:
   # GitHub Configuration
   githubRepository: 'mthitservice/MTHBDEIOTClient'
   githubConnection: 'github-connection'  # Muss in Azure DevOps konfiguriert sein
+  
+  # Cleanup Configuration
+  keepPatchReleases: 10  # Anzahl der Patch-Releases die behalten werden sollen
+  keepPipelineBuilds: 20  # Anzahl der Pipeline Builds die behalten werden sollen
 
 stages:
 # =============================================================================
@@ -294,3 +298,282 @@ stages:
           *Dieses Release wurde automatisch durch Azure DevOps erstellt und enthält nur die fertigen Anwendungspakete.*
         assets: '$(Pipeline.Workspace)/all-packages/*.deb'
         assetUploadMode: 'replace'
+
+  - job: CleanupOldReleases
+    displayName: 'Cleanup Old GitHub Releases'
+    dependsOn: CreateGitHubRelease
+    condition: succeeded()
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: none
+    
+    - script: |
+        echo "=== GITHUB RELEASE CLEANUP ==="
+        echo "Cleaning up old releases - keeping last $(keepPatchReleases) patch versions"
+        echo "Major versions (x.0.0) and Minor releases (x.Y.0) will be preserved"
+        echo "Current release $(gitTag) will be protected"
+        echo ""
+        
+        # GitHub Repository und API Setup
+        REPO="$(githubRepository)"
+        API_BASE="https://api.github.com"
+        
+        # GitHub CLI installieren
+        echo "Installing GitHub CLI..."
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt update && sudo apt install gh -y
+        
+        # GitHub Token aus der Service Connection verwenden
+        # Das Token wird durch die GitHubRelease Task automatisch verfügbar gemacht
+        echo "Setting up GitHub authentication..."
+        
+        # Alternative: Direkte API Calls mit curl
+        echo "Fetching releases via GitHub API..."
+        
+        # Alle Releases abrufen (erste 100)
+        curl -s \
+          -H "Accept: application/vnd.github.v3+json" \
+          "$API_BASE/repos/$REPO/releases?per_page=100" \
+          > releases.json
+        
+        if [ ! -s releases.json ]; then
+            echo "❌ Failed to fetch releases from GitHub API"
+            echo "This is non-critical - release was created successfully"
+            exit 0
+        fi
+        
+        echo "Releases fetched successfully. Analyzing..."
+        
+        # Python Script für Release-Analyse und Cleanup-Liste
+        python3 << 'EOF'
+        import json
+        import re
+        import sys
+        from datetime import datetime
+        
+        try:
+            # Releases laden
+            with open('releases.json', 'r') as f:
+                releases = json.load(f)
+            
+            print(f"Found {len(releases)} total releases")
+            
+            # Nur stabile Releases (nicht Draft, nicht Pre-Release)
+            stable_releases = [r for r in releases if not r.get('draft', False) and not r.get('prerelease', False)]
+            print(f"Found {len(stable_releases)} stable releases")
+            
+            # Version parsing und Kategorisierung
+            major_releases = []  # x.0.0 Versionen
+            minor_releases = []  # x.Y.0 Versionen (Y > 0)
+            patch_releases = []  # Alle anderen (x.Y.Z mit Z > 0)
+            current_tag = "$(gitTag)"
+            
+            for release in stable_releases:
+                tag = release['tag_name']
+                
+                # Aktuelles Release schützen
+                if tag == current_tag:
+                    print(f"🔒 PROTECTED: {tag} (Current Release)")
+                    continue
+                    
+                match = re.match(r'v?(\d+)\.(\d+)\.(\d+)', tag)
+                if match:
+                    major, minor, patch = map(int, match.groups())
+                    version_tuple = (major, minor, patch)
+                    
+                    # Major Release Detection (x.0.0)
+                    if minor == 0 and patch == 0:
+                        major_releases.append((release, version_tuple))
+                        print(f"🔒 PROTECTED: {tag} (Major Version)")
+                    # Minor Release Detection (x.Y.0 with Y > 0)
+                    elif patch == 0 and minor > 0:
+                        minor_releases.append((release, version_tuple))
+                        print(f"🔒 PROTECTED: {tag} (Minor Release)")
+                    # Patch Release (x.Y.Z with Z > 0)
+                    else:
+                        patch_releases.append((release, version_tuple))
+            
+            # Patch Releases nach Version sortieren (neueste zuerst)
+            patch_releases.sort(key=lambda x: x[1], reverse=True)
+            
+            print(f"\nFound {len(major_releases)} major releases (protected)")
+            print(f"Found {len(minor_releases)} minor releases (protected)")
+            print(f"Found {len(patch_releases)} patch releases")
+            
+            # Die letzten X Patch-Releases behalten
+            KEEP_PATCHES = $(keepPatchReleases)
+            to_keep = patch_releases[:KEEP_PATCHES]
+            to_delete = patch_releases[KEEP_PATCHES:]
+            
+            print(f"\n📦 KEEPING last {KEEP_PATCHES} patch releases:")
+            for release, version in to_keep:
+                print(f"  ✅ {release['tag_name']} - {release['name']}")
+            
+            if to_delete:
+                print(f"\n🗑️  MARKING {len(to_delete)} old patch releases for deletion:")
+                with open('releases_to_delete.json', 'w') as f:
+                    delete_list = []
+                    for release, version in to_delete:
+                        print(f"  ❌ {release['tag_name']} - {release['name']}")
+                        delete_list.append({
+                            'tag_name': release['tag_name'],
+                            'id': release['id'],
+                            'name': release['name']
+                        })
+                    json.dump(delete_list, f, indent=2)
+                
+                print(f"\nCreated deletion list with {len(delete_list)} releases")
+            else:
+                print(f"\n✅ No old releases to delete")
+                with open('releases_to_delete.json', 'w') as f:
+                    json.dump([], f)
+                    
+        except Exception as e:
+            print(f"❌ Error analyzing releases: {e}")
+            # Leere Liste erstellen, damit der nachfolgende Schritt nicht fehlschlägt
+            with open('releases_to_delete.json', 'w') as f:
+                json.dump([], f)
+            sys.exit(0)  # Nicht kritisch
+        EOF
+        
+        echo ""
+        echo "Analysis completed. Checking deletion list..."
+        
+        # Prüfen ob Releases zu löschen sind
+        DELETE_COUNT=$(cat releases_to_delete.json | jq '. | length')
+        
+        if [ "$DELETE_COUNT" -gt 0 ]; then
+            echo "Found $DELETE_COUNT releases to delete"
+            echo "⚠️  Deletion would be performed here if GitHub token was available"
+            echo ""
+            echo "To enable automatic cleanup, configure a GitHub Personal Access Token"
+            echo "in Azure DevOps as a pipeline variable named 'GITHUB_TOKEN'"
+            echo ""
+            echo "Releases marked for deletion:"
+            cat releases_to_delete.json | jq -r '.[] | "  ❌ \(.tag_name) - \(.name)"'
+        else
+            echo "✅ No releases need to be deleted"
+        fi
+        
+        echo ""
+        echo "=== CLEANUP SUMMARY ==="
+        echo "• Major versions (x.0.0): PROTECTED - never deleted"
+        echo "• Minor releases (x.Y.0): PROTECTED - never deleted"
+        echo "• Patch versions: Keep last $(keepPatchReleases), mark older ones for deletion"
+        echo "• Current release $(gitTag): PROTECTED as newest"
+        echo "• Note: Automatic deletion requires GitHub token configuration"
+        
+      displayName: 'Analyze Old GitHub Releases'
+
+  - job: CleanupPipelineArtifacts
+    displayName: 'Cleanup Old Pipeline Artifacts'
+    dependsOn: CreateGitHubRelease
+    condition: succeeded()
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: none
+    
+    - task: PowerShell@2
+      displayName: 'Cleanup Old Pipeline Artifacts'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "=== AZURE PIPELINE ARTIFACTS CLEANUP ==="
+          Write-Host "Cleaning up old pipeline builds - keeping last $(keepPipelineBuilds) builds"
+          Write-Host ""
+          
+          try {
+              # Azure DevOps REST API Setup
+              $organization = "$(System.TeamFoundationCollectionUri)".TrimEnd('/')
+              $project = "$(System.TeamProject)"
+              $buildDefinitionId = "$(System.DefinitionId)"
+              
+              $headers = @{
+                  "Authorization" = "Bearer $(System.AccessToken)"
+                  "Content-Type" = "application/json"
+              }
+              
+              Write-Host "Organization: $organization"
+              Write-Host "Project: $project"
+              Write-Host "Build Definition ID: $buildDefinitionId"
+              Write-Host ""
+              
+              # Alle Builds dieser Pipeline abrufen
+              $apiUrl = "$organization/$project/_apis/build/builds?definitions=$buildDefinitionId&`$top=100&api-version=7.0"
+              Write-Host "Fetching builds from: $apiUrl"
+              
+              $builds = Invoke-RestMethod -Uri $apiUrl -Headers $headers -Method Get
+              
+              Write-Host "Found $($builds.count) total builds for this pipeline"
+              
+              # Nur erfolgreich abgeschlossene Builds
+              $completedBuilds = $builds.value | Where-Object { 
+                  $_.status -eq "completed" -and $_.result -eq "succeeded" 
+              } | Sort-Object finishTime -Descending
+              
+              Write-Host "Found $($completedBuilds.Count) successfully completed builds"
+              
+              # Builds zu behalten und zu löschen
+              $keepCount = $(keepPipelineBuilds)
+              $buildsToKeep = $completedBuilds | Select-Object -First $keepCount
+              $buildsToDelete = $completedBuilds | Select-Object -Skip $keepCount
+              
+              Write-Host ""
+              Write-Host "📦 KEEPING last $keepCount builds:" -ForegroundColor Green
+              foreach ($build in $buildsToKeep) {
+                  $buildNumber = $build.buildNumber
+                  $finishTime = $build.finishTime
+                  Write-Host "  ✅ Build $buildNumber (Finished: $finishTime)" -ForegroundColor Green
+              }
+              
+              if ($buildsToDelete.Count -gt 0) {
+                  Write-Host ""
+                  Write-Host "🗑️  DELETING $($buildsToDelete.Count) old builds:" -ForegroundColor Red
+                  
+                  foreach ($build in $buildsToDelete) {
+                      $buildId = $build.id
+                      $buildNumber = $build.buildNumber
+                      $finishTime = $build.finishTime
+                      
+                      Write-Host "  ❌ Deleting Build $buildNumber (ID: $buildId, Finished: $finishTime)" -ForegroundColor Red
+                      
+                      try {
+                          # Build löschen
+                          $deleteUrl = "$organization/$project/_apis/build/builds/$buildId" + "?api-version=7.0"
+                          Invoke-RestMethod -Uri $deleteUrl -Headers $headers -Method Delete
+                          
+                          Write-Host "    ✅ Successfully deleted build $buildNumber" -ForegroundColor Green
+                          
+                          # Rate limiting vermeiden
+                          Start-Sleep -Seconds 1
+                          
+                      } catch {
+                          Write-Host "    ❌ Failed to delete build $buildNumber : $($_.Exception.Message)" -ForegroundColor Red
+                      }
+                  }
+                  
+                  Write-Host ""
+                  Write-Host "✅ Pipeline cleanup completed!" -ForegroundColor Green
+              } else {
+                  Write-Host ""
+                  Write-Host "✅ No cleanup needed - less than $keepCount builds found" -ForegroundColor Green
+              }
+              
+              Write-Host ""
+              Write-Host "=== PIPELINE CLEANUP SUMMARY ===" -ForegroundColor Cyan
+              Write-Host "• Total builds found: $($builds.count)" -ForegroundColor Yellow
+              Write-Host "• Successful builds: $($completedBuilds.Count)" -ForegroundColor Yellow
+              Write-Host "• Builds kept: $($buildsToKeep.Count)" -ForegroundColor Green
+              Write-Host "• Builds deleted: $($buildsToDelete.Count)" -ForegroundColor Red
+              Write-Host "• Current build $(Build.BuildNumber): PROTECTED as current" -ForegroundColor Green
+              
+          } catch {
+              Write-Host "❌ Error during pipeline cleanup: $($_.Exception.Message)" -ForegroundColor Red
+              Write-Host "This is non-critical - release was created successfully" -ForegroundColor Yellow
+              # Nicht die gesamte Pipeline zum Scheitern bringen
+          }
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)

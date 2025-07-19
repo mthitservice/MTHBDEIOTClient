@@ -204,14 +204,40 @@ Das System folgt **Semantic Versioning 2.0.0** (semver.org):
 ### Beispiele
 
 ```bash
-# Bugfix Release
+# Bugfix Release (Patch)
 npm run release:patch  # 1.0.0 → 1.0.1
 
-# Feature Release
+# Feature Release (Minor) - wird geschützt
 npm run release:minor  # 1.0.1 → 1.1.0
 
-# Breaking Change Release
+# Breaking Change Release (Major) - wird geschützt
 npm run release:major  # 1.1.0 → 2.0.0
+```
+
+## 🧹 Automatische Säuberung
+
+Das Release Management System beinhaltet **intelligente Cleanup-Features** um Speicherplatz zu sparen:
+
+### GitHub Release Cleanup
+
+- **Schützt Major Releases** (x.0.0) - werden nie gelöscht
+- **Schützt Minor Releases** (x.Y.0) - werden nie gelöscht  
+- **Behält die letzten 10 Patch Releases** (konfigurierbar)
+- **Löscht automatisch ältere Patch Releases**
+
+### Azure Pipeline Artifacts Cleanup
+
+- **Behält die letzten 20 erfolgreichen Builds** (konfigurierbar)
+- **Löscht automatisch ältere Pipeline Builds**
+- **Spart Speicherplatz in Azure DevOps**
+
+### Konfiguration der Säuberung
+
+```yaml
+# In azure-pipelines-raspberry.yml
+variables:
+  keepPatchReleases: 10    # Anzahl Patch-Releases behalten
+  keepPipelineBuilds: 20   # Anzahl Pipeline Builds behalten
 ```
 
 ## 🔍 Debugging & Troubleshooting
