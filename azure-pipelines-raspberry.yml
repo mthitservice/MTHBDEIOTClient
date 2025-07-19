@@ -95,9 +95,9 @@ stages:
     - task: Cache@2
       displayName: 'Cache node_modules'
       inputs:
-        key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+        key: 'npm | "$(Agent.OS)" | App/package.json'
         restoreKeys: |
-          npm | "$(Agent.OS)" | App/package-lock.json
+          npm | "$(Agent.OS)" | App/package.json
           npm | "$(Agent.OS)"
         path: 'App/node_modules'
         cacheHitVar: 'CACHE_RESTORED'
@@ -106,28 +106,40 @@ stages:
         cd App
         echo "=== ARM64 BUILD PROCESS ==="
         echo "Cache restored: $CACHE_RESTORED"
+        echo "Version: $(releaseVersion)"
+        
+        echo "Setting version to $(releaseVersion)..."
+        npm version $(releaseVersion) --no-git-tag-version --allow-same-version
         
         echo "Installing dependencies..."
         if [ "$CACHE_RESTORED" != "true" ]; then
             echo "Fresh install (cache miss)"
-            npm ci --production=false
+            npm ci --production=false --prefer-offline --no-audit --no-fund
         else
-            echo "Using cached dependencies"
-            # Nur prüfen ob node_modules vollständig ist
-            npm ci --production=false --prefer-offline
+            echo "Using cached dependencies - validating..."
+            npm ci --production=false --prefer-offline --no-audit --no-fund
         fi
-        
-        echo "Setting version to $(releaseVersion)"
-        npm version $(releaseVersion) --no-git-tag-version --allow-same-version
         
         echo "Building ARM64 package..."
         npm run package:raspberry-optimized-arm64
+        
+        echo "Listing all files in release directory..."
+        find release -type f -name "*.deb" -ls
         
         echo "Creating output directory..."
         mkdir -p $(Build.ArtifactStagingDirectory)/arm64
         
         echo "Copying ARM64 package..."
-        find release -name "*.deb" -path "*/make/deb/arm64/*" -exec cp {} $(Build.ArtifactStagingDirectory)/arm64/ \;
+        # Multiple fallback strategies to find the DEB file
+        if find release -name "*_arm64.deb" -exec cp {} $(Build.ArtifactStagingDirectory)/arm64/ \; ; then
+            echo "Found ARM64 deb file with pattern *_arm64.deb"
+        elif find release -name "*.deb" | grep -i arm64 | head -1 | xargs -I {} cp {} $(Build.ArtifactStagingDirectory)/arm64/ ; then
+            echo "Found ARM64 deb file with grep pattern"
+        else
+            echo "No ARM64 deb file found! Listing all deb files:"
+            find release -name "*.deb" -ls
+            exit 1
+        fi
         
         echo "Verifying ARM64 package..."
         ls -la $(Build.ArtifactStagingDirectory)/arm64/
@@ -156,9 +168,9 @@ stages:
     - task: Cache@2
       displayName: 'Cache node_modules'
       inputs:
-        key: 'npm | "$(Agent.OS)" | App/package-lock.json'
+        key: 'npm | "$(Agent.OS)" | App/package.json'
         restoreKeys: |
-          npm | "$(Agent.OS)" | App/package-lock.json
+          npm | "$(Agent.OS)" | App/package.json
           npm | "$(Agent.OS)"
         path: 'App/node_modules'
         cacheHitVar: 'CACHE_RESTORED'
@@ -167,28 +179,40 @@ stages:
         cd App
         echo "=== ARMv7l BUILD PROCESS ==="
         echo "Cache restored: $CACHE_RESTORED"
+        echo "Version: $(releaseVersion)"
+        
+        echo "Setting version to $(releaseVersion)..."
+        npm version $(releaseVersion) --no-git-tag-version --allow-same-version
         
         echo "Installing dependencies..."
         if [ "$CACHE_RESTORED" != "true" ]; then
             echo "Fresh install (cache miss)"
-            npm ci --production=false
+            npm ci --production=false --prefer-offline --no-audit --no-fund
         else
-            echo "Using cached dependencies"
-            # Nur prüfen ob node_modules vollständig ist
-            npm ci --production=false --prefer-offline
+            echo "Using cached dependencies - validating..."
+            npm ci --production=false --prefer-offline --no-audit --no-fund
         fi
-        
-        echo "Setting version to $(releaseVersion)"
-        npm version $(releaseVersion) --no-git-tag-version --allow-same-version
         
         echo "Building ARMv7l package..."
         npm run package:raspberry-optimized-armv7l
+        
+        echo "Listing all files in release directory..."
+        find release -type f -name "*.deb" -ls
         
         echo "Creating output directory..."
         mkdir -p $(Build.ArtifactStagingDirectory)/armv7l
         
         echo "Copying ARMv7l package..."
-        find release -name "*.deb" -path "*/make/deb/armv7l/*" -exec cp {} $(Build.ArtifactStagingDirectory)/armv7l/ \;
+        # Multiple fallback strategies to find the DEB file
+        if find release -name "*_armv7l.deb" -exec cp {} $(Build.ArtifactStagingDirectory)/armv7l/ \; ; then
+            echo "Found ARMv7l deb file with pattern *_armv7l.deb"
+        elif find release -name "*.deb" | grep -i armv7l | head -1 | xargs -I {} cp {} $(Build.ArtifactStagingDirectory)/armv7l/ ; then
+            echo "Found ARMv7l deb file with grep pattern"
+        else
+            echo "No ARMv7l deb file found! Listing all deb files:"
+            find release -name "*.deb" -ls
+            exit 1
+        fi
         
         echo "Verifying ARMv7l package..."
         ls -la $(Build.ArtifactStagingDirectory)/armv7l/
