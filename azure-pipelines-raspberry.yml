@@ -96,13 +96,26 @@ stages:
       displayName: 'Cache node_modules'
       inputs:
         key: 'npm | "$(Agent.OS)" | App/package-lock.json'
-        restoreKeys: 'npm | "$(Agent.OS)"'
+        restoreKeys: |
+          npm | "$(Agent.OS)" | App/package-lock.json
+          npm | "$(Agent.OS)"
         path: 'App/node_modules'
+        cacheHitVar: 'CACHE_RESTORED'
         
     - script: |
         cd App
+        echo "=== ARM64 BUILD PROCESS ==="
+        echo "Cache restored: $(CACHE_RESTORED)"
+        
         echo "Installing dependencies..."
-        npm ci --production=false
+        if [ "$CACHE_RESTORED" != "true" ]; then
+            echo "Fresh install (cache miss)"
+            npm ci --production=false
+        else
+            echo "Using cached dependencies"
+            # Nur prüfen ob node_modules vollständig ist
+            npm ci --production=false --prefer-offline
+        fi
         
         echo "Setting version to $(releaseVersion)"
         npm version $(releaseVersion) --no-git-tag-version --allow-same-version
@@ -144,13 +157,26 @@ stages:
       displayName: 'Cache node_modules'
       inputs:
         key: 'npm | "$(Agent.OS)" | App/package-lock.json'
-        restoreKeys: 'npm | "$(Agent.OS)"'
+        restoreKeys: |
+          npm | "$(Agent.OS)" | App/package-lock.json
+          npm | "$(Agent.OS)"
         path: 'App/node_modules'
+        cacheHitVar: 'CACHE_RESTORED'
         
     - script: |
         cd App
+        echo "=== ARMv7l BUILD PROCESS ==="
+        echo "Cache restored: $(CACHE_RESTORED)"
+        
         echo "Installing dependencies..."
-        npm ci --production=false
+        if [ "$CACHE_RESTORED" != "true" ]; then
+            echo "Fresh install (cache miss)"
+            npm ci --production=false
+        else
+            echo "Using cached dependencies"
+            # Nur prüfen ob node_modules vollständig ist
+            npm ci --production=false --prefer-offline
+        fi
         
         echo "Setting version to $(releaseVersion)"
         npm version $(releaseVersion) --no-git-tag-version --allow-same-version
