@@ -239,7 +239,7 @@ const createWindow = async () => {
   });
 
   console.log('🔄 Loading HTML file:', resolveHtmlPath('index.html'));
-  
+
   // Zusätzliche URL-Debugging für ARM-Systeme
   if (isArmSystem) {
     const htmlPath = resolveHtmlPath('index.html');
@@ -247,7 +247,7 @@ const createWindow = async () => {
     console.log('🏠 Arbeitsverzeichnis:', process.cwd());
     console.log('📂 __dirname:', __dirname);
     console.log('🎯 app.getAppPath():', app.getAppPath());
-    
+
     // Prüfen ob die HTML-Datei existiert
     const fs = require('fs');
     try {
@@ -257,7 +257,7 @@ const createWindow = async () => {
       console.error('❌ HTML-Datei nicht gefunden:', error.message);
     }
   }
-  
+
   mainWindow.loadURL(resolveHtmlPath('index.html')).catch((error) => {
     console.error('❌ Fehler beim Laden der HTML-Datei:', error);
     if (isArmSystem) {
@@ -268,17 +268,17 @@ const createWindow = async () => {
       mainWindow?.loadURL(fallbackUrl);
     }
   });
-  
+
   // Debugging Events für ARM-Systeme
   if (isArmSystem) {
     mainWindow.webContents.on('did-start-loading', () => {
       console.log('📄 Webinhalt hat angefangen zu laden...');
     });
-    
+
     mainWindow.webContents.on('did-finish-load', () => {
       console.log('✅ Webinhalt wurde vollständig geladen');
     });
-    
+
     mainWindow.webContents.on(
       'did-fail-load',
       (event, errorCode, errorDescription, validatedURL) => {
@@ -289,41 +289,41 @@ const createWindow = async () => {
         });
       },
     );
-    
+
     mainWindow.webContents.on('dom-ready', () => {
       console.log('🎯 DOM ist bereit');
     });
-    
+
     mainWindow.webContents.on('did-frame-finish-load', () => {
       console.log('🖼️ Frame wurde vollständig geladen');
     });
-    
+
     mainWindow.webContents.on('render-process-gone', (event, details) => {
       console.error('💥 Render-Prozess ist gestorben:', details);
     });
-    
+
     mainWindow.webContents.on('unresponsive', () => {
       console.warn('⏰ Webinhalt reagiert nicht mehr');
     });
-    
+
     mainWindow.webContents.on('responsive', () => {
       console.log('✨ Webinhalt reagiert wieder');
     });
   }
-  
+
   mainWindow.on('ready-to-show', () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
     }
-    
+
     console.log('👁️ Fenster ist bereit zum Anzeigen');
-    
+
     // Für ARM-Systeme: DevTools aktivieren für Debugging
     if (isArmSystem && process.env.NODE_ENV === 'development') {
       console.log('🔧 Öffne DevTools für ARM-Debugging...');
       mainWindow.webContents.openDevTools();
     }
-    
+
     if (process.env.START_MINIMIZED) {
       mainWindow.minimize();
     } else {
