@@ -4,7 +4,7 @@
 trigger:
   branches:
     include:
-      - "master"  # Trigger auf master branch commits
+      - "master"  # Trigger auf master branch commits (Azure DevOps Quellcode)
   tags:
     exclude:
       - "*"  # Keine Tag-Trigger (Tags werden automatisch erstellt)

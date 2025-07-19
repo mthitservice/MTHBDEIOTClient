@@ -262,8 +262,8 @@ Features:
 - GitHub Release Integration
 
 Installation:
-wget https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/master/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb
-sudo dpkg -i mthbdeiotclient_${NEW_VERSION}_armhf.deb
+wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v${NEW_VERSION}/mthbdeiotclient_${NEW_VERSION}_arm64.deb
+sudo dpkg -i mthbdeiotclient_${NEW_VERSION}_arm64.deb
 sudo apt-get install -f
 "
 
@@ -294,9 +294,11 @@ echo "  3. GitHub releases/ folder will be updated automatically"
 echo "  4. Package will be available as 'latest' release"
 echo ""
 echo -e "${INFO} ${BLUE}Useful links:${NC}"
-echo "  • Azure DevOps: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
+echo "  • Azure DevOps Dashboard: https://dev.azure.com/mth-it-service/MTHUABDEDS/_dashboards/index"
+echo "  • Azure Build Overview: https://dev.azure.com/mth-it-service/MTHUABDEDS/_build"
 echo "  • GitHub Repository: https://github.com/mthitservice/MTHBDEIOTClient"
-echo "  • Latest Release: https://github.com/mthitservice/MTHBDEIOTClient/tree/main/releases/latest"
-echo "  • Install on Raspberry Pi: https://raw.githubusercontent.com/mthitservice/MTHBDEIOTClient/main/releases/latest/mthbdeiotclient_${NEW_VERSION}_armhf.deb"
+echo "  • Latest Release: https://github.com/mthitservice/MTHBDEIOTClient/releases/latest"
+echo "  • Install ARM64: wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v${NEW_VERSION}/mthbdeiotclient_${NEW_VERSION}_arm64.deb"
+echo "  • Install ARMv7l: wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v${NEW_VERSION}/mthbdeiotclient_${NEW_VERSION}_armv7l.deb"
 echo ""
 echo -e "${SUCCESS} ${GREEN}Version $NEW_VERSION released successfully!${NC}"

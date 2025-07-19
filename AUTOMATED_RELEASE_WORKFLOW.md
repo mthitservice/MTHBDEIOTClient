@@ -8,6 +8,18 @@ Dieser neue Workflow automatisiert den gesamten Release-Prozess:
 - **Automatische Pipeline-Auslösung** bei Code-Änderungen
 - **GitHub Releases** nur mit fertigen .deb Paketen
 
+## 🏗️ Branch-Architektur
+
+**Azure DevOps (Quellcode & Build):**
+- Branch: `master` 
+- Enthält: Vollständiger Quellcode, Entwicklung, Pipeline
+- Zweck: Development und automatische Builds
+
+**GitHub (Release Distribution):**
+- Branch: `main`
+- Enthält: Nur fertige Release-Pakete (.deb Dateien)
+- Zweck: Public Release Downloads für Endnutzer
+
 ## 🚀 Workflow-Schritte
 
 ### 1. Version in package.json aktualisieren
@@ -61,9 +73,14 @@ Die Azure DevOps Pipeline wird automatisch:
 
 ## 🔗 Links
 
-### Pipeline-Monitoring:
+### Azure DevOps Dashboard:
 ```
-https://dev.azure.com/mth-it-service/MthBdeIotClient/_build
+https://dev.azure.com/mth-it-service/MTHUABDEDS/_dashboards/index
+```
+
+### Build-Übersicht:
+```
+https://dev.azure.com/mth-it-service/MTHUABDEDS/_build
 ```
 
 ### GitHub Releases:
@@ -78,7 +95,7 @@ https://github.com/mthitservice/MTHBDEIOTClient/releases
 trigger:
   branches:
     include:
-      - "master"  # Trigger auf master commits
+      - "master"  # Trigger auf master commits (Azure DevOps Quellcode)
   tags:
     exclude:
       - "*"      # Keine Tag-Trigger (werden automatisch erstellt)
