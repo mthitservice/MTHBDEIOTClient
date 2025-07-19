@@ -3,6 +3,9 @@
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
 
+/* Import Raspberry Pi DPI corrections */
+@import './styles/raspberry-pi-dpi.css';
+
 body {
   position: relative;
 

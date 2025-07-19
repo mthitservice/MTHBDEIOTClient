@@ -96,6 +96,13 @@ Automatische Releases werden durch die Pipeline getriggert:
 - Swap vergrößern: `sudo dphys-swapfile swapoff && sudo nano /etc/dphys-swapfile`
 - Desktop-Environment deaktivieren: `sudo systemctl set-default multi-user.target`
 
+#### DPI/Schriftgröße Probleme (Raspberry Pi)
+
+- **Problem**: Schrift zu klein bei 1920x1080 auf Raspberry Pi
+- **Lösung**: DPI-Zoom anpassen in `.env` Datei: `RASPBERRY_DPI_ZOOM=1.2`
+- **Test-Tool**: `./shell-scripts/test-raspberry-dpi.sh auto`
+- **Verfügbare Zoom-Level**: 1.0 bis 1.5 (empfohlen: 1.2 für Raspberry Pi)
+
 ### Debug-Modi
 
 ```bash
@@ -199,6 +206,10 @@ journalctl -u mthbdeiotclient -f
 
 # Version bumpen und releasen (Linux/macOS)
 ./shell-scripts/release-version.sh
+
+# DPI-Test für Raspberry Pi
+./shell-scripts/test-raspberry-dpi.sh auto
+./shell-scripts/test-raspberry-dpi.sh 1.2
 ```
 
 ```powershell
@@ -206,6 +217,10 @@ journalctl -u mthbdeiotclient -f
 .\mth-manager.ps1 fix      # Schnelle Fehlerbehebung
 .\mth-manager.ps1 debug    # DEB Package debuggen
 .\mth-manager.ps1 build raspberry  # Raspberry Pi Build
+
+# DPI-Test für Raspberry Pi (Windows)
+.\powershell-scripts\test-raspberry-dpi.ps1 auto
+.\powershell-scripts\test-raspberry-dpi.ps1 1.2
 ```
 
 ## 🤝 Contributing
