@@ -319,6 +319,115 @@ stages:
           sudo systemctl start mthbdeiotclient
           ```
           
+          ## 🖥️ Kiosk-Modus Setup (Vollbild bei Neustart)
+          
+          ### 1. Desktop Auto-Login aktivieren
+          ```bash
+          # Raspberry Pi Configuration öffnen
+          sudo raspi-config
+          # Wählen: 1 System Options → S5 Boot / Auto Login → B4 Desktop Autologin
+          ```
+          
+          ### 2. Autostart-Desktop-Datei erstellen
+          ```bash
+          # Autostart-Verzeichnis erstellen
+          mkdir -p ~/.config/autostart
+          
+          # Desktop-Datei für Autostart erstellen
+          cat > ~/.config/autostart/mthbdeiotclient-kiosk.desktop << EOF
+          [Desktop Entry]
+          Type=Application
+          Name=MTH BDE IoT Client Kiosk
+          Comment=Startet MTH BDE IoT Client im Kiosk-Modus
+          Exec=mthbdeiotclient --kiosk --fullscreen
+          Hidden=false
+          NoDisplay=false
+          X-GNOME-Autostart-enabled=true
+          EOF
+          ```
+          
+          ### 3. Alternative: Systemd Service für Kiosk-Modus
+          ```bash
+          # Service-Datei erstellen
+          sudo tee /etc/systemd/system/mthbdeiotclient-kiosk.service << EOF
+          [Unit]
+          Description=MTH BDE IoT Client Kiosk Mode
+          After=graphical-session.target
+          Wants=graphical-session.target
+          
+          [Service]
+          Type=simple
+          User=pi
+          Environment=DISPLAY=:0
+          Environment=WAYLAND_DISPLAY=wayland-0
+          Environment=XDG_RUNTIME_DIR=/run/user/1000
+          Environment=KIOSK_MODE=true
+          ExecStart=/usr/local/bin/mthbdeiotclient --kiosk --fullscreen
+          Restart=always
+          RestartSec=3
+          
+          [Install]
+          WantedBy=default.target
+          EOF
+          
+          # Service aktivieren
+          sudo systemctl enable mthbdeiotclient-kiosk.service
+          sudo systemctl start mthbdeiotclient-kiosk.service
+          ```
+          
+          ### 4. Bildschirmschoner deaktivieren
+          ```bash
+          # Xorg Konfiguration für Bildschirmschoner
+          sudo tee /etc/X11/xorg.conf.d/10-monitor.conf << EOF
+          Section "ServerLayout"
+              Identifier "ServerLayout0"
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
+          EndSection
+          
+          Section "Extensions"
+              Option "DPMS" "Disable"
+          EndSection
+          EOF
+          
+          # LXDE Bildschirmschoner deaktivieren
+          echo "@xset s noblank" >> ~/.config/lxsession/LXDE-pi/autostart
+          echo "@xset s off" >> ~/.config/lxsession/LXDE-pi/autostart
+          echo "@xset -dpms" >> ~/.config/lxsession/LXDE-pi/autostart
+          ```
+          
+          ### 5. Kiosk-Modus Kommandozeilenoptionen
+          ```bash
+          # Vollbild-Modus
+          mthbdeiotclient --fullscreen
+          
+          # Kiosk-Modus (Vollbild + Always-on-Top)
+          mthbdeiotclient --kiosk
+          
+          # Beide Optionen kombiniert
+          mthbdeiotclient --kiosk --fullscreen
+          
+          # Umgebungsvariable setzen
+          KIOSK_MODE=true mthbdeiotclient
+          ```
+          
+          ### 6. Problembehandlung Kiosk-Modus
+          ```bash
+          # Service Status prüfen
+          sudo systemctl status mthbdeiotclient-kiosk.service
+          
+          # Service Logs anzeigen
+          sudo journalctl -u mthbdeiotclient-kiosk.service -f
+          
+          # Display-Variable prüfen
+          echo $DISPLAY
+          
+          # Manuelle X11-Berechtigung (falls nötig)
+          xhost +local:
+          ```
+          
           ## Performance-Optimierungen in $(releaseVersion)
           * Optimierte Maus-Responsivität auf Raspberry Pi
           * Reduzierte Memory-Nutzung (512MB Limit)
@@ -333,10 +442,26 @@ stages:
           
           ## Deinstallation
           ```bash
+          # Standard-Deinstallation
           sudo apt-get remove --purge mthbdeiotclient
           sudo apt-get autoremove
           rm -rf ~/.config/MthBdeIotClient
           rm -rf ~/.local/share/MthBdeIotClient
+          
+          # Kiosk-Modus Komponenten entfernen
+          sudo systemctl stop mthbdeiotclient-kiosk.service
+          sudo systemctl disable mthbdeiotclient-kiosk.service
+          sudo rm /etc/systemd/system/mthbdeiotclient-kiosk.service
+          rm -f ~/.config/autostart/mthbdeiotclient-kiosk.desktop
+          sudo rm -f /etc/X11/xorg.conf.d/10-monitor.conf
+          
+          # Autostart-Einträge entfernen
+          sed -i '/xset.*noblank/d' ~/.config/lxsession/LXDE-pi/autostart
+          sed -i '/xset.*off/d' ~/.config/lxsession/LXDE-pi/autostart
+          sed -i '/xset.*dpms/d' ~/.config/lxsession/LXDE-pi/autostart
+          
+          # Systemd neu laden
+          sudo systemctl daemon-reload
           ```
           
           **Build Information:**
