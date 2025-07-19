@@ -104,6 +104,10 @@ class AppUpdater {
 
     autoUpdater.on('error', (err) => {
       console.error('Error in auto-updater:', err);
+      // Für ARM/Linux-Systeme: Auto-Update Fehler sind normal (DEB-Pakete unterstützen kein Auto-Update)
+      if (isArmSystem || process.platform === 'linux') {
+        console.log('Auto-Update ist für ARM/Linux DEB-Installationen nicht verfügbar - verwenden Sie die manuelle Update-Methode');
+      }
     });
 
     autoUpdater.on('download-progress', (progressObj) => {
@@ -120,9 +124,18 @@ class AppUpdater {
       }
     });
 
-    // Prüfe nur in Production auf Updates
-    if (process.env.NODE_ENV === 'production') {
+    // Auto-Update nur für Windows und nicht-ARM Systeme aktivieren
+    // ARM/Linux DEB-Pakete unterstützen kein Auto-Update über GitHub
+    const shouldCheckForUpdates = process.env.NODE_ENV === 'production' && 
+                                  !isArmSystem && 
+                                  process.platform !== 'linux';
+                                  
+    if (shouldCheckForUpdates) {
+      console.log('Auto-Update aktiviert für unterstützte Plattform');
       autoUpdater.checkForUpdatesAndNotify();
+    } else {
+      console.log('Auto-Update deaktiviert für diese Plattform (ARM/Linux DEB)');
+      console.log('Für Updates: Neues DEB-Paket von GitHub herunterladen und installieren');
     }
   }
 }
@@ -135,23 +148,69 @@ ipcMain.on('ipc-example', async (event, arg) => {
 
 // AutoUpdater IPC Handlers
 ipcMain.handle('check-for-updates', async () => {
-  if (process.env.NODE_ENV === 'production') {
+  try {
+    // Für ARM/Linux: Manueller Update-Check über GitHub API
+    if (isArmSystem || process.platform === 'linux') {
+      console.log(
+        'Checking for updates via GitHub API for ARM/Linux system...',
+      );
+
+      const response = await fetch(
+        'https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest',
+      );
+      const data = await response.json();
+
+      const latestVersion = data.tag_name.replace('v', '');
+      const currentVersion = process.env.APP_VERSION || '1.0.0';
+
+      const updateInfo = {
+        currentVersion,
+        latestVersion,
+        hasUpdate: latestVersion !== currentVersion,
+        downloadUrl: `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${data.tag_name}`,
+        releaseNotes: data.body,
+        publishedAt: data.published_at,
+      };
+
+      console.log('Update check result:', updateInfo);
+      return updateInfo;
+    }
+
+    // Standard Auto-Updater für andere Plattformen
     return autoUpdater.checkForUpdates();
+  } catch (error: any) {
+    console.error('Error checking for updates:', error);
+    return { error: error.message };
   }
-  return { updateInfo: null };
 });
 
 ipcMain.handle('download-update', async () => {
-  if (process.env.NODE_ENV === 'production') {
+  try {
+    // Für ARM/Linux: Anweisung zur manuellen Installation
+    if (isArmSystem || process.platform === 'linux') {
+      return {
+        manual: true,
+        message:
+          'Für ARM/Linux Systeme: Laden Sie das neue DEB-Paket von GitHub herunter und installieren Sie es manuell mit: sudo dpkg -i package.deb',
+      };
+    }
+
     return autoUpdater.downloadUpdate();
+  } catch (error: any) {
+    console.error('Error downloading update:', error);
+    return { error: error.message };
   }
-  return false;
 });
 
-ipcMain.handle('install-update', async () => {
-  if (process.env.NODE_ENV === 'production') {
-    autoUpdater.quitAndInstall();
+ipcMain.handle('quit-and-install', () => {
+  // Für ARM/Linux: Nur App beenden (kein Auto-Install möglich)
+  if (isArmSystem || process.platform === 'linux') {
+    console.log('Manual installation required for ARM/Linux systems');
+    app.quit();
+    return;
   }
+
+  autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle('get-app-version', async () => {
@@ -175,7 +234,6 @@ const isDebug =
   process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
-
   require('electron-debug').default();
 }
 
