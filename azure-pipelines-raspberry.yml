@@ -1,15 +1,15 @@
 # Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi Multi-Architecture Build
-# Optimierte Pipeline für Raspberry Pi ARM64 und ARMv7l .deb Pakete
+# Automatische Tag-Erstellung und GitHub Release ohne Quellcode-Push
 
 trigger:
   branches:
-    exclude:
-      - "*"  # Keine Branch-Trigger
-  tags:
     include:
-      - "v*"  # Nur bei Tags die mit "v" beginnen
+      - "master"  # Trigger auf master branch commits
+  tags:
+    exclude:
+      - "*"  # Keine Tag-Trigger (Tags werden automatisch erstellt)
 
-# Deaktiviere auch Pull Request Triggers  
+# Deaktiviere Pull Request Triggers  
 pr: none
 
 variables:
@@ -17,20 +17,87 @@ variables:
   buildConfiguration: "Release"
   nodeVersion: "22.x"
   
-  # Versioning
-  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
-  releaseVersion: $[replace(variables['Build.SourceBranchName'], 'v', '')]
+  # Versioning - wird automatisch aus package.json gelesen
+  isRelease: true  # Immer als Release behandeln
   
   # Artifact Names
   artifactName: "MthBdeIotClient-RaspberryPi"
   
-  # GitHub Configuration
+  # GitHub Configuration (nur für Releases, nicht für Quellcode)
   githubRepository: "mthitservice/MTHBDEIOTClient"
   githubConnection: "github-connection"
 
 stages:
+  - stage: VersionAndTag
+    displayName: "Version Detection and Git Tag Creation"
+    jobs:
+      - job: CreateGitTag
+        displayName: "Read Version and Create Git Tag"
+        pool:
+          vmImage: "ubuntu-latest"
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+            displayName: "Checkout Source Code"
+
+          - task: NodeTool@0
+            displayName: "Install Node.js $(nodeVersion)"
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd App
+              echo "=== READING VERSION FROM PACKAGE.JSON ==="
+              
+              # Version aus package.json auslesen
+              VERSION=$(node -p "require('./package.json').version")
+              echo "Detected version: $VERSION"
+              
+              # Prüfen ob Version gültig ist
+              if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "❌ Invalid version format: $VERSION"
+                exit 1
+              fi
+              
+              # Git Tag erstellen
+              GIT_TAG="v$VERSION"
+              echo "Creating Git tag: $GIT_TAG"
+              
+              # Prüfen ob Tag bereits existiert
+              if git rev-parse "$GIT_TAG" >/dev/null 2>&1; then
+                echo "⚠️ Tag $GIT_TAG already exists, will update release"
+                echo "##vso[task.setvariable variable=releaseVersion;isOutput=true]$VERSION"
+                echo "##vso[task.setvariable variable=gitTag;isOutput=true]$GIT_TAG"
+                echo "##vso[task.setvariable variable=tagExists;isOutput=true]true"
+              else
+                echo "✅ Creating new tag $GIT_TAG"
+                
+                # Git Konfiguration
+                git config user.name "Azure DevOps Pipeline"
+                git config user.email "pipeline@mth-it-service.com"
+                
+                # Tag mit Nachricht erstellen (escaped für YAML)
+                TAG_MESSAGE="Release $VERSION - MTH BDE IoT Client Release v$VERSION - Features: Electron App für Raspberry Pi - Performance-Optimierungen für bessere Maus-Responsivität - Build: $(Build.BuildNumber) - Commit: $(Build.SourceVersion)"
+
+                git tag -a "$GIT_TAG" -m "$TAG_MESSAGE"
+                
+                echo "##vso[task.setvariable variable=releaseVersion;isOutput=true]$VERSION"
+                echo "##vso[task.setvariable variable=gitTag;isOutput=true]$GIT_TAG"
+                echo "##vso[task.setvariable variable=tagExists;isOutput=true]false"
+                
+                echo "✅ Git tag $GIT_TAG created successfully"
+              fi
+            displayName: "Create Git Tag from Package Version"
+            name: versionInfo
+
   - stage: Build
     displayName: "Build Raspberry Pi Applications"
+    dependsOn: VersionAndTag
+    variables:
+      releaseVersion: $[ stageDependencies.VersionAndTag.CreateGitTag.outputs['versionInfo.releaseVersion'] ]
+      gitTag: $[ stageDependencies.VersionAndTag.CreateGitTag.outputs['versionInfo.gitTag'] ]
     jobs:
       - job: BuildRaspberryPiARM64
         displayName: "Build Raspberry Pi 64-bit (ARM64)"
@@ -405,12 +472,17 @@ stages:
             condition: always()
 
   - stage: Deploy
-    displayName: "Deploy & Release"
-    dependsOn: Build
-    condition: and(succeeded(), eq(variables.isRelease, true))
+    displayName: "Deploy & GitHub Release"
+    dependsOn: 
+      - VersionAndTag
+      - Build
+    condition: succeeded()
+    variables:
+      releaseVersion: $[ stageDependencies.VersionAndTag.CreateGitTag.outputs['versionInfo.releaseVersion'] ]
+      gitTag: $[ stageDependencies.VersionAndTag.CreateGitTag.outputs['versionInfo.gitTag'] ]
     jobs:
       - job: CreateGitHubRelease
-        displayName: "Create GitHub Release"
+        displayName: "Create GitHub Release with Artifacts Only"
         pool:
           vmImage: "ubuntu-latest"
         
@@ -440,42 +512,68 @@ stages:
             displayName: "Verify Downloaded Artifacts"
 
           - task: GitHubRelease@1
-            displayName: "Create GitHub Release"
+            displayName: "Create GitHub Release with Auto-Generated Tag"
             inputs:
               gitHubConnection: $(githubConnection)
               repositoryName: $(githubRepository)
               action: "create"
-              target: "master"
+              target: "$(Build.SourceVersion)"  # Commit Hash statt Branch
               tagSource: "userSpecifiedTag"
-              tag: "$(Build.SourceBranchName)"
+              tag: "$(gitTag)"  # Verwende automatisch erstellten Tag
               title: "MthBdeIotClient $(releaseVersion)"
               releaseNotesSource: "inline"
               releaseNotesInline: |
-                ## Release $(releaseVersion)
+                ## 🚀 MTH BDE IoT Client Release $(releaseVersion)
+                
+                **Automatisch generiert durch Azure DevOps Pipeline**
                 
                 ### 📦 Download-Links
                 
                 #### Direkte wget-Befehle:
                 ```bash
                 # ARM64 (Raspberry Pi 4, Pi 400, Pi 5)
-                wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/$(Build.SourceBranchName)/mthbdeiotclient_$(releaseVersion)_arm64.deb
+                wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/$(gitTag)/mthbdeiotclient_$(releaseVersion)_arm64.deb
                 
                 # ARMv7l (Raspberry Pi 3, Pi Zero 2 W)  
-                wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/$(Build.SourceBranchName)/mthbdeiotclient_$(releaseVersion)_armv7l.deb
+                wget https://github.com/mthitservice/MTHBDEIOTClient/releases/download/$(gitTag)/mthbdeiotclient_$(releaseVersion)_armv7l.deb
                 ```
                 
-                #### Datei-Downloads:
+                #### 📋 Verfügbare Pakete:
                 - **Raspberry Pi 64-bit (ARM64)**: `mthbdeiotclient_$(releaseVersion)_arm64.deb`
                 - **Raspberry Pi 32-bit (ARMv7l)**: `mthbdeiotclient_$(releaseVersion)_armv7l.deb`
                 
-                ### 🔧 Installation
+                ### 🔧 Schnell-Installation
                 ```bash
                 # 1. Abhängigkeiten installieren
-                sudo apt-get update
-                sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
+                sudo apt-get update && sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 libgbm1
                 
                 # 2. DEB Package installieren (ARM64)
-                sudo dpkg -i mthbdeiotclient_$(releaseVersion)_arm64.deb
+                sudo dpkg -i mthbdeiotclient_$(releaseVersion)_arm64.deb && sudo apt-get install -f
+                
+                # 3. Anwendung starten
+                mthbdeiotclient
+                ```
+                
+                ### ⚡ Performance-Verbesserungen in $(releaseVersion)
+                - Optimierte Maus-Responsivität auf Raspberry Pi
+                - Reduzierte Memory-Nutzung (512MB Limit)
+                - GPU-Beschleunigung deaktiviert für bessere Stabilität
+                - Wayland/X11 Kompatibilität verbessert
+                
+                ### 🖥️ Systemanforderungen
+                - **Raspberry Pi 4/5 (ARM64)**: 64-bit Raspberry Pi OS
+                - **Raspberry Pi 3/3+ (ARMv7l)**: 32-bit Raspberry Pi OS  
+                - **Mindestens 1GB RAM** (2GB+ empfohlen)
+                - **Desktop-Umgebung** (X11/Wayland)
+                
+                ### 🔗 Build Information
+                - **Build**: $(Build.BuildNumber)
+                - **Commit**: $(Build.SourceVersion)
+                - **Pipeline**: Automatische Release-Generierung
+                - **Datum**: $[format('{0:yyyy-MM-dd HH:mm:ss} UTC', pipeline.startTime)]
+                
+                ---
+                *Dieses Release wurde automatisch durch Azure DevOps erstellt und enthält nur die fertigen Anwendungspakete.*
                 sudo apt-get install -f
                 
                 # ODER für ARMv7l:

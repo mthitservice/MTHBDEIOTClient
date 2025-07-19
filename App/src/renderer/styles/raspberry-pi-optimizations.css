@@ -7,15 +7,15 @@
   animation-delay: 0s !important;
   transition-duration: 0.1s !important;
   transition-delay: 0s !important;
-  
+
   /* Schatten und Filter reduzieren */
   box-shadow: none !important;
   text-shadow: none !important;
   filter: none !important;
-  
+
   /* Transparenz minimieren */
   backdrop-filter: none !important;
-  
+
   /* Hardware-Beschleunigung deaktivieren */
   transform: translateZ(0);
   will-change: auto;

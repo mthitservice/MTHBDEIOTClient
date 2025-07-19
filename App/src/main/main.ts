@@ -165,17 +165,17 @@ const createWindow = async () => {
     process.env.KIOSK_MODE === 'true';
 
   // Performance-Optimierungen für Raspberry Pi (ARM-basierte Systeme)
-  const isArmSystem = process.arch === 'arm' || process.arch === 'arm64' || 
-                     process.platform === 'linux' && (
-                       process.env.RASPBERRY_PI === 'true' || 
-                       process.env.NODE_ENV === 'production'
-                     );
-  
+  const isArmSystem = process.arch === 'arm' || process.arch === 'arm64' ||
+    process.platform === 'linux' && (
+      process.env.RASPBERRY_PI === 'true' ||
+      process.env.NODE_ENV === 'production'
+    );
+
   if (isArmSystem) {
     console.log('🔧 Applying Raspberry Pi/ARM performance optimizations...');
-    
+
     app.disableHardwareAcceleration(); // GPU-Beschleunigung deaktivieren
-    
+
     // Weitere Performance-Optimierungen
     app.commandLine.appendSwitch('--no-sandbox');
     app.commandLine.appendSwitch('--disable-dev-shm-usage');
@@ -188,7 +188,7 @@ const createWindow = async () => {
     app.commandLine.appendSwitch('--enable-features=VaapiVideoDecoder');
     app.commandLine.appendSwitch('--disable-features=TranslateUI');
     app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
-    
+
     // Speicher-Optimierungen
     app.commandLine.appendSwitch('--memory-pressure-off');
     app.commandLine.appendSwitch('--max_old_space_size=512'); // Begrenze RAM-Nutzung
