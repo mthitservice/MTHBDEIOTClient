@@ -3,7 +3,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'build', 'dev', 'release', 'debug', 'deploy', 'trigger', 'validate', 'fix', 'dpi-test')]
+    [ValidateSet('help', 'build', 'dev', 'release', 'debug', 'deploy', 'trigger', 'validate', 'fix')]
     [string]$Command = 'help',
     
     [Parameter(Position = 1)]
@@ -28,13 +28,11 @@ function Show-Help {
     Write-Host "⚡ trigger   - Pipeline triggern" -ForegroundColor Cyan
     Write-Host "✅ validate  - DEB-Paket validieren" -ForegroundColor Cyan
     Write-Host "🔧 fix       - Schnelle Fehlerbehebung" -ForegroundColor Cyan
-    Write-Host "🍓 dpi-test  - Raspberry Pi DPI Test" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Beispiele:" -ForegroundColor Yellow
     Write-Host "  .\mth-manager.ps1 dev" -ForegroundColor White
     Write-Host "  .\mth-manager.ps1 build raspberry" -ForegroundColor White
     Write-Host "  .\mth-manager.ps1 release 1.0.50" -ForegroundColor White
-    Write-Host "  .\mth-manager.ps1 dpi-test 1.2" -ForegroundColor White
     Write-Host ""
 }
 
@@ -116,24 +114,6 @@ function Invoke-Fix {
     & ".\powershell-scripts\quick-fix-deb.ps1"
 }
 
-function Invoke-DpiTest {
-    param([string]$ZoomLevel = "auto")
-    
-    Write-Host "🍓 Starte Raspberry Pi DPI Test..." -ForegroundColor Magenta
-    
-    if (-not (Test-Path "powershell-scripts\test-raspberry-dpi.ps1")) {
-        Write-Host "❌ DPI-Test Skript nicht gefunden!" -ForegroundColor Red
-        return
-    }
-    
-    if ($ZoomLevel -ne "") {
-        & ".\powershell-scripts\test-raspberry-dpi.ps1" $ZoomLevel
-    }
-    else {
-        & ".\powershell-scripts\test-raspberry-dpi.ps1" "auto"
-    }
-}
-
 # Hauptlogik
 Show-Header
 
@@ -147,7 +127,6 @@ switch ($Command.ToLower()) {
     'trigger' { Invoke-Trigger }
     'validate' { Invoke-Validate }
     'fix' { Invoke-Fix }
-    'dpi-test' { Invoke-DpiTest -ZoomLevel $Parameter }
     default { 
         Write-Host "❌ Unbekannter Befehl: $Command" -ForegroundColor Red
         Show-Help 

@@ -27,7 +27,6 @@ require('dotenv').config();
 console.log('APP Name:', process.env.APP_NAME);
 console.log('APP Version:', process.env.APP_VERSION);
 console.log('Raspberry Pi Mode:', process.env.RASPBERRY_PI);
-console.log('DPI Zoom Level:', process.env.RASPBERRY_DPI_ZOOM);
 
 // Performance-Optimierungen für Raspberry Pi (ARM-basierte Systeme)
 // WICHTIG: Muss vor app.ready ausgeführt werden!
@@ -287,20 +286,6 @@ const createWindow = async () => {
 
   console.log(`🖥️  Window size: ${windowWidth}x${windowHeight} (Fullscreen: ${isFullscreenMode}, Dev1080: ${isDev1080Mode})`);
 
-  // DPI-Skalierung für Raspberry Pi bestimmen
-  let zoomFactor = 1.0;
-
-  // Prüfe Umgebungsvariable für benutzerdefinierten Zoom
-  const customZoom = process.env.RASPBERRY_DPI_ZOOM;
-  if (customZoom && !Number.isNaN(parseFloat(customZoom))) {
-    zoomFactor = parseFloat(customZoom);
-    console.log('🔍 Using custom DPI zoom from environment:', zoomFactor);
-  } else if (isArmSystem && windowWidth === 1920 && windowHeight === 1080) {
-    // Raspberry Pi mit 1920x1080 braucht größere Fonts
-    zoomFactor = 1.2; // 20% größer
-    console.log('🔍 Applying default Raspberry Pi zoom factor:', zoomFactor);
-  }
-
   mainWindow = new BrowserWindow({
     show: false,
     width: windowWidth,
@@ -325,8 +310,6 @@ const createWindow = async () => {
       sandbox: false,
       allowRunningInsecureContent: isArmSystem,
       offscreen: false,
-      // DPI/Zoom-Behandlung
-      zoomFactor,
     },
   });
 
@@ -384,21 +367,6 @@ const createWindow = async () => {
 
     mainWindow.webContents.on('dom-ready', () => {
       console.log('🎯 DOM ist bereit');
-
-      // Zusätzliche Zoom-Anpassung für Raspberry Pi nach DOM-Load
-      if (isArmSystem && zoomFactor > 1.0) {
-        console.log('🔍 Setting web contents zoom level for Raspberry Pi...');
-        mainWindow?.webContents.setZoomLevel(
-          Math.log(zoomFactor) / Math.log(1.2),
-        );
-
-        // CSS-Variablen für DPI-Anpassung setzen
-        mainWindow?.webContents.executeJavaScript(`
-          document.documentElement.style.setProperty('--raspberry-scale', '${zoomFactor}');
-          document.documentElement.classList.add('raspberry-pi-mode');
-          console.log('🍓 Raspberry Pi DPI scaling applied: ${zoomFactor}x');
-        `);
-      }
     });
 
     mainWindow.webContents.on('did-frame-finish-load', () => {
