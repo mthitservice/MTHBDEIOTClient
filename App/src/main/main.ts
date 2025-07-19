@@ -289,7 +289,7 @@ const createWindow = async () => {
 
   // DPI-Skalierung für Raspberry Pi bestimmen
   let zoomFactor = 1.0;
-  
+
   // Prüfe Umgebungsvariable für benutzerdefinierten Zoom
   const customZoom = process.env.RASPBERRY_DPI_ZOOM;
   if (customZoom && !Number.isNaN(parseFloat(customZoom))) {
@@ -384,14 +384,14 @@ const createWindow = async () => {
 
     mainWindow.webContents.on('dom-ready', () => {
       console.log('🎯 DOM ist bereit');
-      
+
       // Zusätzliche Zoom-Anpassung für Raspberry Pi nach DOM-Load
       if (isArmSystem && zoomFactor > 1.0) {
         console.log('🔍 Setting web contents zoom level for Raspberry Pi...');
         mainWindow?.webContents.setZoomLevel(
           Math.log(zoomFactor) / Math.log(1.2),
         );
-        
+
         // CSS-Variablen für DPI-Anpassung setzen
         mainWindow?.webContents.executeJavaScript(`
           document.documentElement.style.setProperty('--raspberry-scale', '${zoomFactor}');

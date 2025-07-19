@@ -98,7 +98,7 @@ function Invoke-Debug {
 
 function Invoke-Deploy {
     Write-Host "📤 Starte Deployment..." -ForegroundColor Green
-    & ".\powershell-scripts\deploy.ps1"
+    & ".\App\deploy.ps1"
 }
 
 function Invoke-Trigger {
@@ -128,7 +128,8 @@ function Invoke-DpiTest {
     
     if ($ZoomLevel -ne "") {
         & ".\powershell-scripts\test-raspberry-dpi.ps1" $ZoomLevel
-    } else {
+    }
+    else {
         & ".\powershell-scripts\test-raspberry-dpi.ps1" "auto"
     }
 }

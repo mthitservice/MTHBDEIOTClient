@@ -105,7 +105,7 @@ unclutter -display :0 -idle 1 -grab &
 
 # STABILE PARAMETER - weniger Features = weniger Crashes
 echo "Starte mthbdeiotclient mit stabilen Parametern..."
-/opt/MthBdeIotClient/mthbdeiotclient \
+/opt/mthbdeiotclient/mthbdeiotclient \
     --no-sandbox \
     --kiosk \
     --fullscreen \

@@ -2,7 +2,7 @@
 
 /* CSS-Variablen für dynamische Skalierung */
 :root {
-  --raspberry-scale: 1.0;
+  --raspberry-scale: 1;
   --base-font-size: 16px;
   --raspberry-font-size: calc(var(--base-font-size) * var(--raspberry-scale));
 }
@@ -21,21 +21,24 @@
 /* Buttons größer und besser lesbar */
 .raspberry-pi-mode .btn {
   font-size: calc(16px * var(--raspberry-scale));
-  padding: calc(12px * var(--raspberry-scale)) calc(24px * var(--raspberry-scale));
+  padding: calc(12px * var(--raspberry-scale))
+    calc(24px * var(--raspberry-scale));
   min-height: calc(48px * var(--raspberry-scale));
   border-radius: calc(4px * var(--raspberry-scale));
 }
 
 .raspberry-pi-mode .btn-large {
   font-size: calc(18px * var(--raspberry-scale));
-  padding: calc(16px * var(--raspberry-scale)) calc(32px * var(--raspberry-scale));
+  padding: calc(16px * var(--raspberry-scale))
+    calc(32px * var(--raspberry-scale));
   min-height: calc(64px * var(--raspberry-scale));
 }
 
 /* Form-Inputs */
 .raspberry-pi-mode .form-control {
   font-size: calc(16px * var(--raspberry-scale));
-  padding: calc(12px * var(--raspberry-scale)) calc(16px * var(--raspberry-scale));
+  padding: calc(12px * var(--raspberry-scale))
+    calc(16px * var(--raspberry-scale));
   min-height: calc(48px * var(--raspberry-scale));
   border-radius: calc(4px * var(--raspberry-scale));
 }
@@ -49,13 +52,15 @@
 /* Navigation */
 .raspberry-pi-mode .nav-pills .nav-link {
   font-size: calc(16px * var(--raspberry-scale));
-  padding: calc(12px * var(--raspberry-scale)) calc(20px * var(--raspberry-scale));
+  padding: calc(12px * var(--raspberry-scale))
+    calc(20px * var(--raspberry-scale));
 }
 
 /* Cards und Headers */
 .raspberry-pi-mode .card-header {
   font-size: calc(18px * var(--raspberry-scale));
-  padding: calc(16px * var(--raspberry-scale)) calc(20px * var(--raspberry-scale));
+  padding: calc(16px * var(--raspberry-scale))
+    calc(20px * var(--raspberry-scale));
 }
 
 .raspberry-pi-mode .card-body {
@@ -70,13 +75,15 @@
 
 .raspberry-pi-mode .table th,
 .raspberry-pi-mode .table td {
-  padding: calc(12px * var(--raspberry-scale)) calc(16px * var(--raspberry-scale));
+  padding: calc(12px * var(--raspberry-scale))
+    calc(16px * var(--raspberry-scale));
   font-size: calc(16px * var(--raspberry-scale));
 }
 
 /* Modals */
 .raspberry-pi-mode .modal-header {
-  padding: calc(16px * var(--raspberry-scale)) calc(24px * var(--raspberry-scale));
+  padding: calc(16px * var(--raspberry-scale))
+    calc(24px * var(--raspberry-scale));
 }
 
 .raspberry-pi-mode .modal-body {
@@ -127,20 +134,23 @@
 }
 
 .raspberry-pi-mode .dropdown-item {
-  padding: calc(8px * var(--raspberry-scale)) calc(16px * var(--raspberry-scale));
+  padding: calc(8px * var(--raspberry-scale))
+    calc(16px * var(--raspberry-scale));
   font-size: calc(16px * var(--raspberry-scale));
 }
 
 /* Alerts und Notifications */
 .raspberry-pi-mode .alert {
   font-size: calc(16px * var(--raspberry-scale));
-  padding: calc(12px * var(--raspberry-scale)) calc(16px * var(--raspberry-scale));
+  padding: calc(12px * var(--raspberry-scale))
+    calc(16px * var(--raspberry-scale));
 }
 
 /* Tooltips */
 .raspberry-pi-mode .tooltip-inner {
   font-size: calc(14px * var(--raspberry-scale));
-  padding: calc(8px * var(--raspberry-scale)) calc(12px * var(--raspberry-scale));
+  padding: calc(8px * var(--raspberry-scale))
+    calc(12px * var(--raspberry-scale));
 }
 
 /* Breadcrumbs */
@@ -151,13 +161,15 @@
 /* Spezielle Anpassungen für kleine Elemente */
 .raspberry-pi-mode .btn-sm {
   font-size: calc(14px * var(--raspberry-scale));
-  padding: calc(8px * var(--raspberry-scale)) calc(16px * var(--raspberry-scale));
+  padding: calc(8px * var(--raspberry-scale))
+    calc(16px * var(--raspberry-scale));
   min-height: calc(36px * var(--raspberry-scale));
 }
 
 .raspberry-pi-mode .form-control-sm {
   font-size: calc(14px * var(--raspberry-scale));
-  padding: calc(8px * var(--raspberry-scale)) calc(12px * var(--raspberry-scale));
+  padding: calc(8px * var(--raspberry-scale))
+    calc(12px * var(--raspberry-scale));
   min-height: calc(36px * var(--raspberry-scale));
 }
 
@@ -176,7 +188,9 @@
 .raspberry-pi-mode .clickable,
 .raspberry-pi-mode button,
 .raspberry-pi-mode a:not(.btn) {
-  min-height: calc(44px * var(--raspberry-scale)); /* Apple/Google empfohlene Touch-Größe */
+  min-height: calc(
+    44px * var(--raspberry-scale)
+  ); /* Apple/Google empfohlene Touch-Größe */
   display: inline-flex;
   align-items: center;
 }
@@ -189,7 +203,7 @@
 
 /* Debug-Info für Entwicklung */
 .raspberry-pi-mode::before {
-  content: "🍓 Raspberry Pi Mode (Scale: " attr(data-scale) ")";
+  content: '🍓 Raspberry Pi Mode (Scale: ' attr(data-scale) ')';
   position: fixed;
   top: 5px;
   right: 5px;

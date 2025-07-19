@@ -151,8 +151,9 @@ case "$ZOOM_LEVEL" in
         reset_settings
         ;;
     "auto")
-        detected_zoom=$(auto_detect)
-        test_zoom_level "$detected_zoom"
+        auto_detect
+        # Verwende 1.2 als Standard für Raspberry Pi
+        test_zoom_level "1.2"
         ;;
     "interactive")
         interactive_test

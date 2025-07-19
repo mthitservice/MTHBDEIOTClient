@@ -2,7 +2,7 @@
 # Test verschiedene Zoom-Level für optimale Darstellung
 
 param(
-    [Parameter(Position=0)]
+    [Parameter(Position = 0)]
     [ValidateSet('1.0', '1.1', '1.2', '1.3', '1.4', '1.5', 'auto', 'reset')]
     [string]$ZoomLevel = 'auto'
 )
@@ -72,7 +72,7 @@ function Auto-Detect {
         $resolution = Get-WmiObject -Class Win32_VideoController | Select-Object CurrentHorizontalResolution, CurrentVerticalResolution
         if ($resolution.CurrentHorizontalResolution -eq 1920 -and $resolution.CurrentVerticalResolution -eq 1080) {
             Write-Host "📺 1920x1080 erkannt - empfohlener Zoom: 1.2" -ForegroundColor Green
-            return "1.2"
+            return
         }
     }
     catch {
@@ -80,7 +80,6 @@ function Auto-Detect {
     }
     
     Write-Host "🍓 Raspberry Pi Modus - verwende Standard-Zoom: 1.2" -ForegroundColor Green
-    return "1.2"
 }
 
 function Interactive-Test {
@@ -125,8 +124,9 @@ switch ($ZoomLevel) {
         Reset-Settings
     }
     'auto' { 
-        $detectedZoom = Auto-Detect
-        Test-ZoomLevel $detectedZoom
+        Auto-Detect
+        # Verwende 1.2 als Standard für Raspberry Pi
+        Test-ZoomLevel "1.2"
     }
     'interactive' {
         Interactive-Test
@@ -134,7 +134,8 @@ switch ($ZoomLevel) {
     default { 
         if ($ZoomLevel -match '^1\.[0-5]$') {
             Test-ZoomLevel $ZoomLevel
-        } else {
+        }
+        else {
             Write-Host "❌ Ungültiges Zoom-Level: $ZoomLevel" -ForegroundColor Red
             Show-Help
         }

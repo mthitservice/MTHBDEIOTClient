@@ -146,8 +146,8 @@ Version=1.0
 Type=Application
 Name=MTH BDE IoT Client
 Comment=MTH BDE IoT Management Application
-Exec=/opt/MthBdeIotClient/mthbdeiotclient --no-sandbox --disable-gpu
-Icon=/opt/MthBdeIotClient/resources/app/assets/icon.png
+Exec=/opt/mthbdeiotclient/mthbdeiotclient --no-sandbox --disable-gpu
+Icon=/opt/mthbdeiotclient/resources/app/assets/icon.png
 Terminal=false
 StartupWMClass=MTH BDE IoT Client
 Categories=Utility;Development;
@@ -163,8 +163,8 @@ Version=1.0
 Type=Application
 Name=MTH BDE IoT Client
 Comment=MTH BDE IoT Management Application
-Exec=/opt/MthBdeIotClient/mthbdeiotclient --no-sandbox --disable-gpu
-Icon=/opt/MthBdeIotClient/resources/app/assets/icon.png
+Exec=/opt/mthbdeiotclient/mthbdeiotclient --no-sandbox --disable-gpu
+Icon=/opt/mthbdeiotclient/resources/app/assets/icon.png
 Terminal=false
 StartupWMClass=MTH BDE IoT Client
 Categories=Utility;Development;
@@ -183,7 +183,7 @@ echo -e "${GREEN}============================================${NC}"
 echo
 echo -e "${BLUE}Starten der Anwendung:${NC}"
 echo "1. Desktop-Verknüpfung: Doppelklick auf 'MTH BDE IoT Client'"
-echo "2. Terminal: /opt/MthBdeIotClient/mthbdeiotclient --no-sandbox"
+echo "2. Terminal: /opt/mthbdeiotclient/mthbdeiotclient --no-sandbox"
 echo
 echo -e "${BLUE}Wichtige Hinweise:${NC}"
 echo "• Datenbank wird in ~/.local/share/MthBdeIotClient/ gespeichert"
@@ -344,7 +344,7 @@ echo ""
 echo "✅ Installation abgeschlossen!"
 echo ""
 echo "📊 Installierte Version: $LATEST_VERSION"
-echo "📁 Installationsort: /opt/MthBdeIotClient"
+echo "📁 Installationsort: /opt/mthbdeiotclient"
 echo "🔄 Update-Command: sudo /usr/local/bin/update-mthbdeiot.sh"
 echo ""
 

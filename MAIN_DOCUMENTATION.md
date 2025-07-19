@@ -88,6 +88,20 @@ Automatische Releases werden durch die Pipeline getriggert:
 #### Autostart Probleme (Raspberry Pi)
 
 - Service-Status prüfen: `systemctl status mthbdeiotclient`
+
+## 🔧 Quick Fixes
+
+### Fehlende Icons nach Installation
+
+Wenn nach der Installation das Standard-Electron-Icon angezeigt wird:
+
+```bash
+# Icon-Pfade automatisch reparieren
+./shell-scripts/fix-icon-paths.sh
+```
+
+### Weitere Fixes
+
 - Permissions fixen: `sudo ./shell-scripts/fix-autostart-admin.sh`
 
 #### Performance Optimierung (Raspberry Pi)
