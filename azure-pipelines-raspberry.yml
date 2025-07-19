@@ -1,13 +1,13 @@
 # Azure DevOps Pipeline für MthBdeIotClient - Raspberry Pi Multi-Architecture Build
-# Automatische Tag-Erstellung und GitHub Release ohne Quellcode-Push
+# Nur bei Git Tags (Releases) ausführen, nicht bei normalen Commits
 
 trigger:
   branches:
-    include:
-      - "master"  # Trigger auf master branch commits (Azure DevOps Quellcode)
-  tags:
     exclude:
-      - "*"  # Keine Tag-Trigger (Tags werden automatisch erstellt)
+      - "*"  # Keine automatischen Branch-Trigger
+  tags:
+    include:
+      - "v*"  # Nur bei Tags die mit 'v' beginnen (z.B. v1.0.87)
 
 # Deaktiviere Pull Request Triggers  
 pr: none
@@ -28,76 +28,53 @@ variables:
   githubConnection: "github-connection"
 
 stages:
-  - stage: VersionAndTag
-    displayName: "Version Detection and Git Tag Creation"
+  - stage: VersionDetection
+    displayName: "Version Detection from Git Tag"
     jobs:
-      - job: CreateGitTag
-        displayName: "Read Version and Create Git Tag"
+      - job: DetectVersion
+        displayName: "Extract Version from Git Tag"
         pool:
           vmImage: "ubuntu-latest"
         
         steps:
           - checkout: self
             fetchDepth: 0
-            persistCredentials: true
             displayName: "Checkout Source Code"
 
-          - task: NodeTool@0
-            displayName: "Install Node.js $(nodeVersion)"
-            inputs:
-              versionSpec: $(nodeVersion)
-
           - script: |
-              cd App
-              echo "=== READING VERSION FROM PACKAGE.JSON ==="
+              echo "=== DETECTING VERSION FROM GIT TAG ==="
               
-              # Version aus package.json auslesen
-              VERSION=$(node -p "require('./package.json').version")
-              echo "Detected version: $VERSION"
-              
-              # Prüfen ob Version gültig ist
-              if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                echo "❌ Invalid version format: $VERSION"
+              # Version aus Git Tag extrahieren (z.B. v1.0.87 -> 1.0.87)
+              if [[ "$(Build.SourceBranch)" =~ refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+                GIT_TAG="${BASH_REMATCH[1]}"
+                VERSION="${GIT_TAG#v}"  # Remove 'v' prefix
+                echo "✅ Detected Git tag: $GIT_TAG"
+                echo "✅ Extracted version: $VERSION"
+                
+                # Prüfen ob Version gültig ist
+                if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                  echo "❌ Invalid version format: $VERSION"
+                  exit 1
+                fi
+                
+                echo "##vso[task.setvariable variable=releaseVersion;isOutput=true]$VERSION"
+                echo "##vso[task.setvariable variable=gitTag;isOutput=true]$GIT_TAG"
+                
+                echo "✅ Version detection completed: $VERSION"
+              else
+                echo "❌ This pipeline should only run on version tags (v*.*.*)"
+                echo "Current source branch: $(Build.SourceBranch)"
                 exit 1
               fi
-              
-              # Git Tag erstellen
-              GIT_TAG="v$VERSION"
-              echo "Creating Git tag: $GIT_TAG"
-              
-              # Prüfen ob Tag bereits existiert
-              if git rev-parse "$GIT_TAG" >/dev/null 2>&1; then
-                echo "⚠️ Tag $GIT_TAG already exists, will update release"
-                echo "##vso[task.setvariable variable=releaseVersion;isOutput=true]$VERSION"
-                echo "##vso[task.setvariable variable=gitTag;isOutput=true]$GIT_TAG"
-                echo "##vso[task.setvariable variable=tagExists;isOutput=true]true"
-              else
-                echo "✅ Creating new tag $GIT_TAG"
-                
-                # Git Konfiguration
-                git config user.name "Azure DevOps Pipeline"
-                git config user.email "pipeline@mth-it-service.com"
-                
-                # Tag mit Nachricht erstellen (escaped für YAML)
-                TAG_MESSAGE="Release $VERSION - MTH BDE IoT Client Release v$VERSION - Features: Electron App für Raspberry Pi - Performance-Optimierungen für bessere Maus-Responsivität - Build: $(Build.BuildNumber) - Commit: $(Build.SourceVersion)"
-
-                git tag -a "$GIT_TAG" -m "$TAG_MESSAGE"
-                
-                echo "##vso[task.setvariable variable=releaseVersion;isOutput=true]$VERSION"
-                echo "##vso[task.setvariable variable=gitTag;isOutput=true]$GIT_TAG"
-                echo "##vso[task.setvariable variable=tagExists;isOutput=true]false"
-                
-                echo "✅ Git tag $GIT_TAG created successfully"
-              fi
-            displayName: "Create Git Tag from Package Version"
+            displayName: "Extract Version from Git Tag"
             name: versionInfo
 
   - stage: Build
     displayName: "Build Raspberry Pi Applications"
-    dependsOn: VersionAndTag
+    dependsOn: VersionDetection
     variables:
-      releaseVersion: $[ stageDependencies.VersionAndTag.CreateGitTag.outputs['versionInfo.releaseVersion'] ]
-      gitTag: $[ stageDependencies.VersionAndTag.CreateGitTag.outputs['versionInfo.gitTag'] ]
+      releaseVersion: $[ stageDependencies.VersionDetection.DetectVersion.outputs['versionInfo.releaseVersion'] ]
+      gitTag: $[ stageDependencies.VersionDetection.DetectVersion.outputs['versionInfo.gitTag'] ]
     jobs:
       - job: BuildRaspberryPiARM64
         displayName: "Build Raspberry Pi 64-bit (ARM64)"

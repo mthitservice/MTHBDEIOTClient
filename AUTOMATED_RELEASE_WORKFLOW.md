@@ -50,14 +50,15 @@ git push origin master
 
 ### 3. Pipeline automatisch ausgeführt
 
-Die Azure DevOps Pipeline wird automatisch:
+Die Azure DevOps Pipeline wird automatisch **nur bei Git Tags** ausgeführt:
 
-1. **Version Detection**: Liest Version aus `App/package.json`
-2. **Git Tag Creation**: Erstellt Tag `v1.0.87` (automatisch)
-3. **Multi-Arch Build**: 
+1. **Version Detection**: Erkennt Version aus Git Tag `v1.0.87`
+2. **Multi-Arch Build**: 
    - ARM64 .deb (Raspberry Pi 4/5)
    - ARMv7l .deb (Raspberry Pi 3)
-4. **GitHub Release**: Erstellt Release mit .deb Dateien
+3. **GitHub Release**: Erstellt Release mit .deb Dateien
+
+**⚠️ Wichtig:** Pipeline läuft **nur** bei Tags, nicht bei normalen Commits!
 
 ## 📦 Was GitHub enthält
 
@@ -94,11 +95,11 @@ https://github.com/mthitservice/MTHBDEIOTClient/releases
 ```yaml
 trigger:
   branches:
-    include:
-      - "master"  # Trigger auf master commits (Azure DevOps Quellcode)
-  tags:
     exclude:
-      - "*"      # Keine Tag-Trigger (werden automatisch erstellt)
+      - "*"  # Keine automatischen Branch-Trigger
+  tags:
+    include:
+      - "v*"  # Nur bei Version-Tags (v1.0.87, v2.0.0, etc.)
 ```
 
 ### Version-Management:
