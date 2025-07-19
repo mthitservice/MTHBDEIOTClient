@@ -180,6 +180,31 @@ autoUpdater.checkForUpdatesAndNotify();
 echo "0 2 * * 0 /usr/local/bin/update-mthbdeiot.sh" | sudo tee -a /etc/crontab
 ```
 
+### Kiosk-Modus Autostart
+```bash
+# Systemd Service für automatischen Kiosk-Start
+sudo tee /etc/systemd/system/mthbdeiot-kiosk.service > /dev/null << EOF
+[Unit]
+Description=MTH BDE IoT Client Kiosk Mode
+After=graphical-session.target
+
+[Service]
+Type=simple
+User=pi
+Environment=DISPLAY=:0
+ExecStart=/opt/MthBdeIotClient/mthbdeiotclient --no-sandbox --kiosk --fullscreen
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+
+# Service aktivieren
+sudo systemctl enable mthbdeiot-kiosk.service
+sudo systemctl start mthbdeiot-kiosk.service
+```
+
 ## 🛠 Pipeline Anpassungen
 
 ### Weitere API Keys hinzufügen
