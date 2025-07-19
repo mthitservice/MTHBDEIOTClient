@@ -241,39 +241,76 @@ ipcMain.handle('check-for-updates', async () => {
       (item: any) => item.key === 'ipv4Address',
     )?.value;
 
-    // Versuche zuerst Internet-Update (GitHub)
+    // Versuche zuerst Internet-Update (GitHub mit version.json)
     try {
       updateLogger.internetCheckStarted();
-      console.log('Trying internet update from GitHub...');
+      console.log('Trying internet update from GitHub (version.json method)...');
 
-      // AbortController für Timeout
+      // Zuerst versuchen wir die direkte version.json vom neuesten Release
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 Sekunden
 
-      const response = await fetch(
+      // Schritt 1: Hole latest release info
+      const releaseResponse = await fetch(
         'https://api.github.com/repos/mthitservice/MTHBDEIOTClient/releases/latest',
         { signal: controller.signal },
       );
 
-      clearTimeout(timeoutId);
+      if (releaseResponse.ok) {
+        const releaseData = await releaseResponse.json();
+        const latestTag = releaseData.tag_name;
 
-      if (response.ok) {
-        const data = await response.json();
-        const latestVersion = data.tag_name.replace('v', '');
+        try {
+          // Schritt 2: Versuche version.json vom Release zu laden
+          const versionJsonUrl = `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${latestTag}/version.json`;
+          const versionResponse = await fetch(versionJsonUrl, { signal: controller.signal });
+
+          if (versionResponse.ok) {
+            const versionData = await versionResponse.json();
+            const currentVersion = packageJson.version;
+            const latestVersion = versionData.version;
+
+            const updateInfo = {
+              source: 'internet-versioned',
+              currentVersion,
+              latestVersion,
+              hasUpdate: latestVersion !== currentVersion,
+              downloadUrl: versionData.platform?.linux?.arm64?.downloadUrl ||
+                versionData.platform?.linux?.armv7l?.downloadUrl ||
+                `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${latestTag}`,
+              releaseNotes: versionData.changelog?.[0]?.changes?.join(', ') || releaseData.body,
+              publishedAt: versionData.releaseDate || releaseData.published_at,
+              versionInfo: versionData
+            };
+
+            clearTimeout(timeoutId);
+            updateLogger.internetCheckSuccess(updateInfo);
+            console.log('✅ Internet update check successful (version.json):', updateInfo);
+
+            updateLogger.updateCheckCompleted(updateInfo);
+            return updateInfo;
+          }
+        } catch (versionJsonError) {
+          console.log('version.json not available, falling back to GitHub API...');
+        }
+
+        // Fallback zu alter GitHub API Methode wenn version.json nicht verfügbar
+        const latestVersion = releaseData.tag_name.replace('v', '');
         const currentVersion = packageJson.version;
 
         const updateInfo = {
-          source: 'internet',
+          source: 'internet-api',
           currentVersion,
           latestVersion,
           hasUpdate: latestVersion !== currentVersion,
-          downloadUrl: `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${data.tag_name}`,
-          releaseNotes: data.body,
-          publishedAt: data.published_at,
+          downloadUrl: `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${releaseData.tag_name}`,
+          releaseNotes: releaseData.body,
+          publishedAt: releaseData.published_at,
         };
 
+        clearTimeout(timeoutId);
         updateLogger.internetCheckSuccess(updateInfo);
-        console.log('✅ Internet update check successful:', updateInfo);
+        console.log('✅ Internet update check successful (GitHub API fallback):', updateInfo);
 
         updateLogger.updateCheckCompleted(updateInfo);
         return updateInfo;

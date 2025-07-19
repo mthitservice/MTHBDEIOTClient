@@ -4,7 +4,7 @@
 
 import webpack from 'webpack';
 import TsconfigPathsPlugins from 'tsconfig-paths-webpack-plugin';
-import { dependencies as externals } from 'MthBdeIotClient/package.json';
+import { dependencies as externals } from '../../package.json';
 import webpackPaths from './webpack.paths';
 
 const configuration: webpack.Configuration = {

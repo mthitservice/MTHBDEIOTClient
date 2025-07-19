@@ -1,0 +1,99 @@
+{
+    "version": "1.0.111",
+    "name": "MTH BDE IoT Client 1.0.111",
+    "releaseDate": "2025-07-19T21:26:13Z",
+    "releaseNotes": "ARM/Linux Update System with intelligent fallback support",
+    "platform": {
+        "linux": {
+            "arm64": {
+                "filename": "mthbdeiotclient_1.0.111_arm64.deb",
+                "downloadUrl": "https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v1.0.111/mthbdeiotclient_1.0.111_arm64.deb",
+                "size": "150MB",
+                "sha256": "placeholder-hash-arm64"
+            },
+            "armv7l": {
+                "filename": "mthbdeiotclient_1.0.111_armv7l.deb",
+                "downloadUrl": "https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v1.0.111/mthbdeiotclient_1.0.111_armv7l.deb",
+                "size": "150MB",
+                "sha256": "placeholder-hash-armv7l"
+            }
+        },
+        "windows": {
+            "x64": {
+                "filename": "MTH-BDE-IOT-Client-Setup-1.0.111.exe",
+                "downloadUrl": "https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v1.0.111/MTH-BDE-IOT-Client-Setup-1.0.111.exe",
+                "size": "200MB",
+                "sha256": "placeholder-hash-win64"
+            }
+        },
+        "darwin": {
+            "x64": {
+                "filename": "MTH-BDE-IOT-Client-1.0.111.dmg",
+                "downloadUrl": "https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v1.0.111/MTH-BDE-IOT-Client-1.0.111.dmg",
+                "size": "200MB",
+                "sha256": "placeholder-hash-mac64"
+            },
+            "arm64": {
+                "filename": "MTH-BDE-IOT-Client-1.0.111-arm64.dmg",
+                "downloadUrl": "https://github.com/mthitservice/MTHBDEIOTClient/releases/download/v1.0.111/MTH-BDE-IOT-Client-1.0.111-arm64.dmg",
+                "size": "200MB",
+                "sha256": "placeholder-hash-mac-arm64"
+            }
+        }
+    },
+    "features": {
+        "autoUpdate": {
+            "windows": true,
+            "darwin": true,
+            "linux": true
+        },
+        "intelligentFallback": {
+            "linux": true,
+            "description": "Fallback to local server for ARM/Linux systems"
+        }
+    },
+    "systemRequirements": {
+        "linux": {
+            "minRam": "1GB",
+            "recommended": "2GB+",
+            "architectures": [
+                "arm64",
+                "armv7l"
+            ],
+            "distributions": [
+                "Raspberry Pi OS",
+                "Ubuntu",
+                "Debian"
+            ]
+        },
+        "windows": {
+            "minRam": "2GB",
+            "minOs": "Windows 10",
+            "architectures": [
+                "x64"
+            ]
+        },
+        "darwin": {
+            "minRam": "2GB",
+            "minOs": "macOS 10.15",
+            "architectures": [
+                "x64",
+                "arm64"
+            ]
+        }
+    },
+    "changelog": [
+        {
+            "version": "1.0.111",
+            "changes": [
+                "✅ ARM/Linux intelligentes Update-System aktiviert",
+                "🔄 Automatische 6-Stunden Update-Intervalle",
+                "🌐 GitHub API + lokaler Server Fallback",
+                "🍓 Raspberry Pi Performance-Optimierungen",
+                "🛠️ White Screen Problem behoben",
+                "💾 Speicher-Optimierung (512MB Limit)",
+                "🎮 GPU-Beschleunigung für Stabilität deaktiviert"
+            ]
+        }
+    ]
+}
