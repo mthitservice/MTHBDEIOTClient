@@ -1,0 +1,46 @@
+[Unit]
+Description=MTH BDE IoT Client (Performance Optimized)
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/mthbdeiotclient
+ExecStartPre=/bin/bash -c 'echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor'
+ExecStart=/opt/mthbdeiotclient/start-raspberry.sh
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+
+# Performance-Optimierungen
+Nice=-10
+IOSchedulingClass=1
+IOSchedulingPriority=4
+CPUSchedulingPolicy=1
+CPUSchedulingPriority=50
+
+# Umgebungsvariablen
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=XDG_SESSION_TYPE=wayland
+Environment=LIBGL_ALWAYS_SOFTWARE=1
+Environment=WLR_RENDERER=pixman
+Environment=WLR_NO_HARDWARE_CURSORS=1
+Environment=NODE_OPTIONS=--max-old-space-size=512
+
+# Ressourcen-Limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Sicherheit
+PrivateDevices=false
+ProtectSystem=strict
+ReadWritePaths=/opt/mthbdeiotclient
+ReadWritePaths=/home/pi/.config
+
+[Install]
+WantedBy=graphical-session.target

@@ -164,6 +164,36 @@ const createWindow = async () => {
     process.argv.includes('--kiosk') ||
     process.env.KIOSK_MODE === 'true';
 
+  // Performance-Optimierungen für Raspberry Pi (ARM-basierte Systeme)
+  const isArmSystem = process.arch === 'arm' || process.arch === 'arm64' || 
+                     process.platform === 'linux' && (
+                       process.env.RASPBERRY_PI === 'true' || 
+                       process.env.NODE_ENV === 'production'
+                     );
+  
+  if (isArmSystem) {
+    console.log('🔧 Applying Raspberry Pi/ARM performance optimizations...');
+    
+    app.disableHardwareAcceleration(); // GPU-Beschleunigung deaktivieren
+    
+    // Weitere Performance-Optimierungen
+    app.commandLine.appendSwitch('--no-sandbox');
+    app.commandLine.appendSwitch('--disable-dev-shm-usage');
+    app.commandLine.appendSwitch('--disable-gpu');
+    app.commandLine.appendSwitch('--disable-gpu-compositing');
+    app.commandLine.appendSwitch('--disable-software-rasterizer');
+    app.commandLine.appendSwitch('--disable-background-timer-throttling');
+    app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+    app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+    app.commandLine.appendSwitch('--enable-features=VaapiVideoDecoder');
+    app.commandLine.appendSwitch('--disable-features=TranslateUI');
+    app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+    
+    // Speicher-Optimierungen
+    app.commandLine.appendSwitch('--memory-pressure-off');
+    app.commandLine.appendSwitch('--max_old_space_size=512'); // Begrenze RAM-Nutzung
+  }
+
   mainWindow = new BrowserWindow({
     show: false,
     width: 1024,
@@ -175,6 +205,15 @@ const createWindow = async () => {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
+      // Performance-Optimierungen für Raspberry Pi
+      backgroundThrottling: false, // Verhindert Throttling im Hintergrund
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      // Renderer-Performance
+      experimentalFeatures: false,
+      v8CacheOptions: 'code', // V8 Code-Caching aktivieren
+      spellcheck: false, // Rechtschreibprüfung deaktivieren
     },
   });
 

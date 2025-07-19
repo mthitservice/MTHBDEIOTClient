@@ -43,7 +43,7 @@ sudo dpkg -i mthbdeiotclient_*_armv7l.deb
 sudo apt-get install -f
 
 # Anwendung starten
-mthbdeiotclient --fullscreen
+mthbdeiotclient --fullscreen1233
 ```
 
 ### Linux 32-bit

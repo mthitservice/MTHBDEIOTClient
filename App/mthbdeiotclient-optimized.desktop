@@ -1,0 +1,24 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MTH BDE IoT Client (Optimized)
+Comment=IoT Client Application optimized for Raspberry Pi
+Exec=/opt/mthbdeiotclient/start-raspberry.sh
+Icon=mthbdeiotclient
+Terminal=false
+StartupNotify=true
+Categories=Development;Utility;System;
+Keywords=IoT;Raspberry;Client;BDE;MTH;
+MimeType=application/x-mthbdeiotclient
+StartupWMClass=MTH BDE IoT Client
+
+# Wayland-spezifische Konfiguration
+X-Desktop-File-Install-Version=0.26
+
+# Performance-Optimierungen
+X-GNOME-SingleWindow=true
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+
+# Umgebungsvariablen für bessere Performance
+X-Environment=WAYLAND_DISPLAY=wayland-1;XDG_SESSION_TYPE=wayland;LIBGL_ALWAYS_SOFTWARE=1;WLR_RENDERER=pixman;WLR_NO_HARDWARE_CURSORS=1

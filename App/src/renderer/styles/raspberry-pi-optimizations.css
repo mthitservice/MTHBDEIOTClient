@@ -1,0 +1,101 @@
+/* Raspberry Pi Performance CSS-Optimierungen */
+
+/* GPU-intensive Effekte deaktivieren */
+* {
+  /* Animationen optimieren */
+  animation-duration: 0.1s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.1s !important;
+  transition-delay: 0s !important;
+  
+  /* Schatten und Filter reduzieren */
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  
+  /* Transparenz minimieren */
+  backdrop-filter: none !important;
+  
+  /* Hardware-Beschleunigung deaktivieren */
+  transform: translateZ(0);
+  will-change: auto;
+}
+
+/* Smooth scrolling deaktivieren */
+html {
+  scroll-behavior: auto !important;
+}
+
+/* Animationen für kritische Elemente deaktivieren */
+.modal,
+.tooltip,
+.dropdown-menu,
+.collapse {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Bootstrap-Animationen reduzieren */
+.fade {
+  transition: none !important;
+}
+
+.fade.show {
+  opacity: 1;
+}
+
+/* Cursor-Performance verbessern */
+* {
+  cursor: default !important;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  cursor: pointer !important;
+}
+
+/* Bild-Optimierungen */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: optimize-contrast;
+  transform: translateZ(0);
+}
+
+/* Text-Rendering optimieren */
+body {
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+}
+
+/* Layout-Performance */
+.container,
+.row,
+.col {
+  contain: layout style;
+}
+
+/* Scroll-Performance */
+.scroll-container {
+  -webkit-overflow-scrolling: auto;
+  contain: strict;
+}
+
+/* GPU-Layers minimieren */
+.layer-optimization {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000;
+}
+
+/* Hover-Effekte vereinfachen */
+@media (hover: hover) {
+  .btn:hover,
+  .nav-link:hover {
+    transition: none !important;
+    transform: none !important;
+  }
+}

@@ -148,13 +148,14 @@ stages:
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
               export ELECTRON_BUILDER_CACHE_DIR=/tmp/.electron-builder-cache
               
-              # Erstelle .env file
+              # Erstelle .env file für ARM64 mit Raspberry Pi Optimierungen
               echo "NODE_ENV=production" > .env
               echo "APP_VERSION=$(APP_VERSION)" >> .env
               echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
+              echo "RASPBERRY_PI=true" >> .env
               
-              echo "Building ARM64 DEB package..."
-              npx electron-builder build --linux deb --arm64 --publish never
+              echo "Building ARM64 DEB package with performance optimizations..."
+              NODE_OPTIONS="--max-old-space-size=512" npx electron-builder build --linux deb --arm64 --publish never
               
               echo "=== PACKAGE VALIDATION ==="
               for debfile in $(find . -name "*arm64*.deb" -o -name "*aarch64*.deb"); do
@@ -292,13 +293,14 @@ stages:
               export ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true
               export ELECTRON_BUILDER_CACHE_DIR=/tmp/.electron-builder-cache
               
-              # Erstelle .env file
+              # Erstelle .env file für ARMv7l mit Raspberry Pi Optimierungen
               echo "NODE_ENV=production" > .env
               echo "APP_VERSION=$(APP_VERSION)" >> .env
               echo "ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true" >> .env
+              echo "RASPBERRY_PI=true" >> .env
               
-              echo "Building ARMv7l DEB package..."
-              npx electron-builder build --linux deb --armv7l --publish never
+              echo "Building ARMv7l DEB package with performance optimizations..."
+              NODE_OPTIONS="--max-old-space-size=512" npx electron-builder build --linux deb --armv7l --publish never
               
               echo "=== PACKAGE VALIDATION ==="
               for debfile in $(find . -name "*armv7l*.deb"); do
