@@ -269,10 +269,26 @@ const createWindow = async () => {
     process.argv.includes('--kiosk') ||
     process.env.KIOSK_MODE === 'true';
 
+  // 1920x1080 Optimierung für Entwicklung und Produktion
+  const isDev1080Mode =
+    process.argv.includes('--dev1080') ||
+    process.env.DEV_1080 === 'true';
+
+  // Fenstergröße bestimmen
+  let windowWidth = 1024;
+  let windowHeight = 728;
+
+  if (isDev1080Mode || isFullscreenMode) {
+    windowWidth = 1920;
+    windowHeight = 1080;
+  }
+
+  console.log(`🖥️  Window size: ${windowWidth}x${windowHeight} (Fullscreen: ${isFullscreenMode}, Dev1080: ${isDev1080Mode})`);
+
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1024,
-    height: 728,
+    width: windowWidth,
+    height: windowHeight,
     fullscreen: isFullscreenMode,
     frame: !isFullscreenMode, // Kein Frame im Kiosk-Modus
     icon: getAssetPath('icon.png'),

@@ -1,0 +1,376 @@
+/* 1920x1080 Optimierung für MTH BDE IoT Client */
+
+/* Root-Level Optimierung für 1920x1080 */
+:root {
+  --window-width: 1920px;
+  --window-height: 1080px;
+  --content-max-width: 1800px;
+  --sidebar-width: 280px;
+  --header-height: 80px;
+  --footer-height: 60px;
+  --content-padding: 20px;
+}
+
+/* Basis-Layout für 1920x1080 */
+html,
+body {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Kein Scrollen im Kiosk-Modus */
+}
+
+/* Haupt-Container */
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--window-width);
+  max-height: var(--window-height);
+}
+
+/* Header-Optimierung */
+.app-header {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  padding: 0 var(--content-padding);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Content-Area */
+.app-content {
+  flex: 1;
+  display: flex;
+  height: calc(100vh - var(--header-height) - var(--footer-height));
+  overflow: hidden;
+}
+
+/* Sidebar für größere Bildschirme */
+.app-sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: #f5f5f5;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+/* Main Content */
+.app-main {
+  flex: 1;
+  padding: var(--content-padding);
+  overflow-y: auto;
+  max-width: calc(100vw - var(--sidebar-width));
+}
+
+/* Ohne Sidebar - Full Width */
+.app-main.full-width {
+  max-width: 100vw;
+}
+
+/* Footer */
+.app-footer {
+  height: var(--footer-height);
+  min-height: var(--footer-height);
+  padding: 0 var(--content-padding);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #ddd;
+  background: #f9f9f9;
+}
+
+/* Buttons und Controls - größer für Touch */
+.btn {
+  min-height: 48px;
+  min-width: 120px;
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+.btn-large {
+  min-height: 64px;
+  min-width: 160px;
+  padding: 16px 32px;
+  font-size: 18px;
+}
+
+/* Form-Inputs größer */
+.form-control {
+  min-height: 48px;
+  padding: 12px 16px;
+  font-size: 16px;
+}
+
+/* Cards und Panels */
+.card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  padding: 16px 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* Navigation */
+.nav-pills .nav-link {
+  padding: 12px 20px;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+/* Tables - responsive für große Bildschirme */
+.table {
+  font-size: 16px;
+}
+
+.table th,
+.table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+/* Modals - größer für 1920x1080 */
+.modal-dialog {
+  max-width: 800px;
+  margin: 60px auto;
+}
+
+.modal-lg {
+  max-width: 1200px;
+}
+
+/* Scan-Interface spezifisch */
+.scan-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.scan-input {
+  width: 100%;
+  max-width: 600px;
+  font-size: 24px;
+  padding: 20px;
+  text-align: center;
+  border: 3px solid #007bff;
+  border-radius: 12px;
+  margin-bottom: 30px;
+}
+
+.scan-instructions {
+  font-size: 20px;
+  text-align: center;
+  margin-bottom: 40px;
+  color: #6c757d;
+}
+
+/* Task-Liste */
+.task-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.task-item {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-item:hover {
+  border-color: #007bff;
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.15);
+}
+
+/* User-Selection */
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+.user-card {
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-card:hover,
+.user-card.selected {
+  border-color: #007bff;
+  background: #f8f9fa;
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  background: #007bff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Responsive Breakpoints für kleinere Bildschirme */
+@media (max-width: 1920px) {
+  :root {
+    --content-max-width: 90vw;
+    --sidebar-width: 250px;
+  }
+}
+
+@media (max-width: 1366px) {
+  :root {
+    --sidebar-width: 220px;
+    --header-height: 70px;
+    --content-padding: 16px;
+  }
+
+  .btn {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .form-control {
+    min-height: 44px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 200px;
+    --header-height: 60px;
+    --content-padding: 12px;
+  }
+
+  .app-sidebar {
+    display: none; /* Sidebar ausblenden auf kleineren Bildschirmen */
+  }
+
+  .app-main {
+    max-width: 100vw;
+  }
+}
+
+/* Kiosk-Modus spezifische Styles */
+.kiosk-mode {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+  /* Rechtsklick-Menü deaktivieren */
+  -webkit-context-menu: none;
+}
+
+.kiosk-mode * {
+  cursor: default !important;
+}
+
+.kiosk-mode .btn,
+.kiosk-mode .form-control,
+.kiosk-mode .task-item,
+.kiosk-mode .user-card {
+  cursor: pointer !important;
+}
+
+/* Print-Styles */
+@media print {
+  .app-header,
+  .app-footer,
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .app-main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #1a1a1a;
+    --text-color: #ffffff;
+    --border-color: #333333;
+    --card-bg: #2d2d2d;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+  }
+
+  .card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+  }
+
+  .app-sidebar {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+
+  .app-footer {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+}
+
+/* Animation für smooth Übergänge */
+* {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* Focus-Styles für Barcode-Scanner */
+.scan-input:focus {
+  outline: none;
+  border-color: #0056b3;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+/* Toast Notifications - größer für 1920x1080 */
+.toast {
+  min-width: 350px;
+  font-size: 16px;
+}
+
+.toast-header {
+  padding: 12px 16px;
+}
+
+.toast-body {
+  padding: 16px;
+}
