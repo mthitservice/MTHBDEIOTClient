@@ -26,7 +26,7 @@ variables:
   
   # GitHub Configuration
   githubRepository: 'mthitservice/MTHBDEIOTClient'
-  githubConnection: 'github-mthitservice'  # Muss in Azure DevOps konfiguriert sein
+  githubConnection: 'github-connection'  # Muss in Azure DevOps konfiguriert sein
 
 stages:
 # =============================================================================
