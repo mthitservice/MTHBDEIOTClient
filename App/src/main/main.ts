@@ -949,7 +949,7 @@ ipcMain.handle('get-env', async () => {
       apiIp = dbIpv4.value;
     }
   } catch (err) {
-    logger.warn('Konnte IPv4-Adresse nicht aus Datenbank laden, verwende Default:', err);
+    console.warn('Konnte IPv4-Adresse nicht aus Datenbank laden, verwende Default:', err);
   }
 
   return {
