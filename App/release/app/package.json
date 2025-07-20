@@ -1,6 +1,6 @@
 {
   "name": "mthbdeiotclient",
-  "version": "1.0.112",
+  "version": "1.0.115",
   "description": "Main process dependencies for MTH BDE IoT Client",
   "main": "./dist/main/main.js",
   "author": {
