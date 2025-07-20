@@ -58,11 +58,69 @@ try {
 function getDatabasePath() {
   let dbPath;
 
+  // Überprüfe ob es ein ARM-System ist (Raspberry Pi)
+  const isArmSystem =
+    process.arch === 'arm' ||
+    process.arch === 'arm64' ||
+    process.env.RASPBERRY_PI === 'true';
+
   if (process.env.NODE_ENV === 'development') {
     // Development: Relative zum Projektverzeichnis
     dbPath = path.resolve(__dirname, '../../public/database/', dbName);
+  } else if (isArmSystem) {
+    // Raspberry Pi Production: Verwende User-Home oder /tmp für beschreibbare Bereiche
+    const os = require('os');
+    const homeDir = os.homedir();
+
+    // Versuche verschiedene Pfade in der Reihenfolge der Priorität
+    const possiblePaths = [
+      path.join(homeDir, '.mthbdeiotclient', 'database', dbName), // ~/.mthbdeiotclient/database/
+      path.join('/var/lib/mthbdeiotclient', 'database', dbName), // System-wide data
+      path.join('/tmp/mthbdeiotclient', 'database', dbName), // Temporary fallback
+      path.join(homeDir, 'mthbdeiotclient-data', 'database', dbName), // Alternative home
+    ];
+
+    // Teste welcher Pfad beschreibbar ist
+    for (const testPath of possiblePaths) {
+      try {
+        const testDir = path.dirname(testPath);
+
+        // Erstelle Verzeichnis wenn nicht vorhanden
+        if (!fs.existsSync(testDir)) {
+          fs.mkdirSync(testDir, { recursive: true });
+        }
+
+        // Teste Schreibberechtigung
+        const testFile = path.join(testDir, '.write-test');
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+
+        dbPath = testPath;
+        console.info(
+          '🍓 Raspberry Pi: Beschreibbarer Datenbankpfad gefunden:',
+          dbPath,
+        );
+        break;
+      } catch (err) {
+        console.warn(
+          '🍓 Raspberry Pi: Pfad nicht beschreibbar:',
+          testPath,
+          err.message,
+        );
+        continue;
+      }
+    }
+
+    // Falls kein Pfad funktioniert, verwende /tmp als letzten Ausweg
+    if (!dbPath) {
+      dbPath = path.join('/tmp', dbName);
+      console.warn(
+        '🍓 Raspberry Pi: Verwende /tmp als Fallback-Datenbankpfad:',
+        dbPath,
+      );
+    }
   } else {
-    // Production: Relative zu den App-Ressourcen
+    // Standard Production: Relative zu den App-Ressourcen
     dbPath = path.join(process.resourcesPath, 'public/database/', dbName);
   }
 
@@ -106,6 +164,32 @@ function ensureDatabaseDirectory(dbPath) {
     }
   } catch (err) {
     console.error('Fehler beim Erstellen des Datenbankverzeichnisses:', err);
+
+    // Raspberry Pi spezifische Hilfe
+    const isArmSystem =
+      process.arch === 'arm' ||
+      process.arch === 'arm64' ||
+      process.env.RASPBERRY_PI === 'true';
+
+    if (isArmSystem) {
+      console.error('🍓 RASPBERRY PI DATENBANK-FEHLER:');
+      console.error('   Pfad:', absoluteDbDir);
+      console.error('   Fehler:', err.message);
+      console.error('');
+      console.error('🔧 LÖSUNGSVORSCHLÄGE:');
+      console.error('   1. Erstelle Verzeichnis manuell:');
+      console.error(`      mkdir -p ${absoluteDbDir}`);
+      console.error(`      chmod 755 ${absoluteDbDir}`);
+      console.error('   2. Überprüfe verfügbaren Speicherplatz: df -h');
+      console.error('   3. Überprüfe Read-Only Filesystem: mount | grep ro');
+      console.error(
+        '   4. Verwende alternatives Verzeichnis: ~/.mthbdeiotclient/database',
+      );
+      console.error('   5. Setze Umgebungsvariable: export RASPBERRY_PI=true');
+      console.error('');
+      console.error('📋 Weitere Hilfe: Führe troubleshoot-raspberry-db.sh aus');
+    }
+
     throw new Error(
       `Datenbankverzeichnis konnte nicht erstellt werden: ${err.message}`,
     );
