@@ -18,7 +18,10 @@ import UpdateLogger from './update-logger';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 
-const configDB = require('../../public/database/DBConfig');
+// Import DBConfig for configuration management
+const configDB = require('./DBConfig');
+
+
 
 let globalConfig: any = 0;
 let mainWindow: BrowserWindow | null = null;
@@ -244,7 +247,9 @@ ipcMain.handle('check-for-updates', async () => {
     // Versuche zuerst Internet-Update (GitHub mit version.json)
     try {
       updateLogger.internetCheckStarted();
-      console.log('Trying internet update from GitHub (version.json method)...');
+      console.log(
+        'Trying internet update from GitHub (version.json method)...',
+      );
 
       // Zuerst versuchen wir die direkte version.json vom neuesten Release
       const controller = new AbortController();
@@ -263,7 +268,9 @@ ipcMain.handle('check-for-updates', async () => {
         try {
           // Schritt 2: Versuche version.json vom Release zu laden
           const versionJsonUrl = `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${latestTag}/version.json`;
-          const versionResponse = await fetch(versionJsonUrl, { signal: controller.signal });
+          const versionResponse = await fetch(versionJsonUrl, {
+            signal: controller.signal,
+          });
 
           if (versionResponse.ok) {
             const versionData = await versionResponse.json();
@@ -275,23 +282,31 @@ ipcMain.handle('check-for-updates', async () => {
               currentVersion,
               latestVersion,
               hasUpdate: latestVersion !== currentVersion,
-              downloadUrl: versionData.platform?.linux?.arm64?.downloadUrl ||
+              downloadUrl:
+                versionData.platform?.linux?.arm64?.downloadUrl ||
                 versionData.platform?.linux?.armv7l?.downloadUrl ||
                 `https://github.com/mthitservice/MTHBDEIOTClient/releases/download/${latestTag}`,
-              releaseNotes: versionData.changelog?.[0]?.changes?.join(', ') || releaseData.body,
+              releaseNotes:
+                versionData.changelog?.[0]?.changes?.join(', ') ||
+                releaseData.body,
               publishedAt: versionData.releaseDate || releaseData.published_at,
-              versionInfo: versionData
+              versionInfo: versionData,
             };
 
             clearTimeout(timeoutId);
             updateLogger.internetCheckSuccess(updateInfo);
-            console.log('✅ Internet update check successful (version.json):', updateInfo);
+            console.log(
+              '✅ Internet update check successful (version.json):',
+              updateInfo,
+            );
 
             updateLogger.updateCheckCompleted(updateInfo);
             return updateInfo;
           }
         } catch (versionJsonError) {
-          console.log('version.json not available, falling back to GitHub API...');
+          console.log(
+            'version.json not available, falling back to GitHub API...',
+          );
         }
 
         // Fallback zu alter GitHub API Methode wenn version.json nicht verfügbar
@@ -310,7 +325,10 @@ ipcMain.handle('check-for-updates', async () => {
 
         clearTimeout(timeoutId);
         updateLogger.internetCheckSuccess(updateInfo);
-        console.log('✅ Internet update check successful (GitHub API fallback):', updateInfo);
+        console.log(
+          '✅ Internet update check successful (GitHub API fallback):',
+          updateInfo,
+        );
 
         updateLogger.updateCheckCompleted(updateInfo);
         return updateInfo;
@@ -883,7 +901,7 @@ app
   .then(() => {
     globalConfig = configDB?.readAllConfig();
     console.log('Global Config:', globalConfig);
-    if (globalConfig?.DEBUG_MODE === 'true') {
+    if (globalConfig?.find?.((item: any) => item.key === 'DEBUG_MODE')?.value === 'true') {
       console.log('Debug mode is enabled');
     }
 
@@ -954,8 +972,8 @@ ipcMain.handle('db-config-get-all', () => {
   return result;
 });
 ipcMain.handle('db-config-get-by-key', (event, key) => {
-  const result = configDB?.getByKey(key);
-  console.log('getByKey result:', result);
+  const result = configDB?.readConfigByKey(key);
+  console.log('readConfigByKey result:', result);
   return result;
 });
 ipcMain.handle('db-config-create-or-update', (event, key, value) => {
@@ -964,7 +982,7 @@ ipcMain.handle('db-config-create-or-update', (event, key, value) => {
   return result;
 });
 ipcMain.handle('db-config-delete-by-key', (event, key) => {
-  const result = configDB?.deleteByKey(key);
-  console.log('deleteByKey result:', result);
+  const result = configDB?.deleteConfigByKey(key);
+  console.log('deleteConfigByKey result:', result);
   return result;
 });

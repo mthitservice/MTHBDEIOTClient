@@ -1,21 +1,21 @@
 {
   "name": "mthbdeiotclient",
   "version": "1.0.112",
-  "description": "BDE App",
-  "license": "MIT",
-  "author": {
-    "name": "MTH-IT-SERVICE",
-    "email": "info@mth-it-service.com",
-    "url": "hhttps://mth-it-service.com"
-  },
+  "description": "Main process dependencies for MTH BDE IoT Client",
   "main": "./dist/main/main.js",
+  "author": {
+    "name": "Michael Lindner",
+    "email": "info@mth-it-service.com",
+    "url": "https://github.com/mthitservice"
+  },
   "scripts": {
     "rebuild": "node -r ts-node/register ../../.erb/scripts/electron-rebuild.js",
     "postinstall": "npm run rebuild && npm run link-modules",
     "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
   },
+  "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^12.2.0",
     "bootstrap-icons": "^1.13.1"
   }
 }

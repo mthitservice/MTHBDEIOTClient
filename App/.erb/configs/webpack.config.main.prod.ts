@@ -12,6 +12,9 @@ import webpackPaths from './webpack.paths';
 import checkNodeEnv from '../scripts/check-node-env';
 import deleteSourceMaps from '../scripts/delete-source-maps';
 
+const dotenv = require('dotenv');
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 checkNodeEnv('production');
 deleteSourceMaps();
 
@@ -48,6 +51,7 @@ const configuration: webpack.Configuration = {
       analyzerMode: process.env.ANALYZE === 'true' ? 'server' : 'disabled',
       analyzerPort: 8888,
     }),
+    // Environment variables plugin
 
     /**
      * Create global constants which can be configured at compile time.
@@ -62,14 +66,13 @@ const configuration: webpack.Configuration = {
       NODE_ENV: 'production',
       DEBUG_PROD: false,
       START_MINIMIZED: false,
-      APP_VERSION: process.env.APP_VERSION || '1.0.0',
-      VERSION: process.env.VERSION || '1.0.0',
-      APP_NAME: process.env.APP_NAME || 'MTH BDE IOT Client',
-      APP_COPYRIGHT: process.env.APP_COPYRIGHT || 'MTH-IT-SERVICE',
-      APP_AUTHOR: process.env.APP_AUTHOR || 'Michael Lindner',
-      APP_DESCRIPTION:
-        process.env.APP_DESCRIPTION ||
-        'Anwendung zum Erfassen von Betriebsdaten',
+      ...Object.keys(process.env).reduce(
+        (acc, key) => {
+          acc[key] = process.env[key];
+          return acc;
+        },
+        {} as Record<string, any>,
+      ),
     }),
 
     new webpack.DefinePlugin({

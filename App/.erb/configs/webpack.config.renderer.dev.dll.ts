@@ -23,7 +23,15 @@ const configuration: webpack.Configuration = {
 
   target: 'electron-renderer',
 
-  externals: ['fsevents', 'crypto-browserify'],
+  externals: [
+    'fsevents',
+    'crypto-browserify',
+    'serialport',
+    '@serialport/parser-readline',
+    'better-sqlite3',
+    '@types/leaflet',
+
+  ],
 
   /**
    * Use `module` from `webpack.config.renderer.dev.js`
@@ -31,9 +39,7 @@ const configuration: webpack.Configuration = {
   module: require('./webpack.config.renderer.dev').default.module,
 
   entry: {
-    renderer: Object.keys(dependencies || {}).filter(
-      (dependency) => !['bootstrap-icons'].includes(dependency),
-    ),
+    renderer: Object.keys(dependencies || {}),
   },
 
   output: {

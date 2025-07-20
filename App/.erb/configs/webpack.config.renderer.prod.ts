@@ -14,7 +14,10 @@ import baseConfig from './webpack.config.base';
 import webpackPaths from './webpack.paths';
 import checkNodeEnv from '../scripts/check-node-env';
 import deleteSourceMaps from '../scripts/delete-source-maps';
+// Load environment variables
+const dotenv = require('dotenv');
 
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 checkNodeEnv('production');
 deleteSourceMaps();
 
@@ -109,14 +112,20 @@ const configuration: webpack.Configuration = {
     new webpack.EnvironmentPlugin({
       NODE_ENV: 'production',
       DEBUG_PROD: false,
-      APP_VERSION: process.env.APP_VERSION || '1.0.0',
-      VERSION: process.env.VERSION || '1.0.0',
-      APP_NAME: process.env.APP_NAME || 'MTH BDE IOT Client',
-      APP_COPYRIGHT: process.env.APP_COPYRIGHT || 'MTH-IT-SERVICE',
-      APP_AUTHOR: process.env.APP_AUTHOR || 'Michael Lindner',
-      APP_DESCRIPTION:
-        process.env.APP_DESCRIPTION ||
-        'Anwendung zum Erfassen von Betriebsdaten',
+      ...Object.keys(process.env).reduce(
+        (acc, key) => {
+          if (
+            key.startsWith('REACT_APP_') ||
+            key.startsWith('API_') ||
+            key === 'APP_NAME' ||
+            key === 'APP_VERSION'
+          ) {
+            acc[key] = process.env[key];
+          }
+          return acc;
+        },
+        {} as Record<string, any>,
+      ),
     }),
 
     new MiniCssExtractPlugin({
@@ -127,7 +136,6 @@ const configuration: webpack.Configuration = {
       analyzerMode: process.env.ANALYZE === 'true' ? 'server' : 'disabled',
       analyzerPort: 8889,
     }),
-
     new HtmlWebpackPlugin({
       filename: 'index.html',
       template: path.join(webpackPaths.srcRendererPath, 'index.ejs'),

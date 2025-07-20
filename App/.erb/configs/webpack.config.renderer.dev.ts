@@ -114,16 +114,23 @@ const configuration: webpack.Configuration = {
       },
     ],
   },
+
+  optimization: {
+    // Reduce case-sensitivity warnings
+    moduleIds: 'named',
+    chunkIds: 'named',
+  },
+
   plugins: [
     ...(skipDLLs
       ? []
       : [
-          new webpack.DllReferencePlugin({
-            context: webpackPaths.dllPath,
-            manifest: require(manifest),
-            sourceType: 'var',
-          }),
-        ]),
+        new webpack.DllReferencePlugin({
+          context: webpackPaths.dllPath,
+          manifest: require(manifest),
+          sourceType: 'var',
+        }),
+      ]),
 
     new webpack.NoEmitOnErrorsPlugin(),
 
@@ -141,14 +148,12 @@ const configuration: webpack.Configuration = {
      */
     new webpack.EnvironmentPlugin({
       NODE_ENV: 'development',
-      APP_VERSION: process.env.APP_VERSION || '1.0.0',
-      VERSION: process.env.VERSION || '1.0.0',
       APP_NAME: process.env.APP_NAME || 'MTH BDE IOT Client',
-      APP_COPYRIGHT: process.env.APP_COPYRIGHT || 'MTH-IT-SERVICE',
-      APP_AUTHOR: process.env.APP_AUTHOR || 'Michael Lindner',
-      APP_DESCRIPTION:
-        process.env.APP_DESCRIPTION ||
-        'Anwendung zum Erfassen von Betriebsdaten',
+      APP_AUTHOR: process.env.APP_AUTHOR || '',
+      APP_DESCRIPTION: process.env.APP_DESCRIPTION || '',
+      APP_COPYRIGHT: process.env.APP_COPYRIGHT || '',
+      APP_LICENSE: process.env.APP_LICENSE || '',
+      DEBUG_PROD: process.env.DEBUG_PROD || 'false',
     }),
 
     new webpack.LoaderOptionsPlugin({
