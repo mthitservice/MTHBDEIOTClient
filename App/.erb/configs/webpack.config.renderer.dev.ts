@@ -153,6 +153,8 @@ const configuration: webpack.Configuration = {
       APP_DESCRIPTION: process.env.APP_DESCRIPTION || '',
       APP_COPYRIGHT: process.env.APP_COPYRIGHT || '',
       APP_LICENSE: process.env.APP_LICENSE || '',
+      API_KEY: process.env.API_KEY || '',
+      API_DEFAULT_IP: process.env.API_DEFAULT_IP || '10.10.10.1',
       DEBUG_PROD: process.env.DEBUG_PROD || 'false',
     }),
 

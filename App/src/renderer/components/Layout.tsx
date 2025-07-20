@@ -9,6 +9,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [appVersion, setAppVersion] = useState('1.0.0');
+  const [deviceName, setDeviceName] = useState('BDE01'); // Fallback
 
   useEffect(() => {
     // Hole die App-Version aus den Umgebungsvariablen
@@ -22,6 +23,19 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({
       })
       .catch(() => {
         // Fallback zur Standard-Version falls getEnv fehlschlägt
+      });
+
+    // Hole den Gerätenamen aus der DB-Konfiguration
+    window.electron.dbConfig
+      .getByKey('deviceName')
+      .then((result: any) => {
+        if (result && result.value) {
+          setDeviceName(result.value);
+        }
+        return null;
+      })
+      .catch(() => {
+        // Fallback zum Standard-Gerätenamen falls getConfigByKey fehlschlägt
       });
   }, []);
   return (
@@ -67,7 +81,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({
             <div className="col-md-3 text-center">
               letzte Aktion: 01.01.2025 00:00:00
             </div>
-            <div className="col-md-3 text-md-center">IOT-Gerät: BDE01</div>
+            <div className="col-md-3 text-md-center">
+              IOT-Gerät: {deviceName}
+            </div>
             <div className="col-md-2 text-end">V {appVersion}</div>
           </div>
         </div>

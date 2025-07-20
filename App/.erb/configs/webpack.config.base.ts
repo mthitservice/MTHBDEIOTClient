@@ -51,13 +51,15 @@ const configuration: webpack.Configuration = {
     cacheWithContext: false,
   },
 
-  plugins: [new webpack.EnvironmentPlugin({ 
+  plugins: [new webpack.EnvironmentPlugin({
     NODE_ENV: 'production',
     APP_NAME: process.env.APP_NAME || 'MTH BDE IOT Client',
     APP_AUTHOR: process.env.APP_AUTHOR || '',
     APP_DESCRIPTION: process.env.APP_DESCRIPTION || '',
     APP_COPYRIGHT: process.env.APP_COPYRIGHT || '',
     APP_LICENSE: process.env.APP_LICENSE || '',
+    API_KEY: process.env.API_KEY || '',
+    API_DEFAULT_IP: process.env.API_DEFAULT_IP || '10.10.10.1',
   })],
 };
 

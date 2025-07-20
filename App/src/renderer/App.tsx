@@ -10,7 +10,6 @@ import { StartPage } from './components/StartPage';
 import { ConfigPage } from './components/ConfigPage';
 import MainPageWithRouter from './components/MainPageWithRouter';
 import { ScanPage } from './components/ScanPage';
-import { EnvTestComponent } from './components/EnvTestComponent';
 import './App.css';
 
 // Component that handles IPC events and navigation
@@ -69,7 +68,6 @@ export default function App() {
   return (
     <Router>
       <AppWithNavigation />
-      <EnvTestComponent />
     </Router>
   );
 }

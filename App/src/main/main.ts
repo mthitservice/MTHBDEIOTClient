@@ -941,8 +941,22 @@ ipcMain.handle('get-fullscreen-state', () => {
 });
 
 ipcMain.handle('get-env', async () => {
+  // Versuche die IPv4-Adresse aus der Datenbank zu laden
+  let apiIp = process.env.API_DEFAULT_IP;
+  try {
+    const dbIpv4 = configDB?.getByKey('ipv4Address');
+    if (dbIpv4 && dbIpv4.value) {
+      apiIp = dbIpv4.value;
+    }
+  } catch (err) {
+    logger.warn('Konnte IPv4-Adresse nicht aus Datenbank laden, verwende Default:', err);
+  }
+
   return {
     API_URL: process.env.API_URL,
+    API_KEY: process.env.API_KEY,
+    API_DEFAULT_IP: process.env.API_DEFAULT_IP,
+    API_IP: apiIp, // Dynamisch basierend auf DB oder Default
     APP_NAME: process.env.APP_NAME,
     APP_VERSION: packageJson.version, // Verwende immer package.json Version
     DEBUG_Mode: process.env.DEBUG_MODE,

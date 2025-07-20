@@ -316,6 +316,60 @@ function createRequiredTables(db) {
       );
     }
   });
+}
+
+/**
+ * Erstellt Standardkonfigurationswerte wenn sie nicht existieren
+ */
+function createDefaultConfiguration(db) {
+  console.info('Erstelle Standardkonfigurationswerte...');
+
+  const defaultConfig = [
+    {
+      key: 'deviceName',
+      value: 'BDE01',
+      description: 'Name des IOT-Geräts',
+    },
+    {
+      key: 'ipv4Address',
+      value: '192.168.1.100',
+      description: 'IPv4-Adresse des Geräts',
+    },
+    {
+      key: 'enableRemoteLogging',
+      value: 'false',
+      description: 'Remote-Logging aktiviert',
+    },
+    {
+      key: 'lastSync',
+      value: new Date().toISOString(),
+      description: 'Letzte Synchronisation',
+    },
+  ];
+
+  const insertOrIgnore = db.prepare(
+    'INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)',
+  );
+
+  defaultConfig.forEach((config) => {
+    try {
+      const result = insertOrIgnore.run(config.key, config.value);
+      if (result.changes > 0) {
+        console.info(
+          `✅ Standardkonfiguration erstellt: ${config.key} = ${config.value}`,
+        );
+      } else {
+        console.info(`ℹ️  Konfiguration existiert bereits: ${config.key}`);
+      }
+    } catch (err) {
+      console.error(
+        `Fehler beim Erstellen der Standardkonfiguration ${config.key}:`,
+        err,
+      );
+    }
+  });
+
+  console.info('Standardkonfigurationswerte erfolgreich erstellt/überprüft');
 } /**
  * Konfiguriert die Datenbankeinstellungen
  */
@@ -361,7 +415,10 @@ function initializeDatabase() {
     // 4. Tabellen erstellen
     createRequiredTables(db);
 
-    // 5. Datenbankeinstellungen konfigurieren
+    // 5. Standardkonfiguration erstellen
+    createDefaultConfiguration(db);
+
+    // 6. Datenbankeinstellungen konfigurieren
     configureDatabaseSettings(db);
 
     console.info('=== Datenbankinitialisierung erfolgreich abgeschlossen ===');
