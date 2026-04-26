@@ -1,0 +1,388 @@
+/* ============================================
+   InfomonitorDisplay CSS
+   Responsive Layout für Kiosk-Mode
+   ============================================ */
+
+.infodisplay-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  color: #222;
+  overflow: hidden;
+}
+
+/* ============================================
+   HEADER: Titel, Uhrzeit, Seitennummer
+   ============================================ */
+
+.infodisplay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #f09609 0%, #e88500 100%);
+  color: white;
+  padding: 20px 40px;
+  border-bottom: 4px solid #d47400;
+  min-height: 80px;
+}
+
+.infodisplay-header-left {
+  flex: 1;
+}
+
+.infodisplay-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.infodisplay-header-right {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.infodisplay-datetime {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.datetime-separator {
+  opacity: 0.8;
+}
+
+.infodisplay-page-indicator {
+  font-size: 18px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 14px;
+  border-radius: 20px;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* ============================================
+   CONTENT AREA: Dynamische Layout-Modi
+   ============================================ */
+
+.infodisplay-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  overflow: hidden;
+  background: white;
+}
+
+/* --- Layout 1: Nur Text (vollständige Anzeige) --- */
+.infodisplay-content.infodisplay-text-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infodisplay-text-full {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 1200px;
+}
+
+.infodisplay-text-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.infodisplay-body {
+  font-size: 32px;
+  line-height: 1.6;
+  color: #333;
+  word-wrap: break-word;
+  white-space: normal;
+  text-align: center;
+  margin: 0;
+  animation: fadeIn 0.5s ease-in;
+}
+
+/* --- Layout 2: Nur Bild (Vollbild) --- */
+.infodisplay-content.infodisplay-image-only {
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  padding: 20px;
+}
+
+.infodisplay-image-full {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infodisplay-image-full .infodisplay-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  animation: fadeIn 0.5s ease-in;
+}
+
+/* --- Layout 3: Text + Bild (Zweieinhalb-Layout) --- */
+.infodisplay-content.infodisplay-text-and-image {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.infodisplay-text-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 20px;
+}
+
+.infodisplay-text-column .infodisplay-text-content {
+  width: 100%;
+  padding: 0;
+}
+
+.infodisplay-text-column .infodisplay-body {
+  font-size: 28px;
+  text-align: left;
+  color: #333;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.infodisplay-image-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 20px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  min-height: 400px;
+  max-height: 80vh;
+}
+
+.infodisplay-image-column .infodisplay-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+/* === Bild-Styles (allgemein) === */
+.infodisplay-image {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   FOOTER: Navigation
+   ============================================ */
+
+.infodisplay-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f0f0f0;
+  padding: 20px 40px;
+  border-top: 2px solid #ddd;
+  min-height: 60px;
+}
+
+.infodisplay-nav-btn {
+  background: #f09609;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.infodisplay-nav-btn:hover {
+  background: #e88500;
+  transform: scale(1.05);
+}
+
+.infodisplay-nav-btn:active {
+  transform: scale(0.98);
+}
+
+.infodisplay-footer-info {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   RESPONSIVE: Tablets und kleinere Bildschirme
+   ============================================ */
+
+@media (max-width: 1200px) {
+  .infodisplay-header {
+    padding: 15px 30px;
+    min-height: 70px;
+  }
+
+  .infodisplay-title {
+    font-size: 24px;
+  }
+
+  .infodisplay-body {
+    font-size: 28px;
+  }
+
+  .infodisplay-text-column .infodisplay-body {
+    font-size: 24px;
+  }
+
+  .infodisplay-content {
+    padding: 30px;
+    gap: 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .infodisplay-header {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 20px;
+    min-height: auto;
+    text-align: center;
+  }
+
+  .infodisplay-header-right {
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .infodisplay-title {
+    font-size: 20px;
+  }
+
+  .infodisplay-body {
+    font-size: 24px;
+  }
+
+  .infodisplay-text-column .infodisplay-body {
+    font-size: 20px;
+  }
+
+  .infodisplay-content {
+    padding: 20px;
+    gap: 20px;
+  }
+
+  /* Auf Tablets: Text und Bild untereinander statt nebeneinander */
+  .infodisplay-content.infodisplay-text-and-image {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .infodisplay-text-column {
+    padding-right: 0;
+  }
+
+  .infodisplay-image-column {
+    padding-left: 0;
+    min-height: 300px;
+  }
+
+  .infodisplay-footer {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px 20px;
+  }
+
+  .infodisplay-nav-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY: High Contrast, Dark Mode
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  .infodisplay-container {
+    background: #1a1a1a;
+    color: #e0e0e0;
+  }
+
+  .infodisplay-body {
+    color: #e0e0e0;
+  }
+
+  .infodisplay-text-column .infodisplay-body {
+    color: #e0e0e0;
+  }
+
+  .infodisplay-footer {
+    background: #2a2a2a;
+    border-top-color: #444;
+  }
+
+  .infodisplay-footer-info {
+    color: #999;
+  }
+
+  .infodisplay-image-column {
+    background: #333;
+  }
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+.infodisplay-text-column .infodisplay-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.infodisplay-text-column .infodisplay-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.infodisplay-text-column .infodisplay-body::-webkit-scrollbar-thumb {
+  background: #f09609;
+  border-radius: 4px;
+}
+
+.infodisplay-text-column .infodisplay-body::-webkit-scrollbar-thumb:hover {
+  background: #e88500;
+}

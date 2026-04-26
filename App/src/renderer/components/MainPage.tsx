@@ -25,11 +25,55 @@ interface MainPageState {
   toasts: ToastMessage[];
   status: string;
   selectedTask: any | null;
+  tasks: any[];
+  workloadSource: 'portal' | 'local';
 }
 // Sortiere die Daten nach PDatum (ältestes zuerst)
-const data = [...dataRaw].sort(
+const fallbackData = [...dataRaw].sort(
   (a, b) => new Date(a.PDatum).getTime() - new Date(b.PDatum).getTime(),
 );
+
+function toDateString(value: any): string {
+  if (!value) return new Date().toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function mapPortalOrderToTask(order: any) {
+  return {
+    Terminstatus: Number(order?.Terminstatus ?? order?.dueStatus ?? 0),
+    PDatum: toDateString(
+      order?.PDatum ||
+        order?.plannedProductionTime ||
+        order?.plannedProductionUtc ||
+        order?.productionDate,
+    ),
+    LDatum: toDateString(
+      order?.LDatum ||
+        order?.deliveryDate ||
+        order?.deliveryDateUtc ||
+        order?.dueDate,
+    ),
+    AuftrNr: String(order?.AuftrNr || order?.orderNumber || order?.id || ''),
+    Anzahl: Number(order?.Anzahl ?? order?.quantity ?? order?.plannedQuantity ?? 0),
+    AnzahlGesamt: Number(order?.AnzahlGesamt ?? order?.totalQuantity ?? 0),
+    Objekt: order?.Objekt || order?.title || order?.name || '-',
+    Auftraggeber: order?.Auftraggeber || order?.customerName || '-',
+    Prozessstatus: order?.Prozessstatus || order?.processStatus || '-',
+    Status: order?.Status || order?.status || '-',
+    Kundennummer: order?.Kundennummer || order?.customerNumber || '-',
+    Artikelnummer: order?.Artikelnummer || order?.articleNumber || '-',
+    Kundenbetreuer: order?.Kundenbetreuer || order?.accountManager || '-',
+    Maschine: order?.Maschine || order?.machineName || '-',
+    Anschrift: order?.Anschrift || order?.address || '-',
+    PLZ_Ort: order?.PLZ_Ort || order?.city || '-',
+    Telefon: order?.Telefon || order?.phone || '-',
+    Email: order?.Email || order?.email || '-',
+    Ansprechpartner: order?.Ansprechpartner || order?.contactPerson || '-',
+    Ersteller: order?.Ersteller || order?.createdBy || '-',
+    Beschreibung: order?.Beschreibung || order?.description || '',
+  };
+}
 
 class MainPage extends React.Component<MainPageProps, MainPageState> {
   buffer: string;
@@ -58,12 +102,15 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
       toasts: [],
       status: 'start',
       selectedTask: null,
+      tasks: fallbackData,
+      workloadSource: 'local',
     };
   }
 
-  componentDidMount() {
+  async componentDidMount() {
     document.body.addEventListener('keydown', this.handleKeyDown, true);
     document.addEventListener('barcode-scan-complete', this.handleBarcodeEvent);
+    await this.loadWorkloadFromPortal();
   }
 
   componentWillUnmount() {
@@ -224,6 +271,40 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
     }, 5000);
   }
 
+  loadWorkloadFromPortal = async () => {
+    try {
+      const config = await window.electron.dbConfig.readAllConfig();
+      const configList = Array.isArray(config) ? config : [];
+      const clientIdentifier =
+        configList.find((item: any) => item.key === 'clientIdentifier')?.value ||
+        configList.find((item: any) => item.key === 'deviceName')?.value;
+
+      if (!clientIdentifier) {
+        this.addToast('Kein clientIdentifier konfiguriert. Verwende lokale Testdaten.');
+        return;
+      }
+
+      const response = await window.electron.portalApi.getWorkload(clientIdentifier, 1, 100);
+      const orders = Array.isArray(response?.Orders) ? response.Orders : [];
+
+      if (orders.length === 0) {
+        this.addToast('Portal verbunden, aber keine Aufträge für diesen Client gefunden.');
+        this.setState({ tasks: [], workloadSource: 'portal' });
+        return;
+      }
+
+      const mapped = orders
+        .map(mapPortalOrderToTask)
+        .sort((a: any, b: any) => new Date(a.PDatum).getTime() - new Date(b.PDatum).getTime());
+
+      this.setState({ tasks: mapped, workloadSource: 'portal' });
+      this.addToast(`Portal-Aufträge geladen: ${mapped.length}`);
+    } catch (error) {
+      console.error('Portal-Workload konnte nicht geladen werden:', error);
+      this.addToast('Portal nicht erreichbar. Verwende lokale Testdaten.');
+    }
+  };
+
   handleGoNext = () => {
     console.log('Next');
     this.tableViewRef.current?.handleNext();
@@ -279,7 +360,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
   };
 
   render() {
-    const { selectedTask } = this.state;
+    const { selectedTask, tasks, workloadSource } = this.state;
     return (
       <div>
         <Layout>
@@ -305,6 +386,11 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                          {' '}
             </ToastContainer>
             {!selectedTask && <h2>Auftragsübersicht</h2>}
+            {!selectedTask && (
+              <p className="text-muted">
+                Datenquelle: {workloadSource === 'portal' ? 'Portal API' : 'Lokale Testdaten'}
+              </p>
+            )}
 
             <div>
               <div className="row MainPageCodeArea">
@@ -330,7 +416,7 @@ class MainPage extends React.Component<MainPageProps, MainPageState> {
                   <>
                     <TableView
                       ref={this.tableViewRef}
-                      Auftraege={data}
+                      Auftraege={tasks}
                       itemsPerPage={13}
                       showPager={false}
                       onSelectTask={this.handleSelectTask}

@@ -1,0 +1,20 @@
+
+> mthbdeiotclient@1.0.117 build
+> concurrently "npm run build:main" "npm run build:renderer"
+
+[0] 
+[0] > mthbdeiotclient@1.0.117 build:main
+[0] > cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" webpack --config ./.erb/configs/webpack.config.main.prod.ts
+[0] 
+[1] 
+[1] > mthbdeiotclient@1.0.117 build:renderer
+[1] > cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS="-r ts-node/register --no-warnings" webpack --config ./.erb/configs/webpack.config.renderer.prod.ts
+[1] 
+[0] npm run build:main exited with code 0
+[1] Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+[1]   npx update-browserslist-db@latest
+[1]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[1] Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+[1]   npx update-browserslist-db@latest
+[1]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[1] npm run build:renderer exited with code 0

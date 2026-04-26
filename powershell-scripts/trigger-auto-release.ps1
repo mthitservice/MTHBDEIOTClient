@@ -1,107 +1,78 @@
-# Automatischer Release-Trigger für Azure DevOps Pipeline
-# PowerShell Version für Windows
+# Automatic release trigger for Azure DevOps pipeline
 
 param(
     [switch]$Force = $false
 )
 
-Write-Host "🚀 Automatischer Release-Trigger für MTH BDE IoT Client" -ForegroundColor Green
+Write-Host "Automatic release trigger for MTH BDE IoT Client" -ForegroundColor Green
 Write-Host "=================================================" -ForegroundColor Green
 
-# Prüfe ob wir im richtigen Verzeichnis sind
 if (-not (Test-Path "App\package.json")) {
-    Write-Host "❌ Error: App\package.json nicht gefunden!" -ForegroundColor Red
-    Write-Host "   Bitte führe dieses Skript im Repository-Root aus." -ForegroundColor Red
+    Write-Host "Error: App\package.json not found. Run this script from repository root." -ForegroundColor Red
     exit 1
 }
 
-# Aktuelle Version aus package.json lesen
 try {
     $packageJson = Get-Content "App\package.json" | ConvertFrom-Json
     $currentVersion = $packageJson.version
-    Write-Host "📋 Aktuelle Version in package.json: $currentVersion" -ForegroundColor Cyan
+    Write-Host "Current package version: $currentVersion" -ForegroundColor Cyan
 }
 catch {
-    Write-Host "❌ Fehler beim Lesen der package.json: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Failed to read App\package.json: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
-# Git Status prüfen
 $gitStatus = git status --porcelain
 if ($gitStatus -and -not $Force) {
-    Write-Host "⚠️  Es gibt uncommittete Änderungen:" -ForegroundColor Yellow
+    Write-Host "There are uncommitted changes:" -ForegroundColor Yellow
     git status --short
-    Write-Host ""
-    $response = Read-Host "Möchten Sie fortfahren? (y/N)"
+    $response = Read-Host "Continue? (y/N)"
     if ($response -notmatch "^[Yy]$") {
-        Write-Host "❌ Abgebrochen." -ForegroundColor Red
+        Write-Host "Aborted." -ForegroundColor Red
         exit 1
     }
 }
 
-# Aktuelle Branch prüfen
 $currentBranch = git branch --show-current
-Write-Host "🌿 Aktuelle Branch: $currentBranch" -ForegroundColor Cyan
+Write-Host "Current branch: $currentBranch" -ForegroundColor Cyan
 
 if ($currentBranch -ne "master" -and -not $Force) {
-    Write-Host "⚠️  Sie sind nicht auf der master branch!" -ForegroundColor Yellow
-    $response = Read-Host "Möchten Sie trotzdem fortfahren? (y/N)"
+    $response = Read-Host "You are not on master. Continue? (y/N)"
     if ($response -notmatch "^[Yy]$") {
-        Write-Host "❌ Abgebrochen." -ForegroundColor Red
+        Write-Host "Aborted." -ForegroundColor Red
         exit 1
     }
 }
 
-# Änderungen committen falls nötig
 if ($gitStatus) {
-    Write-Host "📝 Committe ausstehende Änderungen..." -ForegroundColor Yellow
+    Write-Host "Committing pending changes..." -ForegroundColor Yellow
     git add .
-    $commitMessage = @"
-Pre-release commit for version $currentVersion
 
-- Updated version to $currentVersion
-- Prepared for automatic Azure DevOps release
-- Performance optimizations included
-
-[automated-release]
-"@
+    $commitMessage = "Pre-release commit for version $currentVersion`n`n[automated-release]"
     git commit -m $commitMessage
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Commit failed." -ForegroundColor Red
+        exit 1
+    }
 }
 
-# Push to Azure DevOps (triggert die Pipeline)
-Write-Host "🔄 Push zu Azure DevOps Repository..." -ForegroundColor Yellow
-try {
-    git push origin $currentBranch
-    Write-Host "✅ Push erfolgreich!" -ForegroundColor Green
-}
-catch {
-    Write-Host "❌ Fehler beim Push: $($_.Exception.Message)" -ForegroundColor Red
+Write-Host "Pushing to Azure DevOps remote..." -ForegroundColor Yellow
+git push origin $currentBranch
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Push to origin failed." -ForegroundColor Red
     exit 1
 }
+Write-Host "Push to origin successful." -ForegroundColor Green
 
 Write-Host ""
-Write-Host "✅ Release-Trigger erfolgreich!" -ForegroundColor Green
-Write-Host "=================================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "🔗 Die Azure DevOps Pipeline wird jetzt automatisch:" -ForegroundColor Cyan
-Write-Host "   1. Version $currentVersion aus package.json lesen" -ForegroundColor White
-Write-Host "   2. Git Tag 'v$currentVersion' erstellen" -ForegroundColor White
-Write-Host "   3. ARM64 und ARMv7l .deb Pakete bauen" -ForegroundColor White
-Write-Host "   4. GitHub Release mit Artefakten erstellen" -ForegroundColor White
-Write-Host ""
-Write-Host "📊 Verfolgen Sie den Build-Status hier:" -ForegroundColor Cyan
-Write-Host "   https://dev.azure.com/mth-it-service/MthBdeIotClient/_build" -ForegroundColor Blue
-Write-Host ""
-Write-Host "🎯 GitHub Release wird hier erstellt:" -ForegroundColor Cyan  
-Write-Host "   https://github.com/mthitservice/MTHBDEIOTClient/releases" -ForegroundColor Blue
-Write-Host ""
-Write-Host "⏱️  Der Build-Prozess dauert ca. 10-15 Minuten." -ForegroundColor Yellow
+Write-Host "Release trigger completed." -ForegroundColor Green
+Write-Host "Azure DevOps build: https://dev.azure.com/mth-it-service/MthBdeIotClient/_build" -ForegroundColor Blue
+Write-Host "Expected GitHub release: https://github.com/mthitservice/MTHBDEIOTClient/releases" -ForegroundColor Blue
 
-# Optional: Öffne Azure DevOps Build Pipeline im Browser
-$response = Read-Host "🌐 Azure DevOps Pipeline im Browser öffnen? (y/N)"
-if ($response -match "^[Yy]$") {
-    Start-Process "https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
+if (-not $Force) {
+    $response = Read-Host "Open Azure DevOps build page now? (y/N)"
+    if ($response -match "^[Yy]$") {
+        Start-Process "https://dev.azure.com/mth-it-service/MthBdeIotClient/_build"
+    }
 }
-
-Write-Host ""
-Write-Host "🎉 Automatischer Release-Prozess gestartet!" -ForegroundColor Green

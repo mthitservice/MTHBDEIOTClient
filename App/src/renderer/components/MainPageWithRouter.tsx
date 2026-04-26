@@ -1,10 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import MainPage from './MainPage';
+import { ModeRouter } from './ModeRouter';
 
+/**
+ * MainPageWithRouter: Integration von ModeRouter mit React Router
+ * Der ModeRouter wählt basierend auf clientMode die richtige Komponente
+ */
 function MainPageWithRouter(props: any) {
   const navigate = useNavigate();
-  return <MainPage {...props} navigate={navigate} />;
+  return <ModeRouter {...props} navigate={navigate} />;
 }
 
 export default MainPageWithRouter;

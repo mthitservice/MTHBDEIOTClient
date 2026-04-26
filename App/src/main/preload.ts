@@ -28,6 +28,28 @@ const electronHandler = {
   },
   dbQuery: (query: string) => ipcRenderer.invoke('db-query', query),
   getEnv: () => ipcRenderer.invoke('get-env'),
+  portalApi: {
+    bootstrap: () => ipcRenderer.invoke('portal-bootstrap'),
+    registerClient: (payload: unknown) =>
+      ipcRenderer.invoke('portal-register-client', payload),
+    heartbeat: (payload: unknown) =>
+      ipcRenderer.invoke('portal-heartbeat', payload),
+    getWorkload: (clientIdentifier: string, page = 1, pageSize = 25) =>
+      ipcRenderer.invoke(
+        'portal-get-workload',
+        clientIdentifier,
+        page,
+        pageSize,
+      ),
+    getNews: (clientIdentifier: string) =>
+      ipcRenderer.invoke('portal-get-news', clientIdentifier),
+    acknowledgeCommand: (clientIdentifier: string, payload: unknown) =>
+      ipcRenderer.invoke(
+        'portal-acknowledge-command',
+        clientIdentifier,
+        payload,
+      ),
+  },
   autoUpdater: {
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('download-update'),

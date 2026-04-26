@@ -5,7 +5,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 interface BarCodeProps {
   code: string;
-  text: string;
+  text: React.ReactNode;
   onClick: any | null;
 }
 

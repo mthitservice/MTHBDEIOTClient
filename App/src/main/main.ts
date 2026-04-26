@@ -9,6 +9,9 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
+import fs from 'fs';
+import http from 'http';
+import https from 'https';
 
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -20,8 +23,6 @@ import { resolveHtmlPath } from './util';
 
 // Import DBConfig for configuration management
 const configDB = require('./DBConfig');
-
-
 
 let globalConfig: any = 0;
 let mainWindow: BrowserWindow | null = null;
@@ -35,6 +36,150 @@ require('dotenv').config({
 });
 
 const packageJson = require('../../package.json');
+
+type PortalApiRequestOptions = {
+  method: 'GET' | 'POST';
+  endpoint: string;
+  body?: unknown;
+};
+
+function getConfigValueByKey(key: string): string | undefined {
+  try {
+    const value = configDB?.getByKey?.(key)?.value;
+    return value || undefined;
+  } catch (error) {
+    console.warn(`Konnte Konfigurationswert ${key} nicht lesen:`, error);
+    return undefined;
+  }
+}
+
+function getPortalBaseUrl(): string {
+  const fromDb = getConfigValueByKey('portalBaseUrl');
+  const fromEnv = process.env.PORTAL_API_BASE_URL || process.env.API_URL;
+  const ipFallback =
+    getConfigValueByKey('ipv4Address') || process.env.API_DEFAULT_IP;
+
+  const resolved =
+    fromDb ||
+    fromEnv ||
+    (ipFallback
+      ? `https://${ipFallback}`
+      : 'https://bdeds.druckerei-schuetz.local');
+
+  return resolved.replace(/\/+$/, '');
+}
+
+function resolvePortalCaCertificate(): Buffer | undefined {
+  const configuredCertPath = process.env.PORTAL_CA_CERT_PATH;
+  const certCandidates = [
+    configuredCertPath,
+    path.resolve(__dirname, '../../certs/portal-root-ca.crt'),
+    path.resolve(__dirname, '../../proxy/ds_Webserver.crt'),
+    path.resolve(__dirname, '../../proxy/my-site.crt'),
+    path.resolve(process.resourcesPath || '', 'certs/portal-root-ca.crt'),
+  ].filter(Boolean) as string[];
+
+  const foundCertPath = certCandidates.find((certPath) => {
+    try {
+      return fs.existsSync(certPath);
+    } catch (error) {
+      console.warn('Konnte Zertifikat nicht lesen:', certPath, error);
+      return false;
+    }
+  });
+
+  if (foundCertPath) {
+    const cert = fs.readFileSync(foundCertPath);
+    console.log('✅ Portal-CA-Zertifikat geladen:', foundCertPath);
+    return cert;
+  }
+
+  console.warn(
+    '⚠ Kein Portal-CA-Zertifikat gefunden. TLS nutzt System-Truststore.',
+  );
+  return undefined;
+}
+
+async function callPortalApi(options: PortalApiRequestOptions): Promise<any> {
+  const baseUrl = getPortalBaseUrl();
+  const url = new URL(
+    `${baseUrl}${options.endpoint.startsWith('/') ? '' : '/'}${options.endpoint}`,
+  );
+  const bodyString =
+    options.body !== undefined ? JSON.stringify(options.body) : undefined;
+  const isInsecureTlsAllowed = process.env.PORTAL_ALLOW_INSECURE_TLS === 'true';
+  const ca = resolvePortalCaCertificate();
+
+  const requestOptions: https.RequestOptions = {
+    method: options.method,
+    hostname: url.hostname,
+    port: url.port ? Number(url.port) : undefined,
+    path: `${url.pathname}${url.search}`,
+    headers: {
+      Accept: 'application/json',
+      ...(bodyString
+        ? {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyString),
+          }
+        : {}),
+    },
+  };
+
+  if (url.protocol === 'https:') {
+    requestOptions.rejectUnauthorized = !isInsecureTlsAllowed;
+    if (ca) {
+      requestOptions.ca = ca;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const requestFn = url.protocol === 'https:' ? https.request : http.request;
+    const req = requestFn(requestOptions, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        const isSuccess =
+          (res.statusCode || 500) >= 200 && (res.statusCode || 500) < 300;
+        const parsed = data
+          ? (() => {
+              try {
+                return JSON.parse(data);
+              } catch {
+                return data;
+              }
+            })()
+          : null;
+
+        if (!isSuccess) {
+          reject(
+            new Error(
+              `Portal API Fehler ${res.statusCode}: ${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`,
+            ),
+          );
+          return;
+        }
+
+        resolve(parsed);
+      });
+    });
+
+    req.on('error', (error) => reject(error));
+    req.setTimeout(15000, () => {
+      req.destroy(new Error('Portal API Timeout nach 15s'));
+    });
+
+    if (bodyString) {
+      req.write(bodyString);
+    }
+    req.end();
+  });
+}
 
 console.log(
   'ENV Debug - dotenv loaded from:',
@@ -303,7 +448,7 @@ ipcMain.handle('check-for-updates', async () => {
             updateLogger.updateCheckCompleted(updateInfo);
             return updateInfo;
           }
-        } catch (versionJsonError) {
+        } catch {
           console.log(
             'version.json not available, falling back to GitHub API...',
           );
@@ -628,7 +773,6 @@ const createWindow = async () => {
     console.log('🎯 app.getAppPath():', app.getAppPath());
 
     // Prüfen ob die HTML-Datei existiert
-    const fs = require('fs');
     try {
       const stats = fs.statSync(htmlPath.replace('file://', ''));
       console.log('✅ HTML-Datei gefunden:', stats.size, 'bytes');
@@ -901,7 +1045,10 @@ app
   .then(() => {
     globalConfig = configDB?.readAllConfig();
     console.log('Global Config:', globalConfig);
-    if (globalConfig?.find?.((item: any) => item.key === 'DEBUG_MODE')?.value === 'true') {
+    if (
+      globalConfig?.find?.((item: any) => item.key === 'DEBUG_MODE')?.value ===
+      'true'
+    ) {
       console.log('Debug mode is enabled');
     }
 
@@ -949,7 +1096,10 @@ ipcMain.handle('get-env', async () => {
       apiIp = dbIpv4.value;
     }
   } catch (err) {
-    console.warn('Konnte IPv4-Adresse nicht aus Datenbank laden, verwende Default:', err);
+    console.warn(
+      'Konnte IPv4-Adresse nicht aus Datenbank laden, verwende Default:',
+      err,
+    );
   }
 
   return {
@@ -957,6 +1107,8 @@ ipcMain.handle('get-env', async () => {
     API_KEY: process.env.API_KEY,
     API_DEFAULT_IP: process.env.API_DEFAULT_IP,
     API_IP: apiIp, // Dynamisch basierend auf DB oder Default
+    PORTAL_API_BASE_URL: getPortalBaseUrl(),
+    PORTAL_ALLOW_INSECURE_TLS: process.env.PORTAL_ALLOW_INSECURE_TLS,
     APP_NAME: process.env.APP_NAME,
     APP_VERSION: packageJson.version, // Verwende immer package.json Version
     DEBUG_Mode: process.env.DEBUG_MODE,
@@ -970,6 +1122,57 @@ ipcMain.handle('get-env', async () => {
     APP_DESCRIPTION: process.env.APP_DESCRIPTION,
   };
 });
+
+ipcMain.handle('portal-bootstrap', async () => {
+  return callPortalApi({
+    method: 'GET',
+    endpoint: '/api/BDEClient/bootstrap',
+  });
+});
+
+ipcMain.handle('portal-register-client', async (event, payload: any) => {
+  return callPortalApi({
+    method: 'POST',
+    endpoint: '/api/BDEClient/register',
+    body: payload,
+  });
+});
+
+ipcMain.handle('portal-heartbeat', async (event, payload: any) => {
+  return callPortalApi({
+    method: 'POST',
+    endpoint: '/api/BDEClient/heartbeat',
+    body: payload,
+  });
+});
+
+ipcMain.handle(
+  'portal-get-workload',
+  async (event, clientIdentifier: string, page = 1, pageSize = 25) => {
+    return callPortalApi({
+      method: 'GET',
+      endpoint: `/api/BDEClient/${encodeURIComponent(clientIdentifier)}/workload?page=${page}&pageSize=${pageSize}`,
+    });
+  },
+);
+
+ipcMain.handle('portal-get-news', async (event, clientIdentifier: string) => {
+  return callPortalApi({
+    method: 'GET',
+    endpoint: `/api/BDEClient/${encodeURIComponent(clientIdentifier)}/news`,
+  });
+});
+
+ipcMain.handle(
+  'portal-acknowledge-command',
+  async (event, clientIdentifier: string, payload: any) => {
+    return callPortalApi({
+      method: 'POST',
+      endpoint: `/api/BDEClient/${encodeURIComponent(clientIdentifier)}/acknowledge-command`,
+      body: payload,
+    });
+  },
+);
 
 ipcMain.handle('restart-app', () => {
   app.relaunch();

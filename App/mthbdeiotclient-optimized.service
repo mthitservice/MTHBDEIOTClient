@@ -8,7 +8,6 @@ Type=simple
 User=pi
 Group=pi
 WorkingDirectory=/opt/mthbdeiotclient
-ExecStartPre=/bin/bash -c 'echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor'
 ExecStart=/opt/mthbdeiotclient/start-raspberry.sh
 Restart=always
 RestartSec=10
@@ -31,6 +30,8 @@ Environment=LIBGL_ALWAYS_SOFTWARE=1
 Environment=WLR_RENDERER=pixman
 Environment=WLR_NO_HARDWARE_CURSORS=1
 Environment=NODE_OPTIONS=--max-old-space-size=512
+Environment=KIOSK_MODE=true
+Environment=RASPBERRY_PI=true
 
 # Ressourcen-Limits
 LimitNOFILE=65536
